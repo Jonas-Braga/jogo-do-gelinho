@@ -143,5 +143,12 @@
   "Etapa 5 · telas, recorde, toque e dificuldade › HUD com botões de toque renderiza sem erro",
   "Etapa 5 · telas, recorde, toque e dificuldade › inimigos e urso nunca ficam mais rápidos que o jogador andando",
   "Etapa 5 · telas, recorde, toque e dificuldade › dificuldade cresce aos poucos e tem teto",
-  "Etapa 5 · telas, recorde, toque e dificuldade › fase 1 é jogável: em 20 s parado na costa nada acontece de ruim"
+  "Etapa 5 · telas, recorde, toque e dificuldade › fase 1 é jogável: em 20 s parado na costa nada acontece de ruim",
+  "Etapa 5 · telas, recorde, toque e dificuldade › direcional reconhece as 8 direções, incluindo as diagonais",
+  "Etapa 5 · telas, recorde, toque e dificuldade › cada diagonal tem uma faixa larga (45°), fácil de acertar com o dedo",
+  "Etapa 5 · telas, recorde, toque e dificuldade › pular na diagonal: sobe uma fileira já andando para o lado",
+  "Etapa 5 · telas, recorde, toque e dificuldade › toque leve no centro (zona morta) não move",
+  "Etapa 5 · telas, recorde, toque e dificuldade › pino fica limitado à base, mas o dedo pode sair dela sem perder o controle",
+  "Etapa 5 · telas, recorde, toque e dificuldade › dá para usar o direcional e o botão de inverter ao mesmo tempo (multitoque)",
+  "Etapa 5 · telas, recorde, toque e dificuldade › direcional fica dentro da tela e longe dos outros botões"
 ]

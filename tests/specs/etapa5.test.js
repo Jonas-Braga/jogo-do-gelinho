@@ -1,9 +1,9 @@
 // Etapa 5: telas, recorde, controles de toque, polimento e ajuste de dificuldade.
 import { suite, test, expect } from '../harness.js';
 import { fakeCanvas, isNode } from '../env.js';
-import { makeGame, step, stepUntil, press } from '../helpers.js';
+import { makeGame, step, stepUntil, press, placeOnFloe } from '../helpers.js';
 import { Game } from '../../src/game.js';
-import { TOUCH_BUTTONS } from '../../src/input.js';
+import { TOUCH_BUTTONS, JOYSTICK, stickDirections } from '../../src/input.js';
 import { MUTE_BUTTON } from '../../src/hud.js';
 import { levelParams, levelIntro } from '../../src/levels.js';
 import { loadHighScore, saveHighScore, removeItem, STORE } from '../../src/storage.js';
@@ -165,11 +165,11 @@ suite('Etapa 5 · telas, recorde, toque e dificuldade', () => {
     }
   });
 
+  // (Adaptados ao direcional analógico, que substituiu os 4 botões a pedido do usuário)
   test('segurar o direcional de toque move o personagem; soltar para', () => {
     const g = makeGame();
-    const right = TOUCH_BUTTONS.find((b) => b.id === 'right');
     const x0 = g.player.x;
-    expect(g.input.pointerDown(1, right.x + 10, right.y + 10)).toBe('right');
+    expect(g.input.pointerDown(1, JOYSTICK.cx + JOYSTICK.r, JOYSTICK.cy)).toBe('stick');
     expect(g.input.touchMode).toBe(true);
     step(g, 0.5);
     expect(g.player.x).toBeGreaterThan(x0 + 50);
@@ -181,24 +181,107 @@ suite('Etapa 5 · telas, recorde, toque e dificuldade', () => {
 
   test('arrastar o dedo no direcional troca de direção', () => {
     const g = makeGame();
-    const left = TOUCH_BUTTONS.find((b) => b.id === 'left');
-    const right = TOUCH_BUTTONS.find((b) => b.id === 'right');
-    g.input.pointerDown(7, left.x + 5, left.y + 5);
+    const { cx, cy, r } = JOYSTICK;
+    g.input.pointerDown(7, cx - r, cy);
     expect(g.input.axisX()).toBe(-1);
-    g.input.pointerMove(7, right.x + 5, right.y + 5);
+    g.input.pointerMove(7, cx + r, cy);
     expect(g.input.axisX()).toBe(1);
-    g.input.pointerMove(7, W / 2, 100); // saiu dos botões
+    g.input.pointerMove(7, cx + 2, cy + 1); // voltou ao centro (zona morta)
     expect(g.input.axisX()).toBe(0);
   });
 
   test('toque e teclado ao mesmo tempo não se atrapalham', () => {
     const g = makeGame();
-    const left = TOUCH_BUTTONS.find((b) => b.id === 'left');
     g.input.held.add('left');
-    g.input.pointerDown(3, left.x + 5, left.y + 5);
+    g.input.pointerDown(3, JOYSTICK.cx - JOYSTICK.r, JOYSTICK.cy);
     g.input.pointerUp(3);
     expect(g.input.isDown('left'), 'tecla continua segurada').toBe(true);
     g.input.held.delete('left');
+  });
+
+  // ---- Direcional analógico (8 direções)
+  test('direcional reconhece as 8 direções, incluindo as diagonais', () => {
+    const g = makeGame();
+    const { cx, cy, r } = JOYSTICK;
+    const cases = [
+      [1, 0, ['right']], [1, 1, ['down', 'right']], [0, 1, ['down']], [-1, 1, ['down', 'left']],
+      [-1, 0, ['left']], [-1, -1, ['up', 'left']], [0, -1, ['up']], [1, -1, ['up', 'right']],
+    ];
+    for (const [dx, dy, want] of cases) {
+      const k = r / Math.hypot(dx, dy);
+      g.input.pointerDown(5, cx + dx * k, cy + dy * k);
+      for (const a of ['up', 'down', 'left', 'right']) {
+        expect(g.input.isDown(a), `(${dx},${dy}) ${a}`).toBe(want.includes(a));
+      }
+      g.input.pointerUp(5);
+    }
+  });
+
+  test('cada diagonal tem uma faixa larga (45°), fácil de acertar com o dedo', () => {
+    const { r } = JOYSTICK;
+    for (const deg of [-62, -45, -28]) { // em volta de cima-direita
+      const a = (deg * Math.PI) / 180;
+      expect(stickDirections(Math.cos(a) * r, Math.sin(a) * r), `${deg}°`).toEqual(['up', 'right']);
+    }
+  });
+
+  test('pular na diagonal: sobe uma fileira já andando para o lado', () => {
+    const g = makeGame();
+    for (const row of g.rows) row.speed = 0;
+    placeOnFloe(g, 1);
+    const x0 = g.player.x;
+    const { cx, cy, r } = JOYSTICK;
+    g.input.pointerDown(2, cx + r * 0.7, cy - r * 0.7); // cima-direita
+    stepUntil(g, () => g.player.state === 'jump', 0.3);
+    expect(g.player.state).toBe('jump');
+    expect(g.player.to, 'subindo').toBe(0);
+    step(g, 0.2);
+    g.input.pointerUp(2);
+    expect(g.player.x, 'andando para a direita no ar').toBeGreaterThan(x0 + 20);
+  });
+
+  test('toque leve no centro (zona morta) não move', () => {
+    const g = makeGame();
+    g.input.pointerDown(4, JOYSTICK.cx + 8, JOYSTICK.cy - 6);
+    expect(g.input.axisX()).toBe(0);
+    expect(g.input.axisY()).toBe(0);
+  });
+
+  test('pino fica limitado à base, mas o dedo pode sair dela sem perder o controle', () => {
+    const g = makeGame();
+    const { cx, cy, r } = JOYSTICK;
+    g.input.pointerDown(6, cx + 20, cy);
+    g.input.pointerMove(6, cx + 400, cy); // muito além da base
+    expect(Math.hypot(g.input.stick.dx, g.input.stick.dy)).toBeCloseTo(r, 1e-6);
+    expect(g.input.isDown('right')).toBe(true);
+    g.input.pointerUp(6);
+    expect(g.input.stick.dirs.length).toBe(0);
+    expect(g.input.stick.dx).toBe(0);
+  });
+
+  test('dá para usar o direcional e o botão de inverter ao mesmo tempo (multitoque)', () => {
+    const g = makeGame();
+    const action = TOUCH_BUTTONS.find((b) => b.id === 'action');
+    g.igloo.add();
+    for (const row of g.rows) row.speed = 0;
+    placeOnFloe(g, 1);
+    const dir = g.rows[1].dir;
+    g.input.pointerDown(1, JOYSTICK.cx + JOYSTICK.r, JOYSTICK.cy);
+    g.input.pointerDown(2, action.x + action.w / 2, action.y + action.h / 2);
+    expect(g.rows[1].dir).toBe(-dir);
+    expect(g.input.isDown('right'), 'direcional continua segurado').toBe(true);
+  });
+
+  test('direcional fica dentro da tela e longe dos outros botões', () => {
+    const { cx, cy, grab } = JOYSTICK;
+    expect(cx - grab).toBeGreaterThanOrEqual(0);
+    expect(cy + grab).toBeLessThanOrEqual(H);
+    for (const b of [...TOUCH_BUTTONS, { id: 'mute', ...MUTE_BUTTON }]) {
+      // ponto do botão mais próximo do centro do direcional
+      const px = Math.max(b.x, Math.min(cx, b.x + b.w));
+      const py = Math.max(b.y, Math.min(cy, b.y + b.h));
+      expect(Math.hypot(px - cx, py - cy), b.id).toBeGreaterThan(grab);
+    }
   });
 
   test('botões de toque de inverter e pausar funcionam', () => {

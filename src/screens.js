@@ -1,6 +1,6 @@
 // Telas: inicial, pausa, fim de fase, fim de jogo, aviso de fase e botões de toque.
 import { W, H } from './config.js';
-import { TOUCH_BUTTONS } from './input.js';
+import { TOUCH_BUTTONS, JOYSTICK } from './input.js';
 import { FONT, panel, pad6 } from './ui.js';
 
 const CONTROLS = [
@@ -225,7 +225,69 @@ export function drawBanner(ctx, game) {
   return k;
 }
 
+// Direcional analógico: base com marcas das 8 direções, fatia acesa na direção
+// ativa e o pino seguindo o dedo.
+function drawJoystick(ctx, game) {
+  const { cx, cy, r, knob } = JOYSTICK;
+  const s = game.input.stick;
+  const active = s.pointerId !== null;
+  ctx.save();
+  // Base
+  ctx.fillStyle = 'rgba(6, 30, 45, 0.38)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + knob * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // Fatia da direção ativa (45°)
+  if (s.dirs.length) {
+    const a = Math.atan2(s.dy, s.dx);
+    const snapped = Math.round(a / (Math.PI / 4)) * (Math.PI / 4);
+    ctx.fillStyle = 'rgba(189, 235, 250, 0.28)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r + knob * 0.6, snapped - Math.PI / 8, snapped + Math.PI / 8);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Marcas das 8 direções (setas nas 4 principais)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4;
+    const big = i % 2 === 0;
+    const d = r + knob * 0.6 - (big ? 13 : 10);
+    ctx.save();
+    ctx.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d);
+    ctx.rotate(a);
+    ctx.beginPath();
+    if (big) {
+      ctx.moveTo(6, 0);
+      ctx.lineTo(-4, -6);
+      ctx.lineTo(-4, 6);
+    } else {
+      ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    ctx.restore();
+  }
+  // Pino
+  const kx = cx + s.dx;
+  const ky = cy + s.dy;
+  const g = ctx.createRadialGradient(kx - 8, ky - 10, 4, kx, ky, knob);
+  g.addColorStop(0, active ? 'rgba(235, 250, 255, 0.95)' : 'rgba(235, 250, 255, 0.75)');
+  g.addColorStop(1, active ? 'rgba(140, 205, 230, 0.9)' : 'rgba(120, 170, 195, 0.6)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(kx, ky, knob, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawTouchButtons(ctx, game) {
+  drawJoystick(ctx, game);
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

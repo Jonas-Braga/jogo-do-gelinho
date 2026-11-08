@@ -13,19 +13,31 @@ export const MAP = {
   NumpadEnter: 'start',
 };
 
-// Botões de toque (coordenadas lógicas 1280x720). Direcional à esquerda;
-// inverter e pausa à direita, acima do botão de mudo.
-const PAD = { cx: 130, cy: H - 132, size: 74, gap: 4 };
-const off = PAD.size + PAD.gap;
-const padBtn = (id, dx, dy, label) => ({
-  id, label, hold: true,
-  x: PAD.cx - PAD.size / 2 + dx * off, y: PAD.cy - PAD.size / 2 + dy * off, w: PAD.size, h: PAD.size,
-});
+// Controles de toque (coordenadas lógicas 1280x720).
+// Esquerda: direcional analógico de 8 direções (permite diagonais, ex.: pular
+// para cima já andando para a direita). Direita: inverter e pausa, acima do mudo.
+export const JOYSTICK = {
+  cx: 150, cy: H - 150,
+  r: 72,        // raio da base (curso máximo do pino)
+  knob: 32,     // raio do pino
+  grab: 120,    // raio da área onde um toque "pega" o direcional
+  dead: 0.3,    // zona morta (fração do raio): toque leve não move
+};
+
+// Setor de 45° → direções seguradas (0 = direita, sentido horário, y para baixo)
+const SECTORS = [
+  ['right'], ['down', 'right'], ['down'], ['down', 'left'],
+  ['left'], ['up', 'left'], ['up'], ['up', 'right'],
+];
+
+export function stickDirections(dx, dy) {
+  const { r, dead } = JOYSTICK;
+  if (Math.hypot(dx, dy) < r * dead) return [];
+  const sector = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
+  return SECTORS[sector];
+}
+
 export const TOUCH_BUTTONS = [
-  padBtn('up', 0, -1, '▲'),
-  padBtn('down', 0, 1, '▼'),
-  padBtn('left', -1, 0, '◀'),
-  padBtn('right', 1, 0, '▶'),
   { id: 'action', label: '⇄', hold: false, x: W - 180, y: H - 214, w: 100, h: 100, round: true },
   { id: 'pause', label: 'II', hold: false, x: W - 62, y: H - 100, w: 46, h: 40 },
 ];
@@ -37,6 +49,8 @@ export class Input {
     this.held = new Set();       // teclado
     this.touchHeld = new Map();  // pointerId → id do botão segurado
     this.touchMode = false;      // vira true no primeiro toque: mostra os botões
+    // Direcional analógico: dedo que o controla, deslocamento do pino e direções ativas
+    this.stick = { pointerId: null, dx: 0, dy: 0, dirs: [] };
     this.listeners = {};
     window.addEventListener('keydown', (e) => {
       const a = MAP[e.code];
@@ -52,6 +66,7 @@ export class Input {
     window.addEventListener('blur', () => {
       this.held.clear();
       this.touchHeld.clear();
+      this.releaseStick();
       this.emit('blur');
     });
   }
@@ -66,6 +81,7 @@ export class Input {
 
   isDown(a) {
     if (this.held.has(a)) return true;
+    if (this.stick.dirs.includes(a)) return true;
     for (const id of this.touchHeld.values()) if (id === a) return true;
     return false;
   }
@@ -84,8 +100,18 @@ export class Input {
     return TOUCH_BUTTONS.find((b) => hit(b, x, y)) || null;
   }
 
+  // O toque cai na área do direcional?
+  inStick(x, y) {
+    return Math.hypot(x - JOYSTICK.cx, y - JOYSTICK.cy) <= JOYSTICK.grab;
+  }
+
   pointerDown(pointerId, x, y) {
     this.touchMode = true;
+    if (this.stick.pointerId === null && this.inStick(x, y)) {
+      this.stick.pointerId = pointerId;
+      this.moveStick(x, y);
+      return 'stick';
+    }
     const b = this.buttonAt(x, y);
     if (!b) return null;
     if (b.hold) {
@@ -96,8 +122,12 @@ export class Input {
     return b.id;
   }
 
-  // Arrastar o dedo pelo direcional troca de direção sem levantar
+  // O dedo que pegou o direcional continua controlando mesmo saindo da base
   pointerMove(pointerId, x, y) {
+    if (pointerId === this.stick.pointerId) {
+      this.moveStick(x, y);
+      return;
+    }
     if (!this.touchHeld.has(pointerId)) return;
     const b = this.buttonAt(x, y);
     if (b && b.hold) this.touchHeld.set(pointerId, b.id);
@@ -105,6 +135,25 @@ export class Input {
   }
 
   pointerUp(pointerId) {
+    if (pointerId === this.stick.pointerId) this.releaseStick();
     this.touchHeld.delete(pointerId);
+  }
+
+  moveStick(x, y) {
+    let dx = x - JOYSTICK.cx;
+    let dy = y - JOYSTICK.cy;
+    this.stick.dirs = stickDirections(dx, dy);
+    // O pino fica limitado à base
+    const d = Math.hypot(dx, dy);
+    if (d > JOYSTICK.r) {
+      dx = (dx / d) * JOYSTICK.r;
+      dy = (dy / d) * JOYSTICK.r;
+    }
+    this.stick.dx = dx;
+    this.stick.dy = dy;
+  }
+
+  releaseStick() {
+    this.stick = { pointerId: null, dx: 0, dy: 0, dirs: [] };
   }
 }
