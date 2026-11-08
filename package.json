@@ -1,0 +1,10 @@
+{
+  "name": "jogo-do-gelinho",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python tools/serve.py 8137",
+    "test": "node tests/run.js",
+    "test:baseline": "node tests/run.js --update-baseline"
+  }
+}

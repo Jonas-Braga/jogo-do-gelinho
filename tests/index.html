@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Testes · Jogo do Gelinho</title>
+  <style>
+    body { margin: 0; padding: 24px; background: #06202e; color: #e8f4f8; font: 14px/1.5 system-ui, sans-serif; }
+    h1 { margin: 0 0 4px; font-size: 22px; }
+    #summary { margin-bottom: 18px; color: #9fc6d4; }
+    h2 { font-size: 15px; margin: 18px 0 6px; }
+    li { list-style: none; margin: 2px 0; }
+    ul { padding-left: 8px; margin: 0; }
+    .pass::before { content: '✓ '; color: #5be08a; }
+    .fail::before { content: '✗ '; color: #ff6b6b; }
+    .todo::before { content: '○ '; color: #ffd36b; }
+    .todo { color: #c9b77a; }
+    .new { color: #6fd3ff; font-size: 12px; margin-left: 6px; }
+    pre { color: #ff9b9b; margin: 2px 0 6px 18px; white-space: pre-wrap; }
+    .missing { color: #ff6b6b; }
+  </style>
+</head>
+<body>
+  <h1>Testes · Jogo do Gelinho</h1>
+  <div id="summary">Rodando…</div>
+  <div id="out"></div>
+  <script type="module">
+    import { tests, runAll, compareBaseline } from './harness.js';
+    import { SPEC_FILES } from './specs/index.js';
+
+    for (const f of SPEC_FILES) await import(`./specs/${f}`);
+    const filter = new URLSearchParams(location.search).get('filtro') || undefined;
+    const results = await runAll({ filter });
+    let baseline = [];
+    try { baseline = await (await fetch('baseline.json', { cache: 'no-store' })).json(); } catch {}
+    const { missing, progressive } = filter ? { missing: [], progressive: [] } : compareBaseline(results, baseline);
+    const isNew = new Set(progressive);
+
+    const out = document.getElementById('out');
+    let ul = null;
+    let suite = null;
+    for (const r of results) {
+      if (r.suite !== suite) {
+        suite = r.suite;
+        const h = document.createElement('h2');
+        h.textContent = suite;
+        out.append(h);
+        ul = document.createElement('ul');
+        out.append(ul);
+      }
+      const li = document.createElement('li');
+      li.className = r.status;
+      li.textContent = r.name + (r.status === 'todo' ? ' (pendente)' : '');
+      if (isNew.has(r.id)) {
+        const s = document.createElement('span');
+        s.className = 'new';
+        s.textContent = 'progressivo';
+        li.append(s);
+      }
+      if (r.error) {
+        const pre = document.createElement('pre');
+        pre.textContent = r.error;
+        li.append(pre);
+      }
+      ul.append(li);
+    }
+    if (missing.length) {
+      const h = document.createElement('h2');
+      h.className = 'missing';
+      h.textContent = 'Testes da baseline que sumiram';
+      out.append(h);
+      for (const id of missing) {
+        const li = document.createElement('li');
+        li.className = 'fail missing';
+        li.textContent = id;
+        out.append(li);
+      }
+    }
+    const n = (s) => results.filter((r) => r.status === s).length;
+    const sum = `${n('pass')} passaram · ${n('fail')} falharam · ${n('todo')} pendentes · ${tests.length} no total · ` +
+      `${baseline.length - missing.length} regressivos · ${progressive.length} progressivos`;
+    document.getElementById('summary').textContent = sum;
+    document.title = (n('fail') || missing.length ? '✗ ' : '✓ ') + document.title;
+    window.__testResults = { results, missing, progressive };
+  </script>
+</body>
+</html>

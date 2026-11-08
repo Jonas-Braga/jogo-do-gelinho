@@ -1,0 +1,16 @@
+# Imagem de referência (arte da caixa original, de terceiros): NÃO publicar
+frostbite1.jpeg
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Ferramentas
+node_modules/
+__pycache__/
+*.pyc
+*.log
+.claude/

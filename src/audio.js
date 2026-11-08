@@ -1,0 +1,207 @@
+// Efeitos sonoros sintetizados com Web Audio API (nenhum arquivo de áudio).
+// Sem AudioContext (ex.: Node nos testes) tudo vira no-op, mas o histórico
+// de sons tocados continua sendo registrado.
+
+import { readItem, writeItem } from './storage.js';
+
+const VOLUME = 0.55;
+
+const loadMuted = () => readItem('muted') === '1';
+const saveMuted = (m) => writeItem('muted', m ? '1' : '0');
+
+const NOTE = (n) => 440 * 2 ** ((n - 69) / 12); // número MIDI → Hz
+
+// Cada som recebe o Sfx (com helpers tone/noise) e opções.
+export const SOUNDS = {
+  jump(s) {
+    s.tone({ type: 'triangle', f0: 320, f1: 640, dur: 0.13, vol: 0.18 });
+  },
+  step(s) {
+    // Passo na neve: estalo curto e abafado
+    s.noise({ dur: 0.07, vol: 0.06, filter: 'bandpass', f0: 1800 + Math.random() * 600, q: 1.5 });
+  },
+  land(s) {
+    s.tone({ type: 'sine', f0: 170, f1: 70, dur: 0.09, vol: 0.22 });
+    s.noise({ dur: 0.05, vol: 0.08, filter: 'highpass', f0: 3000 });
+  },
+  floe(s) {
+    // Gelo "acendendo": dois sinos cristalinos
+    s.tone({ type: 'triangle', f0: NOTE(84), dur: 0.25, vol: 0.12 });
+    s.tone({ type: 'sine', f0: NOTE(91), dur: 0.3, vol: 0.09, t: 0.05 });
+  },
+  block(s) {
+    // Bloco de neve compactada encaixando
+    s.noise({ dur: 0.12, vol: 0.25, filter: 'lowpass', f0: 900, f1: 200 });
+    s.tone({ type: 'sine', f0: 210, f1: 110, dur: 0.12, vol: 0.2 });
+  },
+  door(s) {
+    [60, 64, 67, 72].forEach((n, i) => s.tone({ type: 'triangle', f0: NOTE(n), dur: 0.4, vol: 0.1, t: i * 0.02 }));
+  },
+  curtain(s) {
+    // Pele de foca caindo e batendo na porta: "fuff" abafado
+    s.noise({ dur: 0.35, vol: 0.2, filter: 'lowpass', f0: 900, f1: 250 });
+    s.tone({ type: 'sine', f0: 140, f1: 80, dur: 0.15, vol: 0.12, t: 0.28 });
+  },
+  unblock(s) {
+    s.noise({ dur: 0.18, vol: 0.18, filter: 'bandpass', f0: 600, f1: 1800, q: 2 });
+  },
+  reverse(s) {
+    s.noise({ dur: 0.3, vol: 0.22, filter: 'bandpass', f0: 2400, f1: 400, q: 3 });
+    s.tone({ type: 'sine', f0: 500, f1: 250, dur: 0.25, vol: 0.08 });
+  },
+  splash(s) {
+    s.noise({ dur: 0.6, vol: 0.45, filter: 'lowpass', f0: 3500, f1: 250 });
+    s.tone({ type: 'sine', f0: 220, f1: 55, dur: 0.35, vol: 0.25 });
+    s.noise({ dur: 0.25, vol: 0.12, filter: 'highpass', f0: 4000, t: 0.08 });
+  },
+  glub(s) {
+    // Últimas bolhas: "glub-glub" abafado
+    [520, 430, 360].forEach((f, i) => s.tone({ type: 'sine', f0: f, f1: f * 1.4, dur: 0.07, vol: 0.12, t: i * 0.09 }));
+  },
+  fish(s) {
+    [76, 81, 88].forEach((n, i) => s.tone({ type: 'sine', f0: NOTE(n), dur: 0.1, vol: 0.15, t: i * 0.06 }));
+  },
+  freeze(s) {
+    s.tone({ type: 'triangle', f0: 1400, f1: 300, dur: 0.9, vol: 0.14 });
+    s.noise({ dur: 1.0, vol: 0.1, filter: 'highpass', f0: 6000 });
+    [96, 91, 88, 84].forEach((n, i) => s.tone({ type: 'sine', f0: NOTE(n), dur: 0.15, vol: 0.06, t: 0.1 + i * 0.15 }));
+  },
+  growl(s) {
+    s.tone({ type: 'sawtooth', f0: 110, f1: 60, dur: 0.55, vol: 0.22, filter: 500 });
+    s.noise({ dur: 0.5, vol: 0.15, filter: 'lowpass', f0: 400 });
+  },
+  scared(s) {
+    // "Aaah!" agudo que sobe e despenca
+    s.tone({ type: 'sawtooth', f0: 650, f1: 1050, dur: 0.16, vol: 0.09, filter: 2600, t: 0.05 });
+    s.tone({ type: 'sawtooth', f0: 1050, f1: 480, dur: 0.45, vol: 0.09, filter: 2600, t: 0.21 });
+  },
+  bump(s, o = {}) {
+    if (o.kind === 'goose') {
+      // Grasnado
+      s.tone({ type: 'square', f0: 460, f1: 380, dur: 0.12, vol: 0.09, filter: 1600 });
+      s.tone({ type: 'square', f0: 440, f1: 360, dur: 0.12, vol: 0.09, t: 0.14, filter: 1600 });
+    } else {
+      // Batida seca (caranguejo, molusco)
+      s.noise({ dur: 0.06, vol: 0.25, filter: 'bandpass', f0: 1200, q: 4 });
+      s.tone({ type: 'square', f0: 180, f1: 120, dur: 0.06, vol: 0.08 });
+    }
+  },
+  life(s) {
+    [72, 76, 79, 84, 88].forEach((n, i) => s.tone({ type: 'square', f0: NOTE(n), dur: 0.09, vol: 0.07, t: i * 0.07, filter: 3000 }));
+  },
+  tick(s) {
+    s.tone({ type: 'square', f0: 1100, dur: 0.03, vol: 0.05, filter: 4000 });
+  },
+  fanfare(s) {
+    [[60, 0], [64, 0.12], [67, 0.24], [72, 0.36], [67, 0.52], [72, 0.64]].forEach(([n, t]) =>
+      s.tone({ type: 'triangle', f0: NOTE(n), dur: t > 0.6 ? 0.5 : 0.14, vol: 0.14, t }));
+  },
+  cold(s) {
+    s.tone({ type: 'sine', f0: 1500, dur: 0.05, vol: 0.06 });
+  },
+  gameover(s) {
+    [[67, 0], [63, 0.25], [60, 0.5], [55, 0.75]].forEach(([n, t]) =>
+      s.tone({ type: 'triangle', f0: NOTE(n), dur: t > 0.7 ? 0.8 : 0.24, vol: 0.14, t }));
+  },
+  pause(s) {
+    s.tone({ type: 'sine', f0: 660, dur: 0.06, vol: 0.08 });
+  },
+};
+
+export const SOUND_NAMES = Object.keys(SOUNDS);
+
+export class Sfx {
+  constructor() {
+    this.muted = loadMuted();
+    this.ctx = null;
+    this.history = [];
+  }
+
+  // O navegador só libera áudio após um gesto do usuário; chamado no 1º toque/tecla.
+  unlock(AudioCtor = globalThis.AudioContext || globalThis.webkitAudioContext) {
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') this.ctx.resume?.();
+      return;
+    }
+    if (!AudioCtor) return;
+    const ctx = new AudioCtor();
+    this.ctx = ctx;
+    this.master = ctx.createGain();
+    this.master.gain.value = this.muted ? 0 : VOLUME;
+    const comp = ctx.createDynamicsCompressor();
+    this.master.connect(comp);
+    comp.connect(ctx.destination);
+    // Ruído branco reaproveitado por todos os sons de ruído
+    const len = Math.floor(ctx.sampleRate * 1.2);
+    this.noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = this.noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  }
+
+  setMuted(m) {
+    this.muted = m;
+    saveMuted(m);
+    if (this.master) this.master.gain.value = m ? 0 : VOLUME;
+  }
+
+  toggleMute() {
+    this.setMuted(!this.muted);
+    if (!this.muted) this.play('pause');
+  }
+
+  play(name, opts) {
+    this.history.push(name);
+    if (this.history.length > 100) this.history.shift();
+    if (!this.ctx || this.muted) return;
+    const fn = SOUNDS[name];
+    if (fn) fn(this, opts);
+  }
+
+  envelope(gain, start, dur, vol, attack = 0.005) {
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(vol, start + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  }
+
+  tone({ type = 'sine', f0, f1, dur, vol = 0.1, t = 0, filter }) {
+    const ctx = this.ctx;
+    const start = ctx.currentTime + t;
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(f0, start);
+    if (f1) osc.frequency.exponentialRampToValueAtTime(f1, start + dur);
+    const gain = ctx.createGain();
+    this.envelope(gain, start, dur, vol);
+    let node = osc;
+    if (filter) {
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = filter;
+      osc.connect(lp);
+      node = lp;
+    }
+    node.connect(gain);
+    gain.connect(this.master);
+    osc.start(start);
+    osc.stop(start + dur + 0.05);
+  }
+
+  noise({ dur, vol = 0.1, t = 0, filter = 'lowpass', f0 = 1000, f1, q = 1 }) {
+    const ctx = this.ctx;
+    const start = ctx.currentTime + t;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    const bq = ctx.createBiquadFilter();
+    bq.type = filter;
+    bq.Q.value = q;
+    bq.frequency.setValueAtTime(f0, start);
+    if (f1) bq.frequency.exponentialRampToValueAtTime(f1, start + dur);
+    const gain = ctx.createGain();
+    this.envelope(gain, start, dur, vol, 0.004);
+    src.connect(bq);
+    bq.connect(gain);
+    gain.connect(this.master);
+    src.start(start);
+    src.stop(start + dur + 0.05);
+  }
+}
