@@ -247,7 +247,81 @@ export function floeSprite(piece, active) {
 // ---------------------------------------------------------------- Personagem
 // Desenhado com os pés em (0,0), olhando para a direita.
 // `ride` = deslocamento vertical da placa em que está (balanço/afundada).
-export function drawPlayer(ctx, p, t, cold, ride = 0) {
+// Roupas do personagem: parka (padrão) ou suéter natalino (fase especial de Natal).
+const OUTFITS = {
+  parka: {
+    body: ['#E8B95A', C.parka, C.parkaShade], armBack: C.parkaShade, armFront: ['#E8B95A', C.parkaShade],
+    seam: 'rgba(120, 80, 25, 0.55)', sweater: false,
+  },
+  sweater: {
+    body: ['#E5474A', '#C62F2F', '#8C1D1F'], armBack: '#9E2224', armFront: ['#E0403F', '#A52528'],
+    seam: 'rgba(90, 15, 15, 0.45)', sweater: true,
+  },
+};
+const KNIT_WHITE = '#F7F2E8';
+const KNIT_GREEN = '#1F7A45';
+
+// Punho do suéter: tricô verde com listra branca (no lugar do punho de pelo)
+function knitCuff(ctx, x, y, w) {
+  ctx.fillStyle = KNIT_GREEN;
+  ctx.fillRect(x, y, w, 3.5);
+  ctx.fillStyle = KNIT_WHITE;
+  ctx.fillRect(x, y + 1.3, w, 0.9);
+}
+
+// Estampa de tricô natalino sobre o corpo (já recortado pelo contorno do corpo)
+function sweaterPattern(ctx, back) {
+  // Faixa branca com zigue-zague verde no peito
+  ctx.fillStyle = KNIT_WHITE;
+  ctx.fillRect(-18, -38, 36, 9);
+  ctx.fillStyle = KNIT_GREEN;
+  ctx.beginPath();
+  ctx.moveTo(-18, -29);
+  for (let x = -18; x <= 18; x += 6) {
+    ctx.lineTo(x, -35);
+    ctx.lineTo(x + 3, -31);
+  }
+  ctx.lineTo(18, -29);
+  ctx.closePath();
+  ctx.fill();
+  // Pontinhos de "neve" no tricô
+  ctx.fillStyle = KNIT_WHITE;
+  for (let x = -14; x <= 14; x += 7) {
+    ctx.fillRect(x, -43, 1.6, 1.6);
+    ctx.fillRect(x + 3.5, -24, 1.6, 1.6);
+  }
+  // Floco de neve na barriga (só de frente)
+  if (!back) {
+    ctx.strokeStyle = KNIT_WHITE;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const a = (i * Math.PI) / 3;
+      ctx.moveTo(7 + Math.cos(a) * 3.6, -21 + Math.sin(a) * 3.6);
+      ctx.lineTo(7 - Math.cos(a) * 3.6, -21 - Math.sin(a) * 3.6);
+    }
+    ctx.stroke();
+  }
+}
+
+// Barra do suéter: tricô verde canelado (no lugar da barra de pelo)
+function sweaterHem(ctx) {
+  ctx.fillStyle = KNIT_GREEN;
+  ctx.beginPath();
+  ctx.roundRect(-18, -17, 36, 6, 2.5);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(10, 50, 25, 0.6)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  for (let x = -16; x <= 16; x += 2.6) {
+    ctx.moveTo(x, -16);
+    ctx.lineTo(x, -12);
+  }
+  ctx.stroke();
+}
+
+export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
+  const O = OUTFITS[outfit] || OUTFITS.parka;
   ctx.save();
   if (p.state === 'drown' && p.sinkLine != null) {
     ctx.beginPath();
@@ -304,7 +378,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0) {
 
   // De costas (entrando no iglu): desenho próprio, sem rosto
   if (p.back) {
-    drawPlayerBack(ctx, t, walking, step, bob);
+    drawPlayerBack(ctx, t, walking, step, bob, O);
     ctx.restore();
     return;
   }
@@ -337,7 +411,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0) {
   ctx.save();
   ctx.translate(-4, -41);
   ctx.rotate(fleeing ? 2.8 + flail : air ? -2.3 : walking ? -step * 0.6 : 0.15);
-  ctx.fillStyle = C.parkaShade;
+  ctx.fillStyle = O.armBack;
   ctx.beginPath();
   ctx.roundRect(-4, 0, 8, 18, 4);
   ctx.fill();
@@ -350,9 +424,9 @@ export function drawPlayer(ctx, p, t, cold, ride = 0) {
 
   // Corpo (parka em A)
   let grd = ctx.createLinearGradient(-16, 0, 16, 0);
-  grd.addColorStop(0, '#E8B95A');
-  grd.addColorStop(0.55, C.parka);
-  grd.addColorStop(1, C.parkaShade);
+  grd.addColorStop(0, O.body[0]);
+  grd.addColorStop(0.55, O.body[1]);
+  grd.addColorStop(1, O.body[2]);
   ctx.fillStyle = grd;
   ctx.beginPath();
   ctx.moveTo(-10, -46);
@@ -361,21 +435,35 @@ export function drawPlayer(ctx, p, t, cold, ride = 0) {
   ctx.quadraticCurveTo(0, -11, -17, -15);
   ctx.quadraticCurveTo(-15, -30, -10, -46);
   ctx.fill();
-  // Costura e bolso
-  ctx.strokeStyle = 'rgba(120, 80, 25, 0.55)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(3, -45);
-  ctx.lineTo(4, -15);
-  ctx.moveTo(-10, -27);
-  ctx.quadraticCurveTo(0, -24, 13, -27);
-  ctx.stroke();
-  // Barra de pelo
-  for (let i = -17; i <= 17; i += 3.4) {
-    ctx.fillStyle = i > 6 ? C.furShade : C.fur;
+  if (O.sweater) {
+    ctx.save();
+    ctx.clip();
+    sweaterPattern(ctx, false);
+    // Sombra lateral por cima da estampa (volume)
+    const sh = ctx.createLinearGradient(-16, 0, 16, 0);
+    sh.addColorStop(0.5, 'rgba(60, 0, 0, 0)');
+    sh.addColorStop(1, 'rgba(60, 0, 0, 0.35)');
+    ctx.fillStyle = sh;
+    ctx.fillRect(-18, -50, 36, 40);
+    ctx.restore();
+    sweaterHem(ctx);
+  } else {
+    // Costura e bolso
+    ctx.strokeStyle = O.seam;
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.arc(i, -14 + Math.sin(i * 1.7) * 0.8, 3.2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(3, -45);
+    ctx.lineTo(4, -15);
+    ctx.moveTo(-10, -27);
+    ctx.quadraticCurveTo(0, -24, 13, -27);
+    ctx.stroke();
+    // Barra de pelo
+    for (let i = -17; i <= 17; i += 3.4) {
+      ctx.fillStyle = i > 6 ? C.furShade : C.fur;
+      ctx.beginPath();
+      ctx.arc(i, -14 + Math.sin(i * 1.7) * 0.8, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // Capuz
@@ -454,12 +542,15 @@ export function drawPlayer(ctx, p, t, cold, ride = 0) {
       ctx.save();
       ctx.translate(sx, -44);
       ctx.rotate(angle);
-      ctx.fillStyle = back ? C.parkaShade : C.parka;
+      ctx.fillStyle = back ? O.armBack : O.body[1];
       ctx.beginPath();
       ctx.roundRect(-4.5, 0, 9, 25, 4);
       ctx.fill();
-      ctx.fillStyle = C.fur;
-      ctx.fillRect(-5, 21, 10, 3.5);
+      if (O.sweater) knitCuff(ctx, -5, 21, 10);
+      else {
+        ctx.fillStyle = C.fur;
+        ctx.fillRect(-5, 21, 10, 3.5);
+      }
       ctx.fillStyle = back ? '#4A3423' : '#5A3E2A';
       ctx.beginPath();
       ctx.arc(0, 28, 5, 0, Math.PI * 2);
@@ -476,14 +567,20 @@ export function drawPlayer(ctx, p, t, cold, ride = 0) {
   ctx.translate(4, -41);
   ctx.rotate(air ? -2.0 : walking ? step * 0.6 : 0.2 + (shiver > 0 ? -0.6 : 0));
   grd = ctx.createLinearGradient(-4, 0, 4, 0);
-  grd.addColorStop(0, '#E8B95A');
-  grd.addColorStop(1, C.parkaShade);
+  grd.addColorStop(0, O.armFront[0]);
+  grd.addColorStop(1, O.armFront[1]);
   ctx.fillStyle = grd;
   ctx.beginPath();
   ctx.roundRect(-4.5, 0, 9, 18, 4);
   ctx.fill();
-  ctx.fillStyle = C.fur;
-  ctx.fillRect(-5, 15, 10, 3.5);
+  if (O.sweater) {
+    ctx.fillStyle = KNIT_WHITE;
+    ctx.fillRect(-4.5, 6, 9, 1.6); // listra na manga
+    knitCuff(ctx, -5, 15, 10);
+  } else {
+    ctx.fillStyle = C.fur;
+    ctx.fillRect(-5, 15, 10, 3.5);
+  }
   ctx.fillStyle = '#5A3E2A';
   ctx.beginPath();
   ctx.arc(0, 21, 4.8, 0, Math.PI * 2);
@@ -545,7 +642,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0) {
 
 // Personagem visto de costas (pés em 0,0). Simétrico: costas da parka com
 // costura central, capuz por trás com o pelo aparecendo nas bordas.
-function drawPlayerBack(ctx, t, walking, step, bob) {
+function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
   // Pernas e botas, alternando a passada
   for (const [lx, lift] of [[-5, Math.max(0, step) * 3], [5, Math.max(0, -step) * 3]]) {
     ctx.fillStyle = C.pants;
@@ -566,12 +663,15 @@ function drawPlayerBack(ctx, t, walking, step, bob) {
     ctx.save();
     ctx.translate(s * 13, -43);
     ctx.rotate(s * 0.18 + (walking ? s * step * 0.25 : 0));
-    ctx.fillStyle = C.parkaShade;
+    ctx.fillStyle = O.armBack;
     ctx.beginPath();
     ctx.roundRect(-4.5, 0, 9, 19, 4);
     ctx.fill();
-    ctx.fillStyle = C.fur;
-    ctx.fillRect(-5, 16, 10, 3.5);
+    if (O.sweater) knitCuff(ctx, -5, 16, 10);
+    else {
+      ctx.fillStyle = C.fur;
+      ctx.fillRect(-5, 16, 10, 3.5);
+    }
     ctx.fillStyle = '#4A3423';
     ctx.beginPath();
     ctx.arc(0, 22, 4.6, 0, Math.PI * 2);
@@ -581,9 +681,9 @@ function drawPlayerBack(ctx, t, walking, step, bob) {
 
   // Costas da parka (em A)
   const g = ctx.createLinearGradient(-16, 0, 16, 0);
-  g.addColorStop(0, C.parkaShade);
-  g.addColorStop(0.5, C.parka);
-  g.addColorStop(1, C.parkaShade);
+  g.addColorStop(0, O.body[2]);
+  g.addColorStop(0.5, O.body[1]);
+  g.addColorStop(1, O.body[2]);
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.moveTo(-11, -46);
@@ -592,19 +692,27 @@ function drawPlayerBack(ctx, t, walking, step, bob) {
   ctx.quadraticCurveTo(0, -11, -17, -15);
   ctx.quadraticCurveTo(-15, -30, -11, -46);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(120, 80, 25, 0.55)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(0, -46);
-  ctx.lineTo(0, -14);
-  ctx.moveTo(-12, -29);
-  ctx.quadraticCurveTo(0, -27, 12, -29);
-  ctx.stroke();
-  for (let i = -17; i <= 17; i += 3.4) {
-    ctx.fillStyle = Math.abs(i) > 10 ? C.furShade : C.fur;
+  if (O.sweater) {
+    ctx.save();
+    ctx.clip();
+    sweaterPattern(ctx, true);
+    ctx.restore();
+    sweaterHem(ctx);
+  } else {
+    ctx.strokeStyle = O.seam;
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.arc(i, -14 + Math.sin(i * 1.7) * 0.8, 3.2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(0, -46);
+    ctx.lineTo(0, -14);
+    ctx.moveTo(-12, -29);
+    ctx.quadraticCurveTo(0, -27, 12, -29);
+    ctx.stroke();
+    for (let i = -17; i <= 17; i += 3.4) {
+      ctx.fillStyle = Math.abs(i) > 10 ? C.furShade : C.fur;
+      ctx.beginPath();
+      ctx.arc(i, -14 + Math.sin(i * 1.7) * 0.8, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // Capuz por trás: pelo do contorno do rosto aparece nas bordas
@@ -933,7 +1041,42 @@ export function drawFish(ctx, c, y, t) {
 }
 
 // ---------------------------------------------------------------- Urso
-export function drawBear(ctx, b, t) {
+// Gorro de Papai Noel na cabeça do urso (coordenadas locais do urso, olhando
+// para a direita). A ponta cai para trás e o pompom balança com o passo.
+function drawSantaHat(ctx, b, hy, t) {
+  const swing = Math.sin(b.walk * 6) * 2.5 + (b.chasing ? Math.sin(t * 14) * 3 : 0);
+  ctx.save();
+  ctx.translate(53, -51 + hy);
+  ctx.rotate(-0.15);
+  // Cone vermelho caindo para trás
+  const g = ctx.createLinearGradient(0, -22, 0, 2);
+  g.addColorStop(0, '#E2353B');
+  g.addColorStop(1, '#A3191F');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(-13, 0);
+  ctx.quadraticCurveTo(-10, -16, 2, -20);
+  ctx.quadraticCurveTo(-10, -24, -21 + swing * 0.4, -11 + swing);
+  ctx.quadraticCurveTo(-14, -10, -8, -9);
+  ctx.quadraticCurveTo(6, -14, 13, 0);
+  ctx.closePath();
+  ctx.fill();
+  // Barra de pelo branca
+  ctx.fillStyle = '#F8F6F0';
+  ctx.beginPath();
+  ctx.roundRect(-15, -4, 30, 7, 3.5);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(170, 185, 200, 0.6)';
+  ctx.fillRect(-13, 1, 26, 1.5);
+  // Pompom
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(-22 + swing * 0.4, -10 + swing, 4.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+export function drawBear(ctx, b, t, outfit = null) {
   const sw = Math.sin(b.walk * 3);
   const breath = Math.sin(t * 2) * 0.8;
   ctx.fillStyle = 'rgba(70, 105, 125, 0.25)';
@@ -1028,6 +1171,8 @@ export function drawBear(ctx, b, t) {
     ctx.quadraticCurveTo(66, -32 + hy, 62, -34 + hy);
     ctx.stroke();
   }
+
+  if (outfit === 'santaHat') drawSantaHat(ctx, b, hy, t);
 
   leg(-22, sw, false);
   leg(32, -sw, false);

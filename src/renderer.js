@@ -3,6 +3,7 @@ import {
   makeBackground, floeSprite, drawPlayer, drawGoose, drawCrab, drawClam, drawFish, drawBear,
 } from './sprites.js';
 import { floeOffset } from './floes.js';
+import { drawSleigh, drawChristmasTrees, drawIglooLights } from './christmas.js';
 import { drawHud } from './hud.js';
 
 const CRITTER_DRAW = { goose: drawGoose, crab: drawCrab, clam: drawClam, fish: drawFish };
@@ -82,6 +83,9 @@ export class Renderer {
     this.aurora = auroraStrength(game.level, this.skyF);
     if (this.aurora > 0) this.drawAurora(ctx, t, this.aurora);
     ctx.drawImage(this.bg.canvas, 0, 0, this.bg.w, this.bg.h);
+    const sp = game.special;
+    if (sp?.sleigh) drawSleigh(ctx, game.sleigh, t);
+    if (sp?.decor === 'natal') drawChristmasTrees(ctx, t);
     this.drawWater(ctx, t, sky);
     game.particles.drawRipples(ctx);
     this.drawEntities(ctx, game, t);
@@ -227,14 +231,16 @@ export class Renderer {
     // De pé numa placa, o personagem sobe e desce junto com ela
     const ride = (p.state === 'stand' || p.state === 'freeze') && p.row >= 0 && p.support
       ? floeOffset(p.support, t) : 0;
-    const drawP = () => drawPlayer(ctx, p, t, cold, ride);
+    const outfits = game.special?.outfits || {};
+    const drawP = () => drawPlayer(ctx, p, t, cold, ride, outfits.player);
     // O jogador é desenhado depois da última fileira que está "atrás" dele.
     let bucket = -1;
     game.rows.forEach((r, i) => { if (r.y <= p.y + 16) bucket = i; });
     if ((p.state === 'drown' || p.state === 'freeze') && p.row >= 0) bucket = Math.max(bucket, p.row);
 
     game.igloo.draw(ctx, t);
-    if (game.bear.active) drawBear(ctx, game.bear, t);
+    if (game.special?.decor === 'natal' && game.igloo.complete) drawIglooLights(ctx, t);
+    if (game.bear.active) drawBear(ctx, game.bear, t, outfits.bear);
     if (p.state !== 'gone' && bucket === -1) {
       drawP();
       // Passando pela porta: moldura do arco, sombra do interior e cortina por cima dele

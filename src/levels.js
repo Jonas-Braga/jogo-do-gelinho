@@ -1,4 +1,5 @@
 import { RULES, PLAYER } from './config.js';
+import { specialFor } from './specials.js';
 
 // Parâmetros por fase: velocidade, tipo de placa, inimigos, urso e pontuação.
 //
@@ -35,11 +36,16 @@ export function levelParams(level) {
     floePoints: 10 * level,
     degreePoints: 10 * level,
     fishPoints: 200,
+
+    // Fase especial (a cada 5 fases, quando já há um tema criado), ou null
+    special: specialFor(level),
   };
 }
 
 // Aviso mostrado no início de cada fase: o que há de novo.
 export function levelIntro(level) {
+  const special = specialFor(level);
+  if (special) return { title: special.title, sub: special.intro, special: special.id };
   const title = `FASE ${level}`;
   let sub;
   if (level === 1) sub = 'Pule nas placas brancas para construir o iglu';

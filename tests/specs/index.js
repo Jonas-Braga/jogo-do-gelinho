@@ -8,5 +8,6 @@ export const SPEC_FILES = [
   'audio.test.js',
   'etapa4.test.js',
   'etapa5.test.js',
+  'especiais.test.js',
   'futuras.test.js',
 ];

@@ -106,15 +106,104 @@ export const SOUNDS = {
   pause(s) {
     s.tone({ type: 'sine', f0: 660, dur: 0.06, vol: 0.08 });
   },
+  sleigh(s) {
+    // Trenó passando ao fundo: guizos chacoalhando, crescendo e sumindo
+    for (let i = 0; i < 10; i++) {
+      const k = Math.sin((i / 9) * Math.PI);
+      sleighShake(s, i * 0.11, 0.025 + k * 0.05);
+    }
+  },
 };
 
 export const SOUND_NAMES = Object.keys(SOUNDS);
+
+// ---------------------------------------------------------------- Trilhas de fundo
+// Sino: fundamental + parcial inarmônico curto (timbre de sino) + corpo suave.
+function bell(s, n, t, vol = 0.05) {
+  const f = NOTE(n + 12);
+  s.tone({ type: 'sine', f0: f, dur: 1.1, vol, t });
+  s.tone({ type: 'sine', f0: f * 2.76, dur: 0.3, vol: vol * 0.3, t });
+  s.tone({ type: 'triangle', f0: NOTE(n), dur: 0.5, vol: vol * 0.35, t });
+}
+
+// Guizos de trenó: chiado agudo + tilintar de dois guizinhos
+function sleighShake(s, t, vol) {
+  s.noise({ dur: 0.08, vol, filter: 'highpass', f0: 6500, t });
+  s.tone({ type: 'sine', f0: 4200 + Math.random() * 1600, dur: 0.06, vol: vol * 0.2, t });
+  s.tone({ type: 'sine', f0: 5200 + Math.random() * 1600, dur: 0.05, vol: vol * 0.15, t: t + 0.02 });
+}
+
+// Notas como [MIDI, duração em batidas], tocadas em sequência.
+const phrase = (notes, start = 0) => {
+  let b = start;
+  return notes.map(([n, d]) => {
+    const ev = { beat: b, note: n };
+    b += d;
+    return ev;
+  });
+};
+// Melodia de sinos tradicional de Natal (domínio público), em dó maior
+const VERSE = [
+  [64, 1], [64, 1], [64, 2], [64, 1], [64, 1], [64, 2], [64, 1], [67, 1], [60, 1.5], [62, 0.5], [64, 4],
+  [65, 1], [65, 1], [65, 1.5], [65, 0.5], [65, 1], [64, 1], [64, 1], [64, 0.5], [64, 0.5],
+];
+const END_1 = [[64, 1], [62, 1], [62, 1], [64, 1], [62, 2], [67, 2]];
+const END_2 = [[67, 1], [67, 1], [65, 1], [62, 1], [60, 4]];
+const NATAL_MELODY = phrase([...VERSE, ...END_1, ...VERSE, ...END_2]); // 64 batidas
+
+function buildTrack({ beat, length, melody }) {
+  const events = [];
+  for (const m of melody) events.push({ beat: m.beat, play: (s, t) => bell(s, m.note, t) });
+  // Guizos o tempo todo, a cada meia batida, mais fortes no tempo
+  for (let b = 0; b < length; b += 0.5) {
+    const vol = b % 1 === 0 ? 0.03 : 0.016;
+    events.push({ beat: b, play: (s, t) => sleighShake(s, t, vol) });
+  }
+  events.sort((a, b) => a.beat - b.beat);
+  return { beat, length, events };
+}
+
+// Trilhas disponíveis (as fases especiais escolhem a sua em specials.js)
+export const MUSIC = {
+  // 64 batidas de melodia + 8 só de guizos, antes de recomeçar
+  natal: buildTrack({ beat: 0.44, length: 72, melody: NATAL_MELODY }),
+};
+const LOOKAHEAD = 0.12; // agenda as notas um pouco antes da hora
 
 export class Sfx {
   constructor() {
     this.muted = loadMuted();
     this.ctx = null;
     this.history = [];
+    this.track = null;
+    this.musicNotes = 0; // notas da trilha já tocadas (mesmo sem áudio; usado nos testes)
+  }
+
+  // Liga uma trilha de fundo em loop (ou desliga com null). Recomeça do início.
+  setMusic(name) {
+    this.track = name && MUSIC[name] ? name : null;
+    this.musicT = 0;
+    this.musicIdx = 0;
+    this.musicLoop = 0;
+  }
+
+  // Avança a trilha (chamado pelo passo do jogo: em pausa ela para junto).
+  updateMusic(dt) {
+    const m = MUSIC[this.track];
+    if (!m) return;
+    this.musicT += dt;
+    const loopLen = m.length * m.beat;
+    for (;;) {
+      const ev = m.events[this.musicIdx];
+      const at = this.musicLoop * loopLen + ev.beat * m.beat;
+      if (at > this.musicT + LOOKAHEAD) break;
+      this.musicNotes++;
+      if (this.ctx && !this.muted) ev.play(this, Math.max(0, at - this.musicT));
+      if (++this.musicIdx >= m.events.length) {
+        this.musicIdx = 0;
+        this.musicLoop++;
+      }
+    }
   }
 
   // O navegador só libera áudio após um gesto do usuário; chamado no 1º toque/tecla.

@@ -7,6 +7,7 @@ import { Igloo } from './igloo.js';
 import { Renderer } from './renderer.js';
 import { Critters } from './enemies.js';
 import { Bear } from './bear.js';
+import { Sleigh } from './christmas.js';
 import { Sfx } from './audio.js';
 import { levelParams, levelIntro } from './levels.js';
 import { loadHighScore, saveHighScore } from './storage.js';
@@ -25,6 +26,8 @@ export class Game {
     this.igloo = new Igloo(this.particles, this.sfx);
     this.critters = new Critters(this);
     this.bear = new Bear(this);
+    this.sleigh = new Sleigh();
+    this.special = null; // tema da fase especial atual (specials.js) ou null
     this.renderer = new Renderer(this.ctx);
     this.time = 0;
     this.paused = false;
@@ -84,6 +87,9 @@ export class Game {
     this.rowsResetTimer = 0;
     this.smokeT = 0;
     this.banner = null;
+    this.special = null;
+    this.sleigh.reset();
+    this.sfx.setMusic(null);
   }
 
   newGame() {
@@ -117,8 +123,12 @@ export class Game {
     this.resetTemperature();
     this.rowsResetTimer = 0;
     this.state = 'play';
+    // Fase especial: tema, trilha de fundo e trenó
+    this.special = this.params.special;
+    this.sleigh.reset();
+    this.sfx.setMusic(this.special?.music || null);
     // Aviso no início da fase (não bloqueia o jogo)
-    this.banner = { ...levelIntro(this.level), t: 0, life: 2.6 };
+    this.banner = { ...levelIntro(this.level), t: 0, life: this.special ? 3.6 : 2.6 };
   }
 
   resetTemperature() {
@@ -183,6 +193,8 @@ export class Game {
       return;
     }
     if (this.state === 'gameOver') return;
+    this.sfx.updateMusic(dt);
+    if (this.special?.sleigh && this.sleigh.update(dt)) this.sfx.play('sleigh');
     this.player.update(dt, this.input);
     if (this.state === 'play' || this.state === 'entering') {
       this.critters.update(dt);
@@ -316,6 +328,7 @@ export class Game {
       this.lives = 0;
       this.state = 'gameOver';
       this.banner = null;
+      this.sfx.setMusic(null);
       this.saveRecord();
       this.sfx.play('gameover');
       return;

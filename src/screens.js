@@ -212,7 +212,9 @@ export function drawBanner(ctx, game) {
   ctx.save();
   ctx.globalAlpha = Math.min(inK, outK);
   ctx.font = `700 17px ${FONT}`;
-  const w = Math.max(320, ctx.measureText(b.sub).width + 60);
+  let w = Math.max(320, ctx.measureText(b.sub).width + 60);
+  ctx.font = `900 28px ${FONT}`;
+  w = Math.max(w, ctx.measureText(b.title).width + 60);
   panel(ctx, W / 2 - w / 2, y - 34, w, 74, 16, 0.7);
   ctx.textAlign = 'center';
   ctx.fillStyle = '#FFD36B';
