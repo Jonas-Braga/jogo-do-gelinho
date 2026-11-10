@@ -9,10 +9,14 @@
 //   outfits  roupas: { player, bear }
 //   sleigh   trenó voando ao fundo de vez em quando
 //   decor    enfeites do cenário (árvores, luzes no iglu)
-//   scenery  cenário inteiro trocado: 'forest' = mata, rio, troncos e folhas caindo
-//   house    o que se constrói na costa: 'igloo' (padrão) ou 'cabin' (cabana de madeira)
+//   scenery  cenário inteiro trocado: 'forest' = mata, rio, troncos e folhas caindo;
+//            'space' = lua, céu estrelado, rio de poeira estelar, asteroides e
+//            estrelinhas douradas no lugar dos peixes
+//   house    o que se constrói na costa: 'igloo' (padrão), 'cabin' (cabana de madeira)
+//            ou 'base' (base lunar)
 //   enemies  inimigos sorteados a cada grupo (no lugar do ciclo ganso/caranguejo/molusco)
 //   aurora   false desliga a aurora boreal nesta fase
+//   pace     ritmo próprio da fase (ex.: 0.8 = placas, bichos e urso a 80% da velocidade)
 export const SPECIAL_EVERY = 5;
 
 export const SPECIALS = {
@@ -37,6 +41,20 @@ export const SPECIALS = {
     house: 'cabin',
     enemies: ['snake', 'bat', 'piranha'],
     aurora: false,
+  },
+  15: {
+    id: 'espaco',
+    title: 'FASE 15 · ESPECIAL DO ESPAÇO',
+    intro: 'Pule nos asteroides do rio de poeira estelar e monte a base lunar!',
+    music: 'espaco',
+    outfits: { player: 'astronaut', bear: 'alien' },
+    sleigh: false,
+    decor: 'espaco',
+    scenery: 'space',
+    house: 'base',
+    enemies: ['ufo', 'crawler', 'comet'],
+    aurora: false,
+    pace: 0.8, // fase mais lenta, a pedido do usuário (asteroides, bichos e alienígena a 80%)
   },
 };
 

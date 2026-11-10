@@ -11,5 +11,6 @@ export const SPEC_FILES = [
   'especiais.test.js',
   'contas.test.js',
   'floresta.test.js',
+  'espaco.test.js',
   'futuras.test.js',
 ];

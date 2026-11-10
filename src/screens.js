@@ -3,13 +3,24 @@ import { W, H } from './config.js';
 import { TOUCH_BUTTONS, JOYSTICK } from './input.js';
 import { FONT, panel, pad6 } from './ui.js';
 
-const CONTROLS = [
-  ['← →', 'andar'],
-  ['↑ ↓', 'pular entre a costa e as placas'],
-  ['Espaço', 'inverter a placa (custa 1 bloco)'],
-  ['↑ na porta', 'entrar no iglu pronto'],
-  ['P / M', 'pausar / som'],
-];
+// Palavras de cada construção: o que se pula e o que se constrói
+const WORDS = {
+  igloo: { floes: 'as placas', floe: 'a placa', house: 'no iglu pronto' },
+  cabin: { floes: 'os troncos', floe: 'o tronco', house: 'na cabana pronta' },
+  base: { floes: 'os asteroides', floe: 'o asteroide', house: 'na base lunar pronta' },
+};
+
+export function controlsFor(style = 'igloo') {
+  const w = WORDS[style] || WORDS.igloo;
+  return [
+    ['← →', 'andar'],
+    ['↑ ↓', `pular entre a costa e ${w.floes}`],
+    ['Espaço', `inverter ${w.floe} (custa 1 bloco)`],
+    ['↑ na porta', `entrar ${w.house}`],
+    ['P / M', 'pausar / som'],
+  ];
+}
+const CONTROLS = controlsFor();
 
 const RULES_TEXT = [
   'Pule nas placas brancas: cada fileira acesa vira um bloco do iglu.',
@@ -127,7 +138,7 @@ export function drawPause(ctx, game) {
   ctx.font = `900 52px ${FONT}`;
   ctx.fillText('PAUSA', W / 2, H / 2 - 62);
   ctx.textAlign = 'left';
-  CONTROLS.forEach(([key, what], i) => {
+  controlsFor(game.igloo.style).forEach(([key, what], i) => {
     const y = H / 2 - 18 + i * 24;
     ctx.font = `800 14px ${FONT}`;
     ctx.fillStyle = '#BDEBFA';

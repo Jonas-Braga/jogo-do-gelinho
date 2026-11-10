@@ -14,16 +14,19 @@ const ESCAPE_MARGIN = 0.8; // inimigos/urso no máximo a 80% da velocidade de ca
 export function levelParams(level) {
   const L = level - 1;
   const maxChaser = PLAYER.walkSpeed * ESCAPE_MARGIN;
+  // Ritmo próprio de uma fase especial (ex.: espaço a 80%): multiplica a velocidade
+  // das placas, dos bichos e do urso. Sem `pace`, ritmo normal.
+  const pace = specialFor(level)?.pace ?? 1;
   return {
     // Placas
-    speed: Math.min(62 + L * 9, 170),
+    speed: Math.min(62 + L * 9, 170) * pace,
     fragmented: level % 2 === 0,          // fases pares: placas em pedaços que abrem e fecham
     breathSpeed: Math.min(1.1 + L * 0.06, 1.9),
 
     // Inimigos e peixes (fase especial pode trocar os bichos, sem mudar velocidade nem quantidade)
     enemy: ENEMY_CYCLE[L % ENEMY_CYCLE.length],
     enemies: specialFor(level)?.enemies || null,
-    enemySpeed: Math.min(80 + L * 10, maxChaser),
+    enemySpeed: Math.min(80 + L * 10, maxChaser) * pace,
     spawnMin: Math.max(1.8, 4.5 - L * 0.3),  // intervalo entre grupos, por fileira (s)
     spawnMax: Math.max(3.8, 9 - L * 0.5),
     maxGroup: Math.min(3, 1 + Math.floor(level / 2)),
@@ -31,7 +34,7 @@ export function levelParams(level) {
 
     // Urso
     bear: level >= 4,
-    bearSpeed: Math.min(85 + (level - 4) * 12, maxChaser),
+    bearSpeed: Math.min(85 + (level - 4) * 12, maxChaser) * pace,
 
     // Pontuação
     floePoints: 10 * level,

@@ -287,7 +287,7 @@ export class Player {
     this.vx = dir * FLEE_SPEED;
     this.facing = dir;
     this.squash = 0;
-    this.game.sfx.play('growl');
+    this.game.sfx.play('growl', { kind: this.game.special?.outfits?.bear });
     this.game.sfx.play('scared');
     this.game.onHit();
   }

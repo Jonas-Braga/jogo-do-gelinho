@@ -8,12 +8,30 @@ import {
   makeForestBackground, logSprite, drawSnake, drawBat, drawPiranha, drawForestDecor,
   drawCabin, drawCabinDoorFront, drawLeaves, drawFireflies, RIVER,
 } from './forest.js';
+import {
+  makeSpaceBackground, drawSpaceSky, asteroidSprite, drawUfo, drawCrawler, drawComet, drawStarBonus,
+  drawSpaceDecor, drawBase, drawBaseDoorFront, drawStardust, DUST,
+} from './space.js';
 import { drawHud } from './hud.js';
 
 const CRITTER_DRAW = {
   goose: drawGoose, crab: drawCrab, clam: drawClam, fish: drawFish,
   snake: drawSnake, bat: drawBat, piranha: drawPiranha,
+  ufo: drawUfo, crawler: drawCrawler, comet: drawComet,
 };
+
+// Construções das fases especiais (o iglu se desenha sozinho)
+const HOUSE_DRAW = {
+  cabin: { body: drawCabin, front: drawCabinDoorFront },
+  base: { body: drawBase, front: drawBaseDoorFront },
+};
+
+// Cores do "rio" de cada cenário (padrão = água gelada)
+const WATERS = { forest: RIVER, space: DUST };
+const ICE_WATER = { water: ['#1C7E99', '#0E5670', '#052A40'], ripple: [190, 235, 250], bank: 'rgba(3, 30, 48, 0.35)' };
+// Placas de cada cenário: gelo, troncos ou asteroides
+const FLOE_SPRITE = { forest: logSprite, space: asteroidSprite };
+const FLOE_HALO = { forest: RIVER.halo, space: DUST.halo };
 
 // Intensidade da aurora boreal (0 = nenhuma). Aparece nas fases avançadas,
 // cresce com a fase e fica mais forte quando o céu escurece.
@@ -86,19 +104,26 @@ export class Renderer {
     ctx.fillStyle = '#04192a';
     ctx.fillRect(-20, -20, W + 40, H + 40);
 
-    this.drawSky(ctx, sky);
     const sp = game.special;
-    const forest = sp?.scenery === 'forest';
+    const scenery = sp?.scenery || null;
+    const forest = scenery === 'forest';
+    const space = scenery === 'space';
+    if (space) drawSpaceSky(ctx, t, this.skyF);
+    else this.drawSky(ctx, sky);
     this.aurora = sp?.aurora === false ? 0 : auroraStrength(game.level, this.skyF);
     if (this.aurora > 0) this.drawAurora(ctx, t, this.aurora);
-    // O fundo da floresta só é criado quando a fase aparece pela primeira vez
-    const bg = forest ? (this.forestBg ||= makeForestBackground()) : this.bg;
+    // Os fundos das fases especiais só são criados quando a fase aparece pela primeira vez
+    let bg = this.bg;
+    if (forest) bg = this.forestBg ||= makeForestBackground();
+    else if (space) bg = this.spaceBg ||= makeSpaceBackground();
     ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h);
     if (sp?.sleigh) drawSleigh(ctx, game.sleigh, t);
     if (sp?.decor === 'natal') drawChristmasTrees(ctx, t);
     if (sp?.decor === 'floresta') drawForestDecor(ctx, t);
+    if (sp?.decor === 'espaco') drawSpaceDecor(ctx, t);
     if (forest) drawFireflies(ctx, t, 1 - this.skyF);
-    this.drawWater(ctx, t, sky, forest);
+    // No espaço o "reflexo do céu" na poeira é o roxo do horizonte
+    this.drawWater(ctx, t, space ? { hor: [120, 80, 220] } : sky, WATERS[scenery] || ICE_WATER);
     game.particles.drawRipples(ctx);
     this.drawEntities(ctx, game, t);
     game.particles.drawPuffs(ctx);
@@ -113,6 +138,7 @@ export class Renderer {
     }
     game.particles.drawTexts(ctx);
     if (game.particles.leaves) drawLeaves(ctx, game.particles.snow, t);
+    else if (game.particles.stardust) drawStardust(ctx, game.particles.snow, t);
     else game.particles.drawSnow(ctx);
     ctx.restore();
 
@@ -189,11 +215,11 @@ export class Renderer {
     ctx.restore();
   }
 
-  // Água gelada ou, na floresta, o rio esverdeado
-  drawWater(ctx, t, sky, forest = false) {
+  // Água gelada, o rio esverdeado da floresta ou a poeira estelar do espaço
+  drawWater(ctx, t, sky, pal = ICE_WATER) {
     const top = WATER_TOP + 10;
     const g = ctx.createLinearGradient(0, top, 0, H);
-    const c = forest ? RIVER.water : ['#1C7E99', '#0E5670', '#052A40'];
+    const c = pal.water;
     g.addColorStop(0, c[0]);
     g.addColorStop(0.4, c[1]);
     g.addColorStop(1, c[2]);
@@ -207,7 +233,7 @@ export class Renderer {
     ctx.fillStyle = r;
     ctx.fillRect(0, top, W, 140);
     // Sombra do paredão de gelo (ou do barranco) na água
-    ctx.fillStyle = forest ? RIVER.bank : 'rgba(3, 30, 48, 0.35)';
+    ctx.fillStyle = pal.bank;
     ctx.fillRect(0, top, W, 6);
 
     // Ondulação
@@ -215,7 +241,7 @@ export class Renderer {
     ctx.lineCap = 'round';
     for (let j = 0, y = top + 10; y < H; j++, y += 12 + j * 0.9) {
       const depth = (y - top) / (H - top);
-      const rc = forest ? RIVER.ripple.join(', ') : '190, 235, 250';
+      const rc = pal.ripple.join(', ');
       ctx.strokeStyle = `rgba(${rc}, ${0.2 * (1 - depth) + 0.04})`;
       ctx.lineWidth = 1.4;
       const dir = j % 2 ? 1 : -1;
@@ -254,8 +280,8 @@ export class Renderer {
     game.rows.forEach((r, i) => { if (r.y <= p.y + 16) bucket = i; });
     if ((p.state === 'drown' || p.state === 'freeze') && p.row >= 0) bucket = Math.max(bucket, p.row);
 
-    const cabin = game.igloo.style === 'cabin';
-    if (cabin) drawCabin(ctx, game.igloo, t);
+    const house = HOUSE_DRAW[game.igloo.style];
+    if (house) house.body(ctx, game.igloo, t);
     else game.igloo.draw(ctx, t);
     if (game.special?.decor === 'natal' && game.igloo.complete) drawIglooLights(ctx, t);
     if (game.bear.active) drawBear(ctx, game.bear, t, outfits.bear);
@@ -263,30 +289,33 @@ export class Renderer {
       drawP();
       // Passando pela porta: moldura do arco, sombra do interior e cortina por cima dele
       if (p.inDoorway) {
-        if (cabin) drawCabinDoorFront(ctx, game.igloo, t);
+        if (house) house.front(ctx, game.igloo, t);
         else game.igloo.drawDoorFront(ctx, t);
       }
     }
     if (game.atDoor) this.drawDoorHint(ctx, game, t);
-    const logs = game.special?.scenery === 'forest';
+    const scenery = game.special?.scenery;
+    // No espaço, os peixes viram estrelinhas douradas (mesmos pontos)
+    const fishDraw = scenery === 'space' ? drawStarBonus : drawFish;
     game.rows.forEach((row, i) => {
-      this.drawRow(ctx, row, t, logs);
+      this.drawRow(ctx, row, t, scenery);
       for (const c of game.critters.inRow(i)) {
-        if (c.x > -60 && c.x < W + 60) CRITTER_DRAW[c.kind](ctx, c, row.y, t);
+        if (c.x > -60 && c.x < W + 60) (c.kind === 'fish' ? fishDraw : CRITTER_DRAW[c.kind])(ctx, c, row.y, t);
       }
       if (p.state !== 'gone' && bucket === i) drawP();
     });
   }
 
-  // Placas de gelo ou, na floresta, troncos (`logs`)
-  drawRow(ctx, row, t, logs = false) {
+  // Placas de gelo, troncos (floresta) ou asteroides (espaço), conforme o cenário
+  drawRow(ctx, row, t, scenery = null) {
+    const sprite = FLOE_SPRITE[scenery] || floeSprite;
     const items = [];
     for (const r of row.rects()) {
       if (r.x > W + 20 || r.x + r.w < -20) continue;
       const y = row.y + floeOffset(r.piece, t);
-      items.push({ x: r.x, y, w: r.w, s: logs ? logSprite(r.piece, row.active) : floeSprite(r.piece, row.active) });
+      items.push({ x: r.x, y, w: r.w, s: sprite(r.piece, row.active) });
     }
-    const halo = logs ? RIVER.halo.join(', ') : '79, 195, 247';
+    const halo = (FLOE_HALO[scenery] || [79, 195, 247]).join(', ');
     // Sombras, reflexos e brilho primeiro, para não cobrirem as placas vizinhas
     for (const it of items) {
       ctx.fillStyle = 'rgba(2, 28, 46, 0.32)';

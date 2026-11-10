@@ -11,6 +11,14 @@ import { Sleigh } from './christmas.js';
 import { Sfx } from './audio.js';
 import { levelParams, levelIntro } from './levels.js';
 import { loadHighScore, saveHighScore } from './storage.js';
+import { DUST } from './space.js';
+
+// Cores das partículas de pouso por cenário: poeira na costa, lascas ao pousar
+// numa placa e brilhos da fileira que acende (padrão = neve e gelo)
+const LAND_FX = {
+  forest: { puff: '#C9B98A', chip: '#C08A50', spark: '#FFE6A8' },
+  space: { puff: DUST.regolith, chip: DUST.rock, spark: DUST.spark },
+};
 
 // Estados: title (tela inicial), play (jogando, incluindo animações de morte),
 // entering (entrando no iglu), levelEnd (contagem do bônus), gameOver.
@@ -80,6 +88,7 @@ export class Game {
     this.igloo.reset();
     this.igloo.style = 'igloo';
     this.particles.leaves = false;
+    this.particles.stardust = false;
     while (!this.igloo.complete) this.igloo.add();
     this.igloo.anim.fill(1);
     this.igloo.landed.fill(true);
@@ -171,10 +180,12 @@ export class Game {
     this.params = levelParams(this.level);
     this.rows = createRows(this.level);
     this.igloo.reset();
-    // Fase da floresta: cabana de madeira no lugar do iglu e folhas no lugar da neve
+    // Fases com cenário próprio: cabana/base no lugar do iglu; folhas ou poeira
+    // estelar no lugar da neve
     const sp = this.params.special;
     this.igloo.style = sp?.house || 'igloo';
     this.particles.leaves = sp?.scenery === 'forest';
+    this.particles.stardust = sp?.scenery === 'space';
     this.player = new Player(this);
     this.critters.reset(this.params);
     this.bear.reset(this.params);
@@ -261,9 +272,9 @@ export class Game {
 
     if (this.state === 'play') {
       if (this.player.alive) {
-        // Vapor da respiração quando está frio
+        // Vapor da respiração quando está frio (o astronauta respira dentro do capacete)
         this.breathT = (this.breathT || 0) - dt;
-        if (this.temp <= RULES.breathBelow && this.player.state === 'stand' && this.breathT <= 0) {
+        if (this.temp <= RULES.breathBelow && !this.space && this.player.state === 'stand' && this.breathT <= 0) {
           this.breathT = 1.3;
           const p = this.player;
           this.particles.breath(p.x + p.facing * 12, p.y - 52, p.facing);
@@ -317,6 +328,15 @@ export class Game {
     return this.special?.scenery === 'forest';
   }
 
+  // Fase com o cenário do espaço (asteroides, base lunar, poeira estelar)
+  get space() {
+    return this.special?.scenery === 'space';
+  }
+
+  get landFx() {
+    return LAND_FX[this.special?.scenery] || {};
+  }
+
   // Jogador parado/andando na costa, em frente à porta do iglu completo
   get atDoor() {
     const p = this.player;
@@ -343,20 +363,20 @@ export class Game {
     this.sfx.play('land');
     const p = this.player;
     if (row < 0) {
-      this.particles.puff(p.x, p.y, 6, this.forest ? '#C9B98A' : '#FFFFFF');
+      this.particles.puff(p.x, p.y, 6, this.landFx.puff || '#FFFFFF');
       return;
     }
     // A placa afunda um pouco e balança; lascas de gelo voam
     if (p.support) p.support.dip = 1;
-    // Lascas de gelo (ou de casca de árvore, nos troncos)
-    this.particles.chips(p.x, p.y, 7, this.forest ? '#C08A50' : undefined);
+    // Lascas de gelo (ou de casca de árvore nos troncos, de rocha nos asteroides)
+    this.particles.chips(p.x, p.y, 7, this.landFx.chip);
     const r = this.rows[row];
     if (r.active) return;
     r.active = true;
     this.sfx.play('floe');
     // Brilhos subindo das placas visíveis da fileira que acendeu
     for (const q of r.rects()) {
-      if (q.x > -q.w && q.x < W) this.particles.sparkle(q.x + q.w / 2, r.y - 4, 2, this.forest ? '#FFE6A8' : undefined);
+      if (q.x > -q.w && q.x < W) this.particles.sparkle(q.x + q.w / 2, r.y - 4, 2, this.landFx.spark);
     }
     this.addScore(this.params.floePoints);
     this.particles.text(this.player.x, this.player.y - 80, `+${this.params.floePoints}`);

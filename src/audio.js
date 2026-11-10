@@ -66,7 +66,14 @@ export const SOUNDS = {
     s.noise({ dur: 1.0, vol: 0.1, filter: 'highpass', f0: 6000 });
     [96, 91, 88, 84].forEach((n, i) => s.tone({ type: 'sine', f0: NOTE(n), dur: 0.15, vol: 0.06, t: 0.1 + i * 0.15 }));
   },
-  growl(s) {
+  growl(s, o = {}) {
+    if (o.kind === 'alien') {
+      // Grito de alienígena: chiado que oscila subindo e descendo
+      [0, 0.12, 0.24].forEach((t, i) =>
+        s.tone({ type: 'sawtooth', f0: 380 + i * 60, f1: 760 - i * 90, dur: 0.14, vol: 0.12, t, filter: 2200 }));
+      s.tone({ type: 'square', f0: 900, f1: 150, dur: 0.5, vol: 0.06, t: 0.3, filter: 1500 });
+      return;
+    }
     s.tone({ type: 'sawtooth', f0: 110, f1: 60, dur: 0.55, vol: 0.22, filter: 500 });
     s.noise({ dur: 0.5, vol: 0.15, filter: 'lowpass', f0: 400 });
   },
@@ -91,6 +98,18 @@ export const SOUNDS = {
       // Mordida: dois estalos rápidos
       s.noise({ dur: 0.04, vol: 0.25, filter: 'bandpass', f0: 2200, q: 5 });
       s.noise({ dur: 0.04, vol: 0.25, filter: 'bandpass', f0: 2000, q: 5, t: 0.07 });
+    } else if (o.kind === 'ufo') {
+      // Disco voador: "uiú-uiú" oscilante
+      s.tone({ type: 'sine', f0: 700, f1: 1400, dur: 0.12, vol: 0.09 });
+      s.tone({ type: 'sine', f0: 1400, f1: 700, dur: 0.12, vol: 0.09, t: 0.12 });
+      s.tone({ type: 'sine', f0: 700, f1: 1400, dur: 0.12, vol: 0.07, t: 0.24 });
+    } else if (o.kind === 'crawler') {
+      // Bichinho lunar: tagarelice aguda
+      [0, 0.05, 0.1, 0.15].forEach((t, i) =>
+        s.tone({ type: 'square', f0: 1300 + (i % 2) * 500, dur: 0.035, vol: 0.05, t, filter: 4000 }));
+    } else if (o.kind === 'comet') {
+      // Cometa passando: sopro chiado que desce
+      s.noise({ dur: 0.4, vol: 0.18, filter: 'bandpass', f0: 5000, f1: 900, q: 2 });
     } else {
       // Batida seca (caranguejo, molusco)
       s.noise({ dur: 0.06, vol: 0.25, filter: 'bandpass', f0: 1200, q: 4 });
@@ -252,12 +271,99 @@ function buildForestTrack({ beat }) {
   return { beat, length: FOREST_BARS.length * 4, events };
 }
 
+// ---- Espaço: tema original de ficção científica em lá menor.
+// Colchão de sintetizador nos acordes, arpejo de "computador" em colcheias,
+// baixo pulsando, melodia de teremim deslizando e bipes de rádio.
+
+// Colchão: acorde inteiro, longo e suave
+function pad(s, notes, t, dur) {
+  for (const n of notes) {
+    s.tone({ type: 'sine', f0: NOTE(n), dur, vol: 0.016, t });
+    s.tone({ type: 'triangle', f0: NOTE(n) * 1.004, dur: dur * 0.9, vol: 0.008, t, filter: 900 });
+  }
+}
+
+function arp(s, n, t) {
+  s.tone({ type: 'square', f0: NOTE(n + 12), dur: 0.12, vol: 0.016, t, filter: 2600 });
+}
+
+function synthBass(s, n, t) {
+  s.tone({ type: 'sawtooth', f0: NOTE(n), dur: 0.3, vol: 0.05, t, filter: 420 });
+}
+
+// Teremim: seno que desliza até a nota, com um harmônico bem baixinho
+function theremin(s, n, t, dur) {
+  s.tone({ type: 'sine', f0: NOTE(n) * 0.97, f1: NOTE(n), dur, vol: 0.05, t });
+  s.tone({ type: 'sine', f0: NOTE(n + 12) * 0.97, f1: NOTE(n + 12), dur: dur * 0.7, vol: 0.008, t });
+}
+
+// Bipes de rádio da base
+function bleep(s, t, n) {
+  s.tone({ type: 'sine', f0: NOTE(n), dur: 0.05, vol: 0.02, t });
+  s.tone({ type: 'sine', f0: NOTE(n + 7), dur: 0.05, vol: 0.016, t: t + 0.08 });
+}
+
+const SPACE_CHORDS = {
+  Am: { bass: 45, notes: [57, 60, 64] },
+  F: { bass: 41, notes: [57, 60, 65] },
+  C: { bass: 48, notes: [55, 60, 64] },
+  G: { bass: 43, notes: [55, 59, 62] },
+  Dm: { bass: 50, notes: [57, 62, 65] },
+  E: { bass: 40, notes: [56, 59, 64] },
+};
+const SPACE_BARS = ['Am', 'Am', 'F', 'F', 'C', 'C', 'G', 'E', 'Am', 'Am', 'F', 'F', 'Dm', 'Dm', 'E', 'E'];
+// Melodia original do teremim, um compasso por linha (nota 0 = pausa)
+const SPACE_TUNE = [
+  [76, 2], [74, 1], [72, 1],
+  [69, 3], [0, 1],
+  [72, 1], [74, 1], [76, 2],
+  [77, 2], [76, 2],
+  [79, 2], [76, 1], [72, 1],
+  [74, 3], [0, 1],
+  [71, 1], [74, 1], [79, 2],
+  [80, 3], [0, 1],
+  [81, 2], [79, 1], [76, 1],
+  [77, 1], [76, 1], [74, 2],
+  [72, 1], [74, 1], [76, 1], [77, 1],
+  [76, 3], [0, 1],
+  [74, 2], [77, 1], [76, 1],
+  [74, 2], [72, 2],
+  [71, 2], [68, 2],
+  [69, 3], [0, 1],
+];
+
+function buildSpaceTrack({ beat }) {
+  const events = [];
+  const add = (b, play) => events.push({ beat: b, play });
+  SPACE_BARS.forEach((name, bar) => {
+    const c = SPACE_CHORDS[name];
+    const b0 = bar * 4;
+    add(b0, (s, t) => pad(s, c.notes, t, 4 * beat));
+    // Baixo pulsando no 1 e no "e" do 2
+    add(b0, (s, t) => synthBass(s, c.bass, t));
+    add(b0 + 1.5, (s, t) => synthBass(s, c.bass, t));
+    add(b0 + 2, (s, t) => synthBass(s, c.bass + 12, t));
+    // Arpejo subindo e descendo em colcheias
+    const seq = [0, 1, 2, 1, 0, 1, 2, 1];
+    seq.forEach((k, i) => add(b0 + i * 0.5, (s, t) => arp(s, c.notes[k], t)));
+    // Bipes de rádio a cada dois compassos
+    if (bar % 2 === 1) add(b0 + 3.5, (s, t) => bleep(s, t, 96 - (bar % 4) * 2));
+  });
+  for (const m of phrase(SPACE_TUNE)) {
+    if (m.note) add(m.beat, (s, t) => theremin(s, m.note, t, Math.min(1.4, m.len * beat * 0.95)));
+  }
+  events.sort((a, b) => a.beat - b.beat);
+  return { beat, length: SPACE_BARS.length * 4, events };
+}
+
 // Trilhas disponíveis (as fases especiais escolhem a sua em specials.js)
 export const MUSIC = {
   // 64 batidas de melodia + 8 só de guizos, antes de recomeçar
   natal: buildTrack({ beat: 0.44, length: 72, melody: NATAL_MELODY }),
   // 16 compassos (64 batidas), cerca de 24 s por volta
   floresta: buildForestTrack({ beat: 0.38 }),
+  // 16 compassos (64 batidas), cerca de 26 s por volta
+  espaco: buildSpaceTrack({ beat: 0.4 }),
 };
 const LOOKAHEAD = 0.12; // agenda as notas um pouco antes da hora
 

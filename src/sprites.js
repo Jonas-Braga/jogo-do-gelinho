@@ -1,6 +1,7 @@
 // Arte procedural. Tudo que é estático é pré-renderizado em canvases offscreen
 // com 2x de resolução para ficar nítido quando a tela é escalada.
 import { W, SHORE_TOP, WATER_TOP, PALETTE as C, CROUCH_SCALE } from './config.js';
+import { drawAlien } from './space.js';
 
 const SS = 2;
 
@@ -264,17 +265,30 @@ const OUTFITS = {
     // Calça jeans e botina de trabalho com a borda de couro (sem pelo)
     pants: ['#33507A', '#243A5A'], bootTrim: ['#3A2614', '#2E1E10'],
   },
+  // Astronauta (fase do espaço): traje branco, capacete de vidro, mochila de
+  // oxigênio, painel no peito, luvas e botas cinza
+  astronaut: {
+    body: ['#FFFFFF', '#E9EEF4', '#AEB6C4'], armBack: '#C3CAD6', armFront: ['#F4F7FA', '#B9C1CE'],
+    seam: 'rgba(90, 100, 120, 0.5)', suit: true, helmet: true,
+    pants: ['#E1E6EE', '#B4BCC9'], boots: ['#8A90A0', '#6A7080'], bootTrim: ['#C3CAD6', '#9AA2B2'],
+    hands: ['#7C8294', '#8E95A6'],
+  },
 };
+export const ASTRO_WHITE = '#E9EEF4';
+const VISOR_RIM = '#D6DCE6';
 export const PLAID_RED = '#B42E26';
 const PLAID_DARK = 'rgba(30, 10, 10, 0.55)';
 const SUSPENDER = '#2E4A6B';
 const BEANIE = ['#3F6E3A', '#2C5229'];
 const HAIR = '#6B4524';
 
-// Punho da manga conforme a roupa (pelo, tricô ou punho da camisa)
+// Punho da manga conforme a roupa (pelo, tricô, punho da camisa ou anel do traje)
 function cuff(ctx, O, x, y, w) {
   if (O.sweater) knitCuff(ctx, x, y, w);
-  else if (O.plaid) {
+  else if (O.suit) {
+    ctx.fillStyle = '#5B8BD9';
+    ctx.fillRect(x, y, w, 3.5);
+  } else if (O.plaid) {
     ctx.fillStyle = '#7A1A16';
     ctx.fillRect(x, y, w, 3.5);
   } else {
@@ -311,6 +325,108 @@ function plaidPattern(ctx, back) {
     ctx.fillRect(-9.5, -24, 3, 2.5);
     ctx.fillRect(7.5, -24, 3, 2.5);
   }
+}
+
+// ---- Traje de astronauta
+// Mochila de oxigênio: de lado (atrás das costas) ou vista de costas (centralizada)
+function backpack(ctx, back) {
+  const g = ctx.createLinearGradient(-20, 0, 12, 0);
+  g.addColorStop(0, '#9AA2B2');
+  g.addColorStop(1, '#DDE3EC');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  if (back) ctx.roundRect(-13, -51, 26, 32, 5);
+  else ctx.roundRect(-25, -50, 15, 30, 4);
+  ctx.fill();
+  ctx.fillStyle = '#6A7080';
+  if (back) {
+    // Grade de ventilação e luzinha
+    for (let y = -45; y < -27; y += 4) ctx.fillRect(-8, y, 16, 1.6);
+    ctx.fillStyle = '#5AF0A0';
+    ctx.fillRect(6, -24, 3, 3);
+  } else {
+    ctx.fillRect(-23, -44, 11, 2);
+    ctx.fillRect(-23, -30, 11, 2);
+  }
+}
+
+// Painel de controle no peito e cinto do traje
+function suitPanel(ctx) {
+  ctx.fillStyle = '#C3CAD6';
+  ctx.beginPath();
+  ctx.roundRect(-4, -38, 15, 11, 2);
+  ctx.fill();
+  for (const [x, c] of [[-1.5, '#E5484D'], [3, '#5AF0A0'], [7.5, '#5B8BD9']]) {
+    ctx.fillStyle = c;
+    ctx.fillRect(x, -35, 3, 3);
+  }
+  ctx.fillStyle = 'rgba(90, 100, 120, 0.6)';
+  ctx.fillRect(-2, -30.5, 11, 1.2);
+  // Bandeirinha no ombro (estrela)
+  ctx.fillStyle = '#2C6FD6';
+  ctx.fillRect(-12, -42, 7, 5);
+  ctx.fillStyle = '#FFD84A';
+  ctx.fillRect(-9.5, -40.5, 2, 2);
+}
+
+function suitHem(ctx) {
+  ctx.fillStyle = '#9AA2B2';
+  ctx.beginPath();
+  ctx.roundRect(-17, -17, 34, 5, 2);
+  ctx.fill();
+  ctx.fillStyle = '#5B8BD9';
+  ctx.fillRect(-3, -16.5, 6, 4);
+}
+
+// Casco do capacete (atrás do rosto): de frente com a abertura do visor escura
+function helmetShell(ctx, back) {
+  const g = ctx.createRadialGradient(-4, -64, 2, 1, -57, 18);
+  g.addColorStop(0, '#FFFFFF');
+  g.addColorStop(1, '#B9C1CE');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(back ? 0 : 2, -58, 16.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Anel do pescoço
+  ctx.fillStyle = '#8E95A6';
+  ctx.beginPath();
+  ctx.roundRect(-12, -47.5, 25, 4.5, 2);
+  ctx.fill();
+  if (back) {
+    // Costura do casco e luzinha de cima
+    ctx.strokeStyle = 'rgba(90, 100, 120, 0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, -74);
+    ctx.quadraticCurveTo(1.5, -58, 0, -45);
+    ctx.stroke();
+    return;
+  }
+  ctx.fillStyle = '#24304F';
+  ctx.beginPath();
+  ctx.ellipse(6, -57, 11, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Vidro do visor (por cima do rosto): reflexo azulado, aro e brilho
+function helmetGlass(ctx) {
+  ctx.fillStyle = 'rgba(140, 200, 255, 0.22)';
+  ctx.beginPath();
+  ctx.ellipse(6, -57, 11, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = VISOR_RIM;
+  ctx.lineWidth = 2.4;
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.ellipse(6, -57, 8, 7, 0, Math.PI * 1.1, Math.PI * 1.45);
+  ctx.stroke();
+  // Luzinha na lateral do capacete
+  ctx.fillStyle = '#5AF0A0';
+  ctx.beginPath();
+  ctx.arc(-11, -62, 1.8, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // Barra da camisa por dentro da calça: cinto de couro com fivela
@@ -484,7 +600,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   const leg = (lx, lift, back) => {
     ctx.fillStyle = O.pants ? O.pants[back ? 1 : 0] : back ? '#2E2218' : C.pants;
     ctx.fillRect(lx - 4, -20 - lift, 8, 12);
-    ctx.fillStyle = back ? '#4A3220' : C.boots;
+    ctx.fillStyle = O.boots ? O.boots[back ? 1 : 0] : back ? '#4A3220' : C.boots;
     ctx.beginPath();
     ctx.roundRect(lx - 5, -10 - lift, 12, 10, 3);
     ctx.fill();
@@ -502,6 +618,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   }
 
   ctx.translate(0, bob);
+  if (O.helmet) backpack(ctx, false);
 
   // Braço de trás (na fuga, os braços são desenhados erguidos depois da cabeça)
   if (!panicking) {
@@ -512,7 +629,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   ctx.beginPath();
   ctx.roundRect(-4, 0, 8, 18, 4);
   ctx.fill();
-  ctx.fillStyle = '#4A3423';
+  ctx.fillStyle = O.hands ? O.hands[0] : '#4A3423';
   ctx.beginPath();
   ctx.arc(0, 20, 4.5, 0, Math.PI * 2);
   ctx.fill();
@@ -544,6 +661,9 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     ctx.fillRect(-18, -50, 36, 40);
     ctx.restore();
     sweaterHem(ctx);
+  } else if (O.suit) {
+    suitPanel(ctx);
+    suitHem(ctx);
   } else if (O.plaid) {
     ctx.save();
     ctx.clip();
@@ -574,7 +694,9 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     }
   }
 
-  if (O.beanie) {
+  if (O.helmet) {
+    helmetShell(ctx, false);
+  } else if (O.beanie) {
     // Cabelo na nuca e orelha (o gorro vem por cima, depois do rosto)
     ctx.fillStyle = HAIR;
     ctx.beginPath();
@@ -669,6 +791,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   }
 
   if (O.beanie) beanieHat(ctx, false);
+  if (O.helmet) helmetGlass(ctx);
 
   // Na fuga: os dois braços erguidos em "V" acima da cabeça, sacudindo
   if (panicking) {
@@ -681,7 +804,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
       ctx.roundRect(-4.5, 0, 9, 25, 4);
       ctx.fill();
       cuff(ctx, O, -5, 21, 10);
-      ctx.fillStyle = back ? '#4A3423' : '#5A3E2A';
+      ctx.fillStyle = O.hands ? O.hands[back ? 0 : 1] : back ? '#4A3423' : '#5A3E2A';
       ctx.beginPath();
       ctx.arc(0, 28, 5, 0, Math.PI * 2);
       ctx.fill();
@@ -712,7 +835,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     ctx.fillRect(-4.5, 10, 9, 2.5);
   }
   cuff(ctx, O, -5, 15, 10);
-  ctx.fillStyle = '#5A3E2A';
+  ctx.fillStyle = O.hands ? O.hands[1] : '#5A3E2A';
   ctx.beginPath();
   ctx.arc(0, 21, 4.8, 0, Math.PI * 2);
   ctx.fill();
@@ -778,7 +901,7 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
   for (const [lx, lift] of [[-5, Math.max(0, step) * 3], [5, Math.max(0, -step) * 3]]) {
     ctx.fillStyle = O.pants ? O.pants[0] : C.pants;
     ctx.fillRect(lx - 4, -20 - lift, 8, 12);
-    ctx.fillStyle = C.boots;
+    ctx.fillStyle = O.boots ? O.boots[0] : C.boots;
     ctx.beginPath();
     ctx.roundRect(lx - 5, -10 - lift, 10, 10, 3);
     ctx.fill();
@@ -799,7 +922,7 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     ctx.roundRect(-4.5, 0, 9, 19, 4);
     ctx.fill();
     cuff(ctx, O, -5, 16, 10);
-    ctx.fillStyle = '#4A3423';
+    ctx.fillStyle = O.hands ? O.hands[0] : '#4A3423';
     ctx.beginPath();
     ctx.arc(0, 22, 4.6, 0, Math.PI * 2);
     ctx.fill();
@@ -825,6 +948,8 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     sweaterPattern(ctx, true);
     ctx.restore();
     sweaterHem(ctx);
+  } else if (O.suit) {
+    suitHem(ctx);
   } else if (O.plaid) {
     ctx.save();
     ctx.clip();
@@ -848,6 +973,12 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     }
   }
 
+  if (O.helmet) {
+    // Mochila de oxigênio nas costas e o casco do capacete por trás
+    backpack(ctx, true);
+    helmetShell(ctx, true);
+    return;
+  }
   if (O.beanie) {
     // Nuca com cabelo, orelhas e o gorro de lã por cima
     ctx.fillStyle = HAIR;
@@ -1429,6 +1560,10 @@ function drawBrownBear(ctx, b, t) {
 export function drawBear(ctx, b, t, outfit = null) {
   if (outfit === 'brown') {
     drawBrownBear(ctx, b, t);
+    return;
+  }
+  if (outfit === 'alien') {
+    drawAlien(ctx, b, t);
     return;
   }
   const F = BEAR_FUR.polar;

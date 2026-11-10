@@ -1,5 +1,13 @@
 import { IGLOO, RULES, SHORE_Y } from './config.js';
 import { CABIN_PIECES, CABIN_VENT, RIVER } from './forest.js';
+import { BASE_PIECES, BASE_VENT, DUST } from './space.js';
+
+// Construções das fases especiais: peças (para a poeira do encaixe), de onde sai
+// a fumaça e a cor da poeira. O iglu usa o próprio layout de blocos.
+const HOUSES = {
+  cabin: { pieces: CABIN_PIECES, vent: CABIN_VENT, dust: RIVER.sawdust },
+  base: { pieces: BASE_PIECES, vent: BASE_VENT, dust: DUST.regolith },
+};
 
 const LAYERS = [5, 4, 3, 2, 1]; // 15 blocos em 5 camadas; a peça 16 é a porta (pórtico)
 
@@ -43,7 +51,7 @@ export class Igloo {
     this.particles = particles;
     this.sfx = sfx;
     this.layout = buildLayout();
-    // 'igloo' ou 'cabin' (fase da floresta): só muda o desenho e de onde saem
+    // 'igloo', 'cabin' (floresta) ou 'base' (espaço): só muda o desenho e de onde saem
     // a serragem e a fumaça; as regras de construção são as mesmas
     this.style = 'igloo';
     this.reset();
@@ -76,18 +84,20 @@ export class Igloo {
 
   // Topo da cúpula (de onde sai a fumaça)
   get ventPos() {
-    if (this.style === 'cabin') return { ...CABIN_VENT };
+    const h = HOUSES[this.style];
+    if (h) return { ...h.vent };
     return { x: IGLOO.x + 6, y: IGLOO.baseY - IGLOO.ry + 4 };
   }
 
-  // Poeira do encaixe: neve no iglu, serragem na cabana
+  // Poeira do encaixe: neve no iglu, serragem na cabana, poeira lunar na base
   get dustColor() {
-    return this.style === 'cabin' ? RIVER.sawdust : '#FFFFFF';
+    return HOUSES[this.style]?.dust || '#FFFFFF';
   }
 
   pieceWorld(i) {
-    if (this.style === 'cabin') {
-      const c = CABIN_PIECES[Math.min(i, CABIN_PIECES.length - 1)];
+    const h = HOUSES[this.style];
+    if (h) {
+      const c = h.pieces[Math.min(i, h.pieces.length - 1)];
       return { x: IGLOO.x + c.cx, y: IGLOO.baseY + c.cy };
     }
     if (i >= this.layout.length) return { x: DOOR.x, y: DOOR.bottom - DOOR.porchRy + 20 };

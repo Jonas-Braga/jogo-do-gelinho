@@ -1,8 +1,13 @@
 import { W, ROW_Y } from './config.js';
 
-// Largura de colisão de cada tipo. Os bichos da floresta têm o tamanho dos que
-// substituem (morcego = ganso, cobra = caranguejo, piranha = molusco).
-export const SIZE = { goose: 44, crab: 40, clam: 34, fish: 30, bat: 44, snake: 40, piranha: 34 };
+// Largura de colisão de cada tipo. Os bichos das fases especiais têm o tamanho dos
+// que substituem (morcego e disco voador = ganso, cobra e bichinho lunar =
+// caranguejo, piranha e cometa = molusco).
+export const SIZE = {
+  goose: 44, crab: 40, clam: 34, fish: 30,
+  bat: 44, snake: 40, piranha: 34,
+  ufo: 44, crawler: 40, comet: 34,
+};
 const SPACING = 52;
 const PLAYER_HALF = 12;
 

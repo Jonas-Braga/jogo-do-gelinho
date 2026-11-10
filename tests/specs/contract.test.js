@@ -90,8 +90,13 @@ suite('Contrato da especificação', () => {
 
   test('velocidade das placas aumenta a cada fase (até um teto)', () => {
     expect(levelParams(2).speed).toBeGreaterThan(levelParams(1).speed);
+    // Exceção aprovada pelo usuário: uma fase especial pode ter ritmo próprio
+    // (`pace` no tema, ex.: espaço a 80%). A velocidade base (sem o ritmo) continua crescendo.
+    const base = (l) => levelParams(l).speed / (levelParams(l).special?.pace ?? 1);
     for (let l = 2; l <= 30; l++) {
-      expect(levelParams(l).speed, `fase ${l}`).toBeGreaterThanOrEqual(levelParams(l - 1).speed);
+      expect(base(l), `fase ${l}`).toBeGreaterThanOrEqual(base(l - 1) - 1e-9);
+      // Fora das fases com ritmo próprio, a velocidade real é a base
+      if (!levelParams(l).special?.pace) expect(levelParams(l).speed, `fase ${l}`).toBe(base(l));
     }
   });
 
