@@ -2,6 +2,7 @@
 // com 2x de resolução para ficar nítido quando a tela é escalada.
 import { W, SHORE_TOP, WATER_TOP, PALETTE as C, CROUCH_SCALE } from './config.js';
 import { drawAlien } from './space.js';
+import { drawGiantCrab } from './beach.js';
 
 const SS = 2;
 
@@ -274,7 +275,17 @@ const OUTFITS = {
     hands: ['#7C8294', '#8E95A6'],
   },
 };
+// Surfista (fase da praia): camisa florida de manga curta, bermuda laranja,
+// pernas e pés descalços de chinelo, cabelo loiro bagunçado e óculos escuros
+OUTFITS.surfer = {
+  body: ['#3FD3CC', '#1FB5B0', '#13807C'], armBack: '#C98B62', armFront: ['#E3AA80', '#C98B62'],
+  seam: 'rgba(10, 70, 70, 0.5)', floral: true, shortSleeve: true, sleeve: ['#1FB5B0', '#178F8B'],
+  pants: ['#FF8A3D', '#D96A22'], shorts: true, skin: ['#E3AA80', '#C98B62'],
+  boots: ['#E3AA80', '#C98B62'], bootTrim: ['#E3AA80', '#C98B62'], sole: '#2FB5E8',
+  hands: ['#C98B62', '#E3AA80'], hair: '#F2C94C',
+};
 export const ASTRO_WHITE = '#E9EEF4';
+export const SURF_SHIRT = '#1FB5B0';
 const VISOR_RIM = '#D6DCE6';
 export const PLAID_RED = '#B42E26';
 const PLAID_DARK = 'rgba(30, 10, 10, 0.55)';
@@ -284,6 +295,7 @@ const HAIR = '#6B4524';
 
 // Punho da manga conforme a roupa (pelo, tricô, punho da camisa ou anel do traje)
 function cuff(ctx, O, x, y, w) {
+  if (O.shortSleeve) return; // manga curta: braço de fora, sem punho
   if (O.sweater) knitCuff(ctx, x, y, w);
   else if (O.suit) {
     ctx.fillStyle = '#5B8BD9';
@@ -325,6 +337,125 @@ function plaidPattern(ctx, back) {
     ctx.fillRect(-9.5, -24, 3, 2.5);
     ctx.fillRect(7.5, -24, 3, 2.5);
   }
+}
+
+// ---- Surfista
+// Manga curta por cima do braço (o braço é desenhado com a cor da pele)
+function sleeve(ctx, O, back = false) {
+  if (!O.shortSleeve) return;
+  ctx.fillStyle = O.sleeve[back ? 1 : 0];
+  ctx.beginPath();
+  ctx.roundRect(-5, -1, 10, 9, 3);
+  ctx.fill();
+}
+
+// Estampa florida da camisa (já recortada pelo contorno do corpo)
+function floralPattern(ctx, back) {
+  const flowers = [[-10, -42], [6, -46], [-2, -32], [11, -28], [-12, -22], [3, -20]];
+  for (const [i, [x, y]] of flowers.entries()) {
+    const fx = back ? -x : x;
+    ctx.fillStyle = i % 2 ? '#FFFFFF' : '#FF6FA8';
+    for (let k = 0; k < 5; k++) {
+      const a = (k * Math.PI * 2) / 5 + i;
+      ctx.beginPath();
+      ctx.arc(fx + Math.cos(a) * 2.6, y + Math.sin(a) * 2.6, 1.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#FFD23F';
+    ctx.beginPath();
+    ctx.arc(fx, y, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Folhinhas verdes
+  ctx.fillStyle = 'rgba(30, 120, 60, 0.7)';
+  for (const [x, y] of [[-4, -40], [13, -37], [-14, -32], [8, -16]]) {
+    ctx.beginPath();
+    ctx.ellipse(back ? -x : x, y, 3, 1.4, 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Abertura da camisa com botões (só de frente)
+  if (!back) {
+    ctx.strokeStyle = 'rgba(10, 70, 70, 0.55)';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(4, -46);
+    ctx.lineTo(5, -15);
+    ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    for (const y of [-38, -29, -20]) ctx.fillRect(5.5, y, 1.6, 1.6);
+  }
+}
+
+// Cós da bermuda com cordão
+function shortsHem(ctx, O, back) {
+  ctx.fillStyle = O.pants[1];
+  ctx.beginPath();
+  ctx.roundRect(-17, -17, 34, 5, 2);
+  ctx.fill();
+  if (!back) {
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(2, -14);
+    ctx.lineTo(0, -9);
+    ctx.moveTo(4, -14);
+    ctx.lineTo(5, -9);
+    ctx.stroke();
+  }
+}
+
+// Cabelo loiro: atrás da cabeça (antes do rosto) e a franja bagunçada (depois)
+function surfHairBack(ctx, O, back) {
+  ctx.fillStyle = O.hair;
+  ctx.beginPath();
+  ctx.arc(back ? 0 : -2, back ? -57 : -58, back ? 12.5 : 11.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = O.skin[0];
+  if (back) {
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(s * 12, -56, 2.6, 3.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.beginPath();
+    ctx.ellipse(-3, -56, 3, 3.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function surfHairTop(ctx, O, back) {
+  ctx.fillStyle = O.hair;
+  ctx.beginPath();
+  ctx.moveTo(back ? -13 : -12, -60);
+  const tufts = back ? [[-10, -72], [-4, -67], [0, -74], [5, -68], [10, -73]] : [[-8, -72], [-2, -68], [3, -74], [8, -68], [13, -66]];
+  for (const [x, y] of tufts) ctx.lineTo(x, y);
+  ctx.lineTo(back ? 13 : 13, -60);
+  ctx.quadraticCurveTo(0, back ? -64 : -66, back ? -13 : -12, -60);
+  ctx.fill();
+  if (!back) {
+    // Franja caindo na testa
+    ctx.beginPath();
+    ctx.moveTo(1, -64);
+    ctx.quadraticCurveTo(8, -66, 13, -61);
+    ctx.quadraticCurveTo(8, -62, 4, -60);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+// Óculos escuros: nos olhos, ou levantados na testa quando está assustado
+function sunglasses(ctx, onForehead) {
+  const y = onForehead ? -65 : -59;
+  ctx.fillStyle = '#1D2A33';
+  ctx.beginPath();
+  ctx.roundRect(3, y - 2, 5, 3.6, 1.5);
+  ctx.roundRect(8.6, y - 2, 4.6, 3.6, 1.5);
+  ctx.fill();
+  ctx.fillStyle = '#FF6FA8';
+  ctx.fillRect(2, y - 1.6, 1.4, 1.2);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.fillRect(4, y - 1.3, 1.6, 0.9);
 }
 
 // ---- Traje de astronauta
@@ -600,6 +731,11 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   const leg = (lx, lift, back) => {
     ctx.fillStyle = O.pants ? O.pants[back ? 1 : 0] : back ? '#2E2218' : C.pants;
     ctx.fillRect(lx - 4, -20 - lift, 8, 12);
+    if (O.shorts) {
+      // Bermuda: canela de fora
+      ctx.fillStyle = O.skin[back ? 1 : 0];
+      ctx.fillRect(lx - 3.5, -14 - lift, 7, 6);
+    }
     ctx.fillStyle = O.boots ? O.boots[back ? 1 : 0] : back ? '#4A3220' : C.boots;
     ctx.beginPath();
     ctx.roundRect(lx - 5, -10 - lift, 12, 10, 3);
@@ -608,6 +744,14 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     ctx.beginPath();
     ctx.roundRect(lx - 6, -12 - lift, 12, 4, 2);
     ctx.fill();
+    if (O.sole) {
+      // Chinelo: sola e tira
+      ctx.fillStyle = O.sole;
+      ctx.beginPath();
+      ctx.roundRect(lx - 6, -2.5 - lift, 14, 3, 1.5);
+      ctx.fill();
+      ctx.fillRect(lx + 1, -7 - lift, 2, 5);
+    }
   };
   if (air) {
     leg(-5, 6, true);
@@ -629,6 +773,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   ctx.beginPath();
   ctx.roundRect(-4, 0, 8, 18, 4);
   ctx.fill();
+  sleeve(ctx, O, true);
   ctx.fillStyle = O.hands ? O.hands[0] : '#4A3423';
   ctx.beginPath();
   ctx.arc(0, 20, 4.5, 0, Math.PI * 2);
@@ -664,6 +809,12 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   } else if (O.suit) {
     suitPanel(ctx);
     suitHem(ctx);
+  } else if (O.floral) {
+    ctx.save();
+    ctx.clip();
+    floralPattern(ctx, false);
+    ctx.restore();
+    shortsHem(ctx, O, false);
   } else if (O.plaid) {
     ctx.save();
     ctx.clip();
@@ -696,6 +847,8 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
 
   if (O.helmet) {
     helmetShell(ctx, false);
+  } else if (O.hair) {
+    surfHairBack(ctx, O, false);
   } else if (O.beanie) {
     // Cabelo na nuca e orelha (o gorro vem por cima, depois do rosto)
     ctx.fillStyle = HAIR;
@@ -791,6 +944,10 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   }
 
   if (O.beanie) beanieHat(ctx, false);
+  if (O.hair) {
+    surfHairTop(ctx, O, false);
+    sunglasses(ctx, panicking);
+  }
   if (O.helmet) helmetGlass(ctx);
 
   // Na fuga: os dois braços erguidos em "V" acima da cabeça, sacudindo
@@ -799,10 +956,11 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
       ctx.save();
       ctx.translate(sx, -44);
       ctx.rotate(angle);
-      ctx.fillStyle = back ? O.armBack : O.body[1];
+      ctx.fillStyle = back ? O.armBack : O.shortSleeve ? O.armFront[0] : O.body[1];
       ctx.beginPath();
       ctx.roundRect(-4.5, 0, 9, 25, 4);
       ctx.fill();
+      sleeve(ctx, O, back);
       cuff(ctx, O, -5, 21, 10);
       ctx.fillStyle = O.hands ? O.hands[back ? 0 : 1] : back ? '#4A3423' : '#5A3E2A';
       ctx.beginPath();
@@ -826,6 +984,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   ctx.beginPath();
   ctx.roundRect(-4.5, 0, 9, 18, 4);
   ctx.fill();
+  sleeve(ctx, O);
   if (O.sweater) {
     ctx.fillStyle = KNIT_WHITE;
     ctx.fillRect(-4.5, 6, 9, 1.6); // listra na manga
@@ -901,6 +1060,10 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
   for (const [lx, lift] of [[-5, Math.max(0, step) * 3], [5, Math.max(0, -step) * 3]]) {
     ctx.fillStyle = O.pants ? O.pants[0] : C.pants;
     ctx.fillRect(lx - 4, -20 - lift, 8, 12);
+    if (O.shorts) {
+      ctx.fillStyle = O.skin[1];
+      ctx.fillRect(lx - 3.5, -14 - lift, 7, 6);
+    }
     ctx.fillStyle = O.boots ? O.boots[0] : C.boots;
     ctx.beginPath();
     ctx.roundRect(lx - 5, -10 - lift, 10, 10, 3);
@@ -909,6 +1072,12 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     ctx.beginPath();
     ctx.roundRect(lx - 6, -12 - lift, 12, 4, 2);
     ctx.fill();
+    if (O.sole) {
+      ctx.fillStyle = O.sole;
+      ctx.beginPath();
+      ctx.roundRect(lx - 6, -2.5 - lift, 12, 3, 1.5);
+      ctx.fill();
+    }
   }
   ctx.translate(0, bob);
 
@@ -921,6 +1090,7 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     ctx.beginPath();
     ctx.roundRect(-4.5, 0, 9, 19, 4);
     ctx.fill();
+    sleeve(ctx, O, true);
     cuff(ctx, O, -5, 16, 10);
     ctx.fillStyle = O.hands ? O.hands[0] : '#4A3423';
     ctx.beginPath();
@@ -950,6 +1120,12 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     sweaterHem(ctx);
   } else if (O.suit) {
     suitHem(ctx);
+  } else if (O.floral) {
+    ctx.save();
+    ctx.clip();
+    floralPattern(ctx, true);
+    ctx.restore();
+    shortsHem(ctx, O, true);
   } else if (O.plaid) {
     ctx.save();
     ctx.clip();
@@ -977,6 +1153,12 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     // Mochila de oxigênio nas costas e o casco do capacete por trás
     backpack(ctx, true);
     helmetShell(ctx, true);
+    return;
+  }
+  if (O.hair) {
+    // Nuca com o cabelo loiro bagunçado
+    surfHairBack(ctx, O, true);
+    surfHairTop(ctx, O, true);
     return;
   }
   if (O.beanie) {
@@ -1564,6 +1746,10 @@ export function drawBear(ctx, b, t, outfit = null) {
   }
   if (outfit === 'alien') {
     drawAlien(ctx, b, t);
+    return;
+  }
+  if (outfit === 'giantCrab') {
+    drawGiantCrab(ctx, b, t);
     return;
   }
   const F = BEAR_FUR.polar;

@@ -9,6 +9,7 @@ export class Particles {
     this.fx = [];
     this.leaves = false;   // fase da floresta: folhas caindo no lugar da neve
     this.stardust = false; // fase do espaço: poeira estelar no lugar da neve
+    this.calm = false;     // fase sem nada caindo do céu (praia)
     // Neve ambiente
     this.snow = Array.from({ length: 140 }, () => ({
       x: Math.random() * W,

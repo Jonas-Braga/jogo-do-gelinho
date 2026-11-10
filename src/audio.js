@@ -67,6 +67,12 @@ export const SOUNDS = {
     [96, 91, 88, 84].forEach((n, i) => s.tone({ type: 'sine', f0: NOTE(n), dur: 0.15, vol: 0.06, t: 0.1 + i * 0.15 }));
   },
   growl(s, o = {}) {
+    if (o.kind === 'giantCrab') {
+      // Caranguejo gigante: pinçadas enormes estalando e um ronco grave
+      [0, 0.12, 0.24, 0.36].forEach((t) => s.noise({ dur: 0.04, vol: 0.3, filter: 'bandpass', f0: 1400, q: 6, t }));
+      s.tone({ type: 'sawtooth', f0: 90, f1: 70, dur: 0.5, vol: 0.12, filter: 400 });
+      return;
+    }
     if (o.kind === 'alien') {
       // Grito de alienígena: chiado que oscila subindo e descendo
       [0, 0.12, 0.24].forEach((t, i) =>
@@ -110,6 +116,17 @@ export const SOUNDS = {
     } else if (o.kind === 'comet') {
       // Cometa passando: sopro chiado que desce
       s.noise({ dur: 0.4, vol: 0.18, filter: 'bandpass', f0: 5000, f1: 900, q: 2 });
+    } else if (o.kind === 'gull') {
+      // Gaivota: "kiá-kiá" agudo e rouco
+      s.tone({ type: 'sawtooth', f0: 1500, f1: 1100, dur: 0.12, vol: 0.06, filter: 3000 });
+      s.tone({ type: 'sawtooth', f0: 1450, f1: 1000, dur: 0.14, vol: 0.06, t: 0.16, filter: 3000 });
+    } else if (o.kind === 'siri') {
+      // Siri: pinças estalando
+      [0, 0.06, 0.12].forEach((t) => s.noise({ dur: 0.025, vol: 0.2, filter: 'bandpass', f0: 3200, q: 8, t }));
+    } else if (o.kind === 'jellyfish') {
+      // Água-viva: choquinho elétrico ondulando
+      s.tone({ type: 'square', f0: 220, f1: 660, dur: 0.18, vol: 0.05, filter: 1800 });
+      s.noise({ dur: 0.18, vol: 0.06, filter: 'highpass', f0: 5000, t: 0.02 });
     } else {
       // Batida seca (caranguejo, molusco)
       s.noise({ dur: 0.06, vol: 0.25, filter: 'bandpass', f0: 1200, q: 4 });
@@ -356,6 +373,85 @@ function buildSpaceTrack({ beat }) {
   return { beat, length: SPACE_BARS.length * 4, events };
 }
 
+// ---- Praia: tema tropical original em fá maior.
+// Tambor de aço (steel drum) na melodia, cavaquinho tocando os acordes em
+// batidas, baixo, chocalho e o barulhinho das ondas.
+
+// Tambor de aço: fundamental + oitava + parcial curto (timbre metálico e doce)
+function steelDrum(s, n, t, dur) {
+  s.tone({ type: 'sine', f0: NOTE(n), dur: Math.max(0.25, dur), vol: 0.05, t });
+  s.tone({ type: 'sine', f0: NOTE(n + 12), dur: 0.2, vol: 0.018, t });
+  s.tone({ type: 'triangle', f0: NOTE(n) * 3.01, dur: 0.08, vol: 0.01, t });
+}
+
+// Batida de cavaquinho: notas do acorde quase juntas
+function strum(s, notes, t, vol = 0.022) {
+  notes.forEach((n, i) => s.tone({ type: 'triangle', f0: NOTE(n), dur: 0.22, vol, t: t + i * 0.014, filter: 2600 }));
+}
+
+function islandBass(s, n, t) {
+  s.tone({ type: 'sine', f0: NOTE(n), dur: 0.32, vol: 0.06, t });
+}
+
+function shaker(s, t, vol) {
+  s.noise({ dur: 0.04, vol, filter: 'highpass', f0: 7000, t });
+}
+
+// Onda quebrando ao fundo (bem baixinha)
+function wave(s, t) {
+  s.noise({ dur: 1.6, vol: 0.02, filter: 'lowpass', f0: 900, f1: 300, t });
+}
+
+const BEACH_CHORDS = {
+  F: { bass: 41, notes: [65, 69, 72] },
+  Bb: { bass: 46, notes: [65, 70, 74] },
+  C: { bass: 48, notes: [64, 67, 72] },
+  Gm: { bass: 43, notes: [67, 70, 74] },
+  Dm: { bass: 50, notes: [65, 69, 74] },
+};
+const BEACH_BARS = ['F', 'F', 'Bb', 'C', 'F', 'Dm', 'Gm', 'C', 'F', 'F', 'Bb', 'Bb', 'F', 'C', 'F', 'F'];
+// Melodia original do tambor de aço, um compasso por linha (nota 0 = pausa)
+const BEACH_TUNE = [
+  [72, 1], [77, 1], [81, 1], [79, 1],
+  [77, 2], [72, 2],
+  [74, 1], [77, 1], [82, 1.5], [81, 0.5],
+  [79, 3], [0, 1],
+  [81, 1], [79, 0.5], [77, 0.5], [79, 1], [81, 1],
+  [77, 2], [74, 2],
+  [74, 1], [77, 1], [79, 1], [82, 1],
+  [81, 2], [79, 2],
+  [84, 1.5], [81, 0.5], [79, 1], [77, 1],
+  [79, 1], [81, 1], [77, 2],
+  [74, 1], [77, 1], [82, 2],
+  [81, 1], [79, 1], [77, 2],
+  [77, 1], [81, 1], [84, 1], [81, 1],
+  [79, 2], [76, 2],
+  [77, 1], [76, 1], [74, 1], [72, 1],
+  [77, 3], [0, 1],
+];
+
+function buildBeachTrack({ beat }) {
+  const events = [];
+  const add = (b, play) => events.push({ beat: b, play });
+  BEACH_BARS.forEach((name, bar) => {
+    const c = BEACH_CHORDS[name];
+    const b0 = bar * 4;
+    add(b0, (s, t) => islandBass(s, c.bass, t));
+    add(b0 + 1.5, (s, t) => islandBass(s, c.bass + 7, t));
+    add(b0 + 2, (s, t) => islandBass(s, c.bass, t));
+    // Batida de cavaquinho sincopada
+    [0, 1, 1.5, 2.5, 3].forEach((o) => add(b0 + o, (s, t) => strum(s, c.notes, t)));
+    // Chocalho em colcheias, mais forte no contratempo
+    for (let i = 0; i < 8; i++) add(b0 + i * 0.5, (s, t) => shaker(s, t, i % 2 ? 0.03 : 0.015));
+    if (bar % 4 === 0) add(b0, (s, t) => wave(s, t));
+  });
+  for (const m of phrase(BEACH_TUNE)) {
+    if (m.note) add(m.beat, (s, t) => steelDrum(s, m.note, t, Math.min(0.9, m.len * beat * 0.9)));
+  }
+  events.sort((a, b) => a.beat - b.beat);
+  return { beat, length: BEACH_BARS.length * 4, events };
+}
+
 // Trilhas disponíveis (as fases especiais escolhem a sua em specials.js)
 export const MUSIC = {
   // 64 batidas de melodia + 8 só de guizos, antes de recomeçar
@@ -364,6 +460,8 @@ export const MUSIC = {
   floresta: buildForestTrack({ beat: 0.38 }),
   // 16 compassos (64 batidas), cerca de 26 s por volta
   espaco: buildSpaceTrack({ beat: 0.4 }),
+  // 16 compassos (64 batidas), cerca de 23 s por volta
+  praia: buildBeachTrack({ beat: 0.36 }),
 };
 const LOOKAHEAD = 0.12; // agenda as notas um pouco antes da hora
 

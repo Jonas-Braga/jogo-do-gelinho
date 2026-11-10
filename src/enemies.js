@@ -1,12 +1,13 @@
 import { W, ROW_Y } from './config.js';
 
 // Largura de colisão de cada tipo. Os bichos das fases especiais têm o tamanho dos
-// que substituem (morcego e disco voador = ganso, cobra e bichinho lunar =
-// caranguejo, piranha e cometa = molusco).
+// que substituem (morcego, disco voador e gaivota = ganso; cobra, bichinho lunar e
+// siri = caranguejo; piranha, cometa e água-viva = molusco).
 export const SIZE = {
   goose: 44, crab: 40, clam: 34, fish: 30,
   bat: 44, snake: 40, piranha: 34,
   ufo: 44, crawler: 40, comet: 34,
+  gull: 44, siri: 40, jellyfish: 34,
 };
 const SPACING = 52;
 const PLAYER_HALF = 12;

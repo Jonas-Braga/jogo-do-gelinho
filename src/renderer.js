@@ -12,26 +12,34 @@ import {
   makeSpaceBackground, drawSpaceSky, asteroidSprite, drawUfo, drawCrawler, drawComet, drawStarBonus,
   drawSpaceDecor, drawBase, drawBaseDoorFront, drawStardust, DUST,
 } from './space.js';
+import {
+  makeBeachBackground, drawBeachDecor, drawSkyGulls, boardSprite, drawGull, drawSiri, drawJellyfish,
+  drawTropicalFish, drawHut, drawHutDoorFront, SEA,
+} from './beach.js';
 import { drawHud } from './hud.js';
 
 const CRITTER_DRAW = {
   goose: drawGoose, crab: drawCrab, clam: drawClam, fish: drawFish,
   snake: drawSnake, bat: drawBat, piranha: drawPiranha,
   ufo: drawUfo, crawler: drawCrawler, comet: drawComet,
+  gull: drawGull, siri: drawSiri, jellyfish: drawJellyfish,
 };
 
 // Construções das fases especiais (o iglu se desenha sozinho)
 const HOUSE_DRAW = {
   cabin: { body: drawCabin, front: drawCabinDoorFront },
   base: { body: drawBase, front: drawBaseDoorFront },
+  hut: { body: drawHut, front: drawHutDoorFront },
 };
 
 // Cores do "rio" de cada cenário (padrão = água gelada)
-const WATERS = { forest: RIVER, space: DUST };
+const WATERS = { forest: RIVER, space: DUST, beach: SEA };
 const ICE_WATER = { water: ['#1C7E99', '#0E5670', '#052A40'], ripple: [190, 235, 250], bank: 'rgba(3, 30, 48, 0.35)' };
-// Placas de cada cenário: gelo, troncos ou asteroides
-const FLOE_SPRITE = { forest: logSprite, space: asteroidSprite };
-const FLOE_HALO = { forest: RIVER.halo, space: DUST.halo };
+// Placas de cada cenário: gelo, troncos, asteroides ou pranchas
+const FLOE_SPRITE = { forest: logSprite, space: asteroidSprite, beach: boardSprite };
+const FLOE_HALO = { forest: RIVER.halo, space: DUST.halo, beach: SEA.halo };
+// Peixes de cada cenário (mesmos pontos): estrelinha no espaço, peixinho tropical na praia
+const FISH_DRAW = { space: drawStarBonus, beach: drawTropicalFish };
 
 // Intensidade da aurora boreal (0 = nenhuma). Aparece nas fases avançadas,
 // cresce com a fase e fica mais forte quando o céu escurece.
@@ -116,11 +124,14 @@ export class Renderer {
     let bg = this.bg;
     if (forest) bg = this.forestBg ||= makeForestBackground();
     else if (space) bg = this.spaceBg ||= makeSpaceBackground();
+    else if (scenery === 'beach') bg = this.beachBg ||= makeBeachBackground();
     ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h);
+    if (scenery === 'beach') drawSkyGulls(ctx, t);
     if (sp?.sleigh) drawSleigh(ctx, game.sleigh, t);
     if (sp?.decor === 'natal') drawChristmasTrees(ctx, t);
     if (sp?.decor === 'floresta') drawForestDecor(ctx, t);
     if (sp?.decor === 'espaco') drawSpaceDecor(ctx, t);
+    if (sp?.decor === 'praia') drawBeachDecor(ctx, t);
     if (forest) drawFireflies(ctx, t, 1 - this.skyF);
     // No espaço o "reflexo do céu" na poeira é o roxo do horizonte
     this.drawWater(ctx, t, space ? { hor: [120, 80, 220] } : sky, WATERS[scenery] || ICE_WATER);
@@ -139,7 +150,7 @@ export class Renderer {
     game.particles.drawTexts(ctx);
     if (game.particles.leaves) drawLeaves(ctx, game.particles.snow, t);
     else if (game.particles.stardust) drawStardust(ctx, game.particles.snow, t);
-    else game.particles.drawSnow(ctx);
+    else if (!game.particles.calm) game.particles.drawSnow(ctx);
     ctx.restore();
 
     drawHud(ctx, game);
@@ -295,8 +306,7 @@ export class Renderer {
     }
     if (game.atDoor) this.drawDoorHint(ctx, game, t);
     const scenery = game.special?.scenery;
-    // No espaço, os peixes viram estrelinhas douradas (mesmos pontos)
-    const fishDraw = scenery === 'space' ? drawStarBonus : drawFish;
+    const fishDraw = FISH_DRAW[scenery] || drawFish;
     game.rows.forEach((row, i) => {
       this.drawRow(ctx, row, t, scenery);
       for (const c of game.critters.inRow(i)) {

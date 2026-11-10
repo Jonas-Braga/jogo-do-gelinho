@@ -11,11 +11,14 @@
 //   decor    enfeites do cenário (árvores, luzes no iglu)
 //   scenery  cenário inteiro trocado: 'forest' = mata, rio, troncos e folhas caindo;
 //            'space' = lua, céu estrelado, rio de poeira estelar, asteroides e
-//            estrelinhas douradas no lugar dos peixes
+//            estrelinhas douradas no lugar dos peixes; 'beach' = praia, mar
+//            turquesa, pranchas de surfe e peixinhos tropicais
 //   house    o que se constrói na costa: 'igloo' (padrão), 'cabin' (cabana de madeira)
-//            ou 'base' (base lunar)
+//            'base' (base lunar) ou 'hut' (cabana de palha)
 //   enemies  inimigos sorteados a cada grupo (no lugar do ciclo ganso/caranguejo/molusco)
 //   aurora   false desliga a aurora boreal nesta fase
+//   breath   false desliga o vapor da respiração no frio
+//   weather  'none' = nada caindo do céu (sem neve, folhas ou poeira)
 //   pace     ritmo próprio da fase (ex.: 0.8 = placas, bichos e urso a 80% da velocidade)
 export const SPECIAL_EVERY = 5;
 
@@ -56,6 +59,23 @@ export const SPECIALS = {
     house: 'base',
     enemies: ['ufo', 'crawler', 'comet'],
     aurora: false,
+    breath: false, // respira dentro do capacete
+    pace: 0.8,
+  },
+  20: {
+    id: 'praia',
+    title: 'FASE 20 · ESPECIAL DA PRAIA',
+    intro: 'Pule nas pranchas de surfe e construa a cabana de palha!',
+    music: 'praia',
+    outfits: { player: 'surfer', bear: 'giantCrab' },
+    sleigh: false,
+    decor: 'praia',
+    scenery: 'beach',
+    house: 'hut',
+    enemies: ['gull', 'siri', 'jellyfish'],
+    aurora: false,
+    breath: false, // calor: sem vapor da respiração
+    weather: 'none', // nada caindo do céu
     pace: 0.8,
   },
 };

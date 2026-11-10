@@ -12,12 +12,14 @@ import { Sfx } from './audio.js';
 import { levelParams, levelIntro } from './levels.js';
 import { loadHighScore, saveHighScore } from './storage.js';
 import { DUST } from './space.js';
+import { SEA } from './beach.js';
 
 // Cores das partículas de pouso por cenário: poeira na costa, lascas ao pousar
 // numa placa e brilhos da fileira que acende (padrão = neve e gelo)
 const LAND_FX = {
   forest: { puff: '#C9B98A', chip: '#C08A50', spark: '#FFE6A8' },
   space: { puff: DUST.regolith, chip: DUST.rock, spark: DUST.spark },
+  beach: { puff: SEA.sand, chip: SEA.spray, spark: SEA.spark },
 };
 
 // Estados: title (tela inicial), play (jogando, incluindo animações de morte),
@@ -89,6 +91,7 @@ export class Game {
     this.igloo.style = 'igloo';
     this.particles.leaves = false;
     this.particles.stardust = false;
+    this.particles.calm = false;
     while (!this.igloo.complete) this.igloo.add();
     this.igloo.anim.fill(1);
     this.igloo.landed.fill(true);
@@ -186,6 +189,7 @@ export class Game {
     this.igloo.style = sp?.house || 'igloo';
     this.particles.leaves = sp?.scenery === 'forest';
     this.particles.stardust = sp?.scenery === 'space';
+    this.particles.calm = sp?.weather === 'none';
     this.player = new Player(this);
     this.critters.reset(this.params);
     this.bear.reset(this.params);
@@ -272,9 +276,10 @@ export class Game {
 
     if (this.state === 'play') {
       if (this.player.alive) {
-        // Vapor da respiração quando está frio (o astronauta respira dentro do capacete)
+        // Vapor da respiração quando está frio (o tema pode desligar: capacete, calor)
         this.breathT = (this.breathT || 0) - dt;
-        if (this.temp <= RULES.breathBelow && !this.space && this.player.state === 'stand' && this.breathT <= 0) {
+        const breathOn = this.special?.breath !== false;
+        if (this.temp <= RULES.breathBelow && breathOn && this.player.state === 'stand' && this.breathT <= 0) {
           this.breathT = 1.3;
           const p = this.player;
           this.particles.breath(p.x + p.facing * 12, p.y - 52, p.facing);

@@ -1,12 +1,14 @@
 import { IGLOO, RULES, SHORE_Y } from './config.js';
 import { CABIN_PIECES, CABIN_VENT, RIVER } from './forest.js';
 import { BASE_PIECES, BASE_VENT, DUST } from './space.js';
+import { HUT_PIECES, HUT_VENT, SEA } from './beach.js';
 
 // Construções das fases especiais: peças (para a poeira do encaixe), de onde sai
 // a fumaça e a cor da poeira. O iglu usa o próprio layout de blocos.
 const HOUSES = {
   cabin: { pieces: CABIN_PIECES, vent: CABIN_VENT, dust: RIVER.sawdust },
   base: { pieces: BASE_PIECES, vent: BASE_VENT, dust: DUST.regolith },
+  hut: { pieces: HUT_PIECES, vent: HUT_VENT, dust: SEA.sand },
 };
 
 const LAYERS = [5, 4, 3, 2, 1]; // 15 blocos em 5 camadas; a peça 16 é a porta (pórtico)

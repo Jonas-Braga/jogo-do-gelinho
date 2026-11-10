@@ -8,6 +8,7 @@ const WORDS = {
   igloo: { floes: 'as placas', floe: 'a placa', house: 'no iglu pronto' },
   cabin: { floes: 'os troncos', floe: 'o tronco', house: 'na cabana pronta' },
   base: { floes: 'os asteroides', floe: 'o asteroide', house: 'na base lunar pronta' },
+  hut: { floes: 'as pranchas', floe: 'a prancha', house: 'na cabana de palha pronta' },
 };
 
 export function controlsFor(style = 'igloo') {
