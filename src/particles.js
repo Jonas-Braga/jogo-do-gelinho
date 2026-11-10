@@ -7,6 +7,7 @@ export class Particles {
     this.puffs = [];
     this.texts = [];
     this.fx = [];
+    this.leaves = false; // fase da floresta: folhas caindo no lugar da neve
     // Neve ambiente
     this.snow = Array.from({ length: 140 }, () => ({
       x: Math.random() * W,
@@ -58,14 +59,14 @@ export class Particles {
   // ---- Efeitos da Etapa 4 (lista única `fx`, cada um com seu tipo)
 
   // Lascas de gelo ao pousar numa placa
-  chips(x, y, n = 7) {
+  chips(x, y, n = 7, color = '#E8F7FC') {
     for (let i = 0; i < n; i++) {
       const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4;
       const s = 60 + Math.random() * 90;
       this.fx.push({
         kind: 'chip', x: x + (Math.random() - 0.5) * 16, y,
         vx: Math.cos(a) * s, vy: Math.sin(a) * s, floor: y + 3,
-        r: 1 + Math.random() * 1.6, rot: Math.random() * 6, t: 0, life: 0.55,
+        r: 1 + Math.random() * 1.6, rot: Math.random() * 6, t: 0, life: 0.55, color,
       });
     }
   }
@@ -140,7 +141,7 @@ export class Particles {
       switch (f.kind) {
         case 'chip':
           ctx.globalAlpha = 1 - k;
-          ctx.fillStyle = '#E8F7FC';
+          ctx.fillStyle = f.color || '#E8F7FC';
           ctx.save();
           ctx.translate(f.x, f.y);
           ctx.rotate(f.rot);

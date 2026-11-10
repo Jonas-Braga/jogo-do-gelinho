@@ -78,6 +78,8 @@ export class Game {
     this.params = levelParams(1);
     this.rows = createRows(1);
     this.igloo.reset();
+    this.igloo.style = 'igloo';
+    this.particles.leaves = false;
     while (!this.igloo.complete) this.igloo.add();
     this.igloo.anim.fill(1);
     this.igloo.landed.fill(true);
@@ -169,6 +171,10 @@ export class Game {
     this.params = levelParams(this.level);
     this.rows = createRows(this.level);
     this.igloo.reset();
+    // Fase da floresta: cabana de madeira no lugar do iglu e folhas no lugar da neve
+    const sp = this.params.special;
+    this.igloo.style = sp?.house || 'igloo';
+    this.particles.leaves = sp?.scenery === 'forest';
     this.player = new Player(this);
     this.critters.reset(this.params);
     this.bear.reset(this.params);
@@ -306,6 +312,11 @@ export class Game {
     }
   }
 
+  // Fase com o cenário da floresta (troncos, cabana, folhas)
+  get forest() {
+    return this.special?.scenery === 'forest';
+  }
+
   // Jogador parado/andando na costa, em frente à porta do iglu completo
   get atDoor() {
     const p = this.player;
@@ -332,19 +343,20 @@ export class Game {
     this.sfx.play('land');
     const p = this.player;
     if (row < 0) {
-      this.particles.puff(p.x, p.y, 6);
+      this.particles.puff(p.x, p.y, 6, this.forest ? '#C9B98A' : '#FFFFFF');
       return;
     }
     // A placa afunda um pouco e balança; lascas de gelo voam
     if (p.support) p.support.dip = 1;
-    this.particles.chips(p.x, p.y);
+    // Lascas de gelo (ou de casca de árvore, nos troncos)
+    this.particles.chips(p.x, p.y, 7, this.forest ? '#C08A50' : undefined);
     const r = this.rows[row];
     if (r.active) return;
     r.active = true;
     this.sfx.play('floe');
     // Brilhos subindo das placas visíveis da fileira que acendeu
     for (const q of r.rects()) {
-      if (q.x > -q.w && q.x < W) this.particles.sparkle(q.x + q.w / 2, r.y - 4, 2);
+      if (q.x > -q.w && q.x < W) this.particles.sparkle(q.x + q.w / 2, r.y - 4, 2, this.forest ? '#FFE6A8' : undefined);
     }
     this.addScore(this.params.floePoints);
     this.particles.text(this.player.x, this.player.y - 80, `+${this.params.floePoints}`);

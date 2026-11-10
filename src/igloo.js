@@ -1,4 +1,5 @@
 import { IGLOO, RULES, SHORE_Y } from './config.js';
+import { CABIN_PIECES, CABIN_VENT, RIVER } from './forest.js';
 
 const LAYERS = [5, 4, 3, 2, 1]; // 15 blocos em 5 camadas; a peça 16 é a porta (pórtico)
 
@@ -42,6 +43,9 @@ export class Igloo {
     this.particles = particles;
     this.sfx = sfx;
     this.layout = buildLayout();
+    // 'igloo' ou 'cabin' (fase da floresta): só muda o desenho e de onde saem
+    // a serragem e a fumaça; as regras de construção são as mesmas
+    this.style = 'igloo';
     this.reset();
   }
 
@@ -72,10 +76,20 @@ export class Igloo {
 
   // Topo da cúpula (de onde sai a fumaça)
   get ventPos() {
+    if (this.style === 'cabin') return { ...CABIN_VENT };
     return { x: IGLOO.x + 6, y: IGLOO.baseY - IGLOO.ry + 4 };
   }
 
+  // Poeira do encaixe: neve no iglu, serragem na cabana
+  get dustColor() {
+    return this.style === 'cabin' ? RIVER.sawdust : '#FFFFFF';
+  }
+
   pieceWorld(i) {
+    if (this.style === 'cabin') {
+      const c = CABIN_PIECES[Math.min(i, CABIN_PIECES.length - 1)];
+      return { x: IGLOO.x + c.cx, y: IGLOO.baseY + c.cy };
+    }
     if (i >= this.layout.length) return { x: DOOR.x, y: DOOR.bottom - DOOR.porchRy + 20 };
     const b = this.layout[i];
     return { x: IGLOO.x + b.cx, y: IGLOO.baseY + b.cy };
@@ -93,7 +107,7 @@ export class Igloo {
     if (this.count <= 0) return false;
     this.count--;
     const p = this.pieceWorld(this.count);
-    this.particles.puff(p.x, p.y, 14);
+    this.particles.puff(p.x, p.y, 14, this.dustColor);
     this.sfx?.play('unblock');
     return true;
   }
@@ -104,7 +118,7 @@ export class Igloo {
       if (!this.landed[i] && this.anim[i] > 0.55) {
         this.landed[i] = true;
         const p = this.pieceWorld(i);
-        this.particles.puff(p.x, p.y + 6, 8);
+        this.particles.puff(p.x, p.y + 6, 8, this.dustColor);
         this.sfx?.play('block');
       }
     }

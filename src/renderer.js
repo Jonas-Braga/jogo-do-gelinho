@@ -4,9 +4,16 @@ import {
 } from './sprites.js';
 import { floeOffset } from './floes.js';
 import { drawSleigh, drawChristmasTrees, drawIglooLights } from './christmas.js';
+import {
+  makeForestBackground, logSprite, drawSnake, drawBat, drawPiranha, drawForestDecor,
+  drawCabin, drawCabinDoorFront, drawLeaves, drawFireflies, RIVER,
+} from './forest.js';
 import { drawHud } from './hud.js';
 
-const CRITTER_DRAW = { goose: drawGoose, crab: drawCrab, clam: drawClam, fish: drawFish };
+const CRITTER_DRAW = {
+  goose: drawGoose, crab: drawCrab, clam: drawClam, fish: drawFish,
+  snake: drawSnake, bat: drawBat, piranha: drawPiranha,
+};
 
 // Intensidade da aurora boreal (0 = nenhuma). Aparece nas fases avançadas,
 // cresce com a fase e fica mais forte quando o céu escurece.
@@ -80,13 +87,18 @@ export class Renderer {
     ctx.fillRect(-20, -20, W + 40, H + 40);
 
     this.drawSky(ctx, sky);
-    this.aurora = auroraStrength(game.level, this.skyF);
-    if (this.aurora > 0) this.drawAurora(ctx, t, this.aurora);
-    ctx.drawImage(this.bg.canvas, 0, 0, this.bg.w, this.bg.h);
     const sp = game.special;
+    const forest = sp?.scenery === 'forest';
+    this.aurora = sp?.aurora === false ? 0 : auroraStrength(game.level, this.skyF);
+    if (this.aurora > 0) this.drawAurora(ctx, t, this.aurora);
+    // O fundo da floresta só é criado quando a fase aparece pela primeira vez
+    const bg = forest ? (this.forestBg ||= makeForestBackground()) : this.bg;
+    ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h);
     if (sp?.sleigh) drawSleigh(ctx, game.sleigh, t);
     if (sp?.decor === 'natal') drawChristmasTrees(ctx, t);
-    this.drawWater(ctx, t, sky);
+    if (sp?.decor === 'floresta') drawForestDecor(ctx, t);
+    if (forest) drawFireflies(ctx, t, 1 - this.skyF);
+    this.drawWater(ctx, t, sky, forest);
     game.particles.drawRipples(ctx);
     this.drawEntities(ctx, game, t);
     game.particles.drawPuffs(ctx);
@@ -100,7 +112,8 @@ export class Renderer {
       ctx.fillRect(-20, -20, W + 40, H + 40);
     }
     game.particles.drawTexts(ctx);
-    game.particles.drawSnow(ctx);
+    if (game.particles.leaves) drawLeaves(ctx, game.particles.snow, t);
+    else game.particles.drawSnow(ctx);
     ctx.restore();
 
     drawHud(ctx, game);
@@ -176,12 +189,14 @@ export class Renderer {
     ctx.restore();
   }
 
-  drawWater(ctx, t, sky) {
+  // Água gelada ou, na floresta, o rio esverdeado
+  drawWater(ctx, t, sky, forest = false) {
     const top = WATER_TOP + 10;
     const g = ctx.createLinearGradient(0, top, 0, H);
-    g.addColorStop(0, '#1C7E99');
-    g.addColorStop(0.4, '#0E5670');
-    g.addColorStop(1, '#052A40');
+    const c = forest ? RIVER.water : ['#1C7E99', '#0E5670', '#052A40'];
+    g.addColorStop(0, c[0]);
+    g.addColorStop(0.4, c[1]);
+    g.addColorStop(1, c[2]);
     ctx.fillStyle = g;
     ctx.fillRect(0, top, W, H - top);
 
@@ -191,8 +206,8 @@ export class Renderer {
     r.addColorStop(1, rgb(sky.hor, 0));
     ctx.fillStyle = r;
     ctx.fillRect(0, top, W, 140);
-    // Sombra do paredão de gelo na água
-    ctx.fillStyle = 'rgba(3, 30, 48, 0.35)';
+    // Sombra do paredão de gelo (ou do barranco) na água
+    ctx.fillStyle = forest ? RIVER.bank : 'rgba(3, 30, 48, 0.35)';
     ctx.fillRect(0, top, W, 6);
 
     // Ondulação
@@ -200,7 +215,8 @@ export class Renderer {
     ctx.lineCap = 'round';
     for (let j = 0, y = top + 10; y < H; j++, y += 12 + j * 0.9) {
       const depth = (y - top) / (H - top);
-      ctx.strokeStyle = `rgba(190, 235, 250, ${0.2 * (1 - depth) + 0.04})`;
+      const rc = forest ? RIVER.ripple.join(', ') : '190, 235, 250';
+      ctx.strokeStyle = `rgba(${rc}, ${0.2 * (1 - depth) + 0.04})`;
       ctx.lineWidth = 1.4;
       const dir = j % 2 ? 1 : -1;
       const len = 16 + (j % 3) * 12;
@@ -238,17 +254,23 @@ export class Renderer {
     game.rows.forEach((r, i) => { if (r.y <= p.y + 16) bucket = i; });
     if ((p.state === 'drown' || p.state === 'freeze') && p.row >= 0) bucket = Math.max(bucket, p.row);
 
-    game.igloo.draw(ctx, t);
+    const cabin = game.igloo.style === 'cabin';
+    if (cabin) drawCabin(ctx, game.igloo, t);
+    else game.igloo.draw(ctx, t);
     if (game.special?.decor === 'natal' && game.igloo.complete) drawIglooLights(ctx, t);
     if (game.bear.active) drawBear(ctx, game.bear, t, outfits.bear);
     if (p.state !== 'gone' && bucket === -1) {
       drawP();
       // Passando pela porta: moldura do arco, sombra do interior e cortina por cima dele
-      if (p.inDoorway) game.igloo.drawDoorFront(ctx, t);
+      if (p.inDoorway) {
+        if (cabin) drawCabinDoorFront(ctx, game.igloo, t);
+        else game.igloo.drawDoorFront(ctx, t);
+      }
     }
     if (game.atDoor) this.drawDoorHint(ctx, game, t);
+    const logs = game.special?.scenery === 'forest';
     game.rows.forEach((row, i) => {
-      this.drawRow(ctx, row, t);
+      this.drawRow(ctx, row, t, logs);
       for (const c of game.critters.inRow(i)) {
         if (c.x > -60 && c.x < W + 60) CRITTER_DRAW[c.kind](ctx, c, row.y, t);
       }
@@ -256,13 +278,15 @@ export class Renderer {
     });
   }
 
-  drawRow(ctx, row, t) {
+  // Placas de gelo ou, na floresta, troncos (`logs`)
+  drawRow(ctx, row, t, logs = false) {
     const items = [];
     for (const r of row.rects()) {
       if (r.x > W + 20 || r.x + r.w < -20) continue;
       const y = row.y + floeOffset(r.piece, t);
-      items.push({ x: r.x, y, w: r.w, s: floeSprite(r.piece, row.active) });
+      items.push({ x: r.x, y, w: r.w, s: logs ? logSprite(r.piece, row.active) : floeSprite(r.piece, row.active) });
     }
+    const halo = logs ? RIVER.halo.join(', ') : '79, 195, 247';
     // Sombras, reflexos e brilho primeiro, para não cobrirem as placas vizinhas
     for (const it of items) {
       ctx.fillStyle = 'rgba(2, 28, 46, 0.32)';
@@ -282,8 +306,8 @@ export class Renderer {
         ctx.translate(it.x + it.w / 2, it.y + 6);
         ctx.scale(1, 0.45);
         const g = ctx.createRadialGradient(0, 0, 4, 0, 0, R);
-        g.addColorStop(0, `rgba(79, 195, 247, ${0.32 + Math.sin(t * 4) * 0.06})`);
-        g.addColorStop(1, 'rgba(79, 195, 247, 0)');
+        g.addColorStop(0, `rgba(${halo}, ${0.32 + Math.sin(t * 4) * 0.06})`);
+        g.addColorStop(1, `rgba(${halo}, 0)`);
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(0, 0, R, 0, Math.PI * 2);

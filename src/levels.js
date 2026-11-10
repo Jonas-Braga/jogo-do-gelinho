@@ -20,8 +20,9 @@ export function levelParams(level) {
     fragmented: level % 2 === 0,          // fases pares: placas em pedaços que abrem e fecham
     breathSpeed: Math.min(1.1 + L * 0.06, 1.9),
 
-    // Inimigos e peixes
+    // Inimigos e peixes (fase especial pode trocar os bichos, sem mudar velocidade nem quantidade)
     enemy: ENEMY_CYCLE[L % ENEMY_CYCLE.length],
+    enemies: specialFor(level)?.enemies || null,
     enemySpeed: Math.min(80 + L * 10, maxChaser),
     spawnMin: Math.max(1.8, 4.5 - L * 0.3),  // intervalo entre grupos, por fileira (s)
     spawnMax: Math.max(3.8, 9 - L * 0.5),

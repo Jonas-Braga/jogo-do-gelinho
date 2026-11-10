@@ -1,7 +1,8 @@
 import { W, ROW_Y } from './config.js';
 
-// Largura de colisão de cada tipo
-const SIZE = { goose: 44, crab: 40, clam: 34, fish: 30 };
+// Largura de colisão de cada tipo. Os bichos da floresta têm o tamanho dos que
+// substituem (morcego = ganso, cobra = caranguejo, piranha = molusco).
+export const SIZE = { goose: 44, crab: 40, clam: 34, fish: 30, bat: 44, snake: 40, piranha: 34 };
 const SPACING = 52;
 const PLAYER_HALF = 12;
 
@@ -29,7 +30,7 @@ export class Critters {
   spawn(row) {
     const p = this.params;
     const fish = Math.random() < p.fishChance;
-    const kind = fish ? 'fish' : p.enemy;
+    const kind = fish ? 'fish' : p.enemies ? p.enemies[Math.floor(Math.random() * p.enemies.length)] : p.enemy;
     const n = fish ? 1 + Math.floor(Math.random() * 3) : 1 + Math.floor(Math.random() * p.maxGroup);
     // Todos os bichos (inimigos e peixes) vêm contra o fluxo das placas.
     const dir = -this.game.rows[row].dir;

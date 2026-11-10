@@ -80,6 +80,17 @@ export const SOUNDS = {
       // Grasnado
       s.tone({ type: 'square', f0: 460, f1: 380, dur: 0.12, vol: 0.09, filter: 1600 });
       s.tone({ type: 'square', f0: 440, f1: 360, dur: 0.12, vol: 0.09, t: 0.14, filter: 1600 });
+    } else if (o.kind === 'bat') {
+      // Guinchos agudos de morcego
+      s.tone({ type: 'square', f0: 2400, f1: 3000, dur: 0.05, vol: 0.05, filter: 5000 });
+      s.tone({ type: 'square', f0: 2600, f1: 3200, dur: 0.05, vol: 0.05, t: 0.08, filter: 5000 });
+    } else if (o.kind === 'snake') {
+      // Chiado de cobra
+      s.noise({ dur: 0.35, vol: 0.12, filter: 'highpass', f0: 3500 });
+    } else if (o.kind === 'piranha') {
+      // Mordida: dois estalos rápidos
+      s.noise({ dur: 0.04, vol: 0.25, filter: 'bandpass', f0: 2200, q: 5 });
+      s.noise({ dur: 0.04, vol: 0.25, filter: 'bandpass', f0: 2000, q: 5, t: 0.07 });
     } else {
       // Batida seca (caranguejo, molusco)
       s.noise({ dur: 0.06, vol: 0.25, filter: 'bandpass', f0: 1200, q: 4 });
@@ -137,7 +148,7 @@ function sleighShake(s, t, vol) {
 const phrase = (notes, start = 0) => {
   let b = start;
   return notes.map(([n, d]) => {
-    const ev = { beat: b, note: n };
+    const ev = { beat: b, note: n, len: d };
     b += d;
     return ev;
   });
@@ -163,10 +174,90 @@ function buildTrack({ beat, length, melody }) {
   return { beat, length, events };
 }
 
+// ---- Floresta: modinha de fogueira original, em sol maior.
+// Violão dedilhado (baixo + arpejo do acorde), flauta de madeira na melodia,
+// bloco de madeira marcando o tempo e passarinhos de vez em quando.
+
+// Corda dedilhada: ataque brilhante que escurece rápido
+function pluck(s, n, t, vol = 0.05) {
+  s.tone({ type: 'triangle', f0: NOTE(n), dur: 0.55, vol, t, filter: 1800 });
+  s.tone({ type: 'sine', f0: NOTE(n + 12), dur: 0.12, vol: vol * 0.35, t });
+}
+
+// Flauta de madeira: seno com um sopro de ruído no começo
+function flute(s, n, t, dur, vol = 0.045) {
+  s.tone({ type: 'sine', f0: NOTE(n), dur, vol, t });
+  s.tone({ type: 'triangle', f0: NOTE(n), dur: dur * 0.8, vol: vol * 0.25, t, filter: 2400 });
+  s.noise({ dur: 0.07, vol: vol * 0.5, filter: 'bandpass', f0: NOTE(n) * 2, q: 3, t });
+}
+
+function woodblock(s, t, vol = 0.05) {
+  s.noise({ dur: 0.03, vol, filter: 'bandpass', f0: 1700, q: 9, t });
+}
+
+// Passarinho: dois piados subindo
+function chirp(s, t) {
+  s.tone({ type: 'sine', f0: 2600, f1: 3700, dur: 0.07, vol: 0.022, t });
+  s.tone({ type: 'sine', f0: 2900, f1: 4100, dur: 0.06, vol: 0.018, t: t + 0.11 });
+}
+
+// Acordes de cada compasso (4 batidas): baixo e notas do arpejo
+const CHORDS = {
+  G: { bass: 43, arp: [59, 62, 67] },
+  C: { bass: 48, arp: [60, 64, 67] },
+  D: { bass: 50, arp: [57, 62, 66] },
+  Em: { bass: 40, arp: [59, 64, 67] },
+};
+const FOREST_BARS = ['G', 'G', 'C', 'G', 'Em', 'C', 'D', 'D', 'G', 'G', 'C', 'G', 'Em', 'D', 'G', 'G'];
+// Melodia original da flauta, um compasso por linha (nota 0 = pausa)
+const FOREST_TUNE = [
+  [67, 1], [71, 1], [74, 1.5], [72, 0.5],
+  [71, 1], [69, 1], [67, 2],
+  [72, 1], [76, 1], [74, 1], [72, 1],
+  [71, 3], [0, 1],
+  [71, 1], [74, 1], [76, 1.5], [74, 0.5],
+  [72, 1], [71, 1], [69, 2],
+  [66, 1], [69, 1], [74, 1], [72, 1],
+  [69, 3], [0, 1],
+  [67, 1], [71, 1], [74, 1.5], [76, 0.5],
+  [79, 1], [76, 1], [74, 2],
+  [76, 1], [72, 1], [74, 1], [76, 1],
+  [74, 2], [71, 2],
+  [71, 1], [74, 1], [76, 1], [79, 1],
+  [78, 1], [76, 1], [74, 2],
+  [71, 1], [69, 1], [67, 1], [69, 1],
+  [67, 3], [0, 1],
+];
+
+function buildForestTrack({ beat }) {
+  const events = [];
+  const add = (b, play) => events.push({ beat: b, play });
+  FOREST_BARS.forEach((name, bar) => {
+    const c = CHORDS[name];
+    const b0 = bar * 4;
+    // Baixo nos tempos 1 e 3; arpejo nos contratempos
+    add(b0, (s, t) => pluck(s, c.bass, t, 0.06));
+    add(b0 + 2, (s, t) => pluck(s, c.bass + 7, t, 0.045));
+    [0.5, 1, 1.5, 2.5, 3, 3.5].forEach((o, i) => add(b0 + o, (s, t) => pluck(s, c.arp[i % 3], t, 0.03)));
+    // Bloco de madeira nos tempos 2 e 4
+    add(b0 + 1, (s, t) => woodblock(s, t));
+    add(b0 + 3, (s, t) => woodblock(s, t));
+    // Passarinhos no fim de alguns compassos
+    if (bar % 4 === 3) add(b0 + 3.25, (s, t) => chirp(s, t));
+  });
+  for (const m of phrase(FOREST_TUNE)) {
+    if (m.note) add(m.beat, (s, t) => flute(s, m.note, t, Math.min(1.2, m.len * beat * 0.95)));
+  }
+  events.sort((a, b) => a.beat - b.beat);
+  return { beat, length: FOREST_BARS.length * 4, events };
+}
+
 // Trilhas disponíveis (as fases especiais escolhem a sua em specials.js)
 export const MUSIC = {
   // 64 batidas de melodia + 8 só de guizos, antes de recomeçar
   natal: buildTrack({ beat: 0.44, length: 72, melody: NATAL_MELODY }),
+  // 16 compassos (64 batidas), cerca de 24 s por volta
+  floresta: buildForestTrack({ beat: 0.38 }),
 };
 const LOOKAHEAD = 0.12; // agenda as notas um pouco antes da hora
 

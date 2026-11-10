@@ -9,6 +9,10 @@
 //   outfits  roupas: { player, bear }
 //   sleigh   trenó voando ao fundo de vez em quando
 //   decor    enfeites do cenário (árvores, luzes no iglu)
+//   scenery  cenário inteiro trocado: 'forest' = mata, rio, troncos e folhas caindo
+//   house    o que se constrói na costa: 'igloo' (padrão) ou 'cabin' (cabana de madeira)
+//   enemies  inimigos sorteados a cada grupo (no lugar do ciclo ganso/caranguejo/molusco)
+//   aurora   false desliga a aurora boreal nesta fase
 export const SPECIAL_EVERY = 5;
 
 export const SPECIALS = {
@@ -20,6 +24,19 @@ export const SPECIALS = {
     outfits: { player: 'sweater', bear: 'santaHat' },
     sleigh: true,
     decor: 'natal',
+  },
+  10: {
+    id: 'floresta',
+    title: 'FASE 10 · ESPECIAL DA FLORESTA',
+    intro: 'Pule nos troncos do rio e construa a cabana de madeira!',
+    music: 'floresta',
+    outfits: { player: 'lumberjack', bear: 'brown' },
+    sleigh: false,
+    decor: 'floresta',
+    scenery: 'forest',
+    house: 'cabin',
+    enemies: ['snake', 'bat', 'piranha'],
+    aurora: false,
   },
 };
 
