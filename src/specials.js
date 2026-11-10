@@ -28,6 +28,7 @@ export const SPECIALS = {
     outfits: { player: 'sweater', bear: 'santaHat' },
     sleigh: true,
     decor: 'natal',
+    pace: 0.8, // fases especiais mais lentas, para apreciar o cenário (pedido do usuário)
   },
   10: {
     id: 'floresta',
@@ -41,6 +42,7 @@ export const SPECIALS = {
     house: 'cabin',
     enemies: ['snake', 'bat', 'piranha'],
     aurora: false,
+    pace: 0.8,
   },
   15: {
     id: 'espaco',
@@ -54,7 +56,7 @@ export const SPECIALS = {
     house: 'base',
     enemies: ['ufo', 'crawler', 'comet'],
     aurora: false,
-    pace: 0.8, // fase mais lenta, a pedido do usuário (asteroides, bichos e alienígena a 80%)
+    pace: 0.8,
   },
 };
 

@@ -98,11 +98,25 @@ suite('Fases especiais · registro', () => {
     expect(levelIntro(1000).title).toBe('FASE 1000');
   });
 
-  test('a fase especial não muda a dificuldade da fase', () => {
+  // Regra mudada com aprovação do usuário: fases especiais são mais lentas (pace 0.8)
+  // para o jogador apreciar o cenário; o resto da dificuldade não muda.
+  test('fase especial de Natal é mais lenta (80%) e o resto da dificuldade igual', () => {
     const p = levelParams(5);
+    const before = levelParams(4);
+    const after = levelParams(6);
+    expect(specialFor(5).pace).toBe(0.8);
     expect(p.bear).toBe(true);
-    expect(p.speed).toBeGreaterThan(levelParams(4).speed);
-    expect(p.speed).toBeLessThan(levelParams(6).speed);
+    expect(p.speed).toBeCloseTo((before.speed + after.speed) / 2 * 0.8);
+    expect(p.speed).toBeLessThan(before.speed);
+    expect(p.maxGroup).toBe(before.maxGroup);
+    expect(p.fragmented).toBe(false);
+  });
+
+  test('toda fase especial criada tem ritmo próprio mais lento', () => {
+    for (const [level, sp] of Object.entries(SPECIALS)) {
+      expect(sp.pace, `fase ${level}`).toBeLessThan(1);
+      expect(sp.pace, `fase ${level}`).toBeGreaterThan(0.5);
+    }
   });
 });
 

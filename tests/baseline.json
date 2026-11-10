@@ -155,7 +155,6 @@
   "Fases especiais · registro › fases que não são múltiplas de 5 nunca são especiais",
   "Fases especiais · registro › fase 5 é a especial de Natal",
   "Fases especiais · registro › múltiplo de 5 ainda sem tema criado é uma fase normal",
-  "Fases especiais · registro › a fase especial não muda a dificuldade da fase",
   "Fases especiais · Natal (fase 5) › o jogo entra no tema de Natal na fase 5 e sai dele na fase 6",
   "Fases especiais · Natal (fase 5) › aviso de início anuncia a fase especial de Natal (e mantém a aurora)",
   "Fases especiais · Natal (fase 5) › personagem usa suéter natalino só na fase de Natal",
@@ -204,7 +203,6 @@
   "Contas · login, aprovação e ranking › painel de conta: login → jogo liberado; pendente → aguardando aprovação",
   "Fases especiais · Floresta (fase 10) › fase 10 é a especial da floresta; 9 e 11 são normais",
   "Fases especiais · Floresta (fase 10) › aviso de início anuncia a floresta e a cabana",
-  "Fases especiais · Floresta (fase 10) › a floresta não muda a dificuldade da fase",
   "Fases especiais · Floresta (fase 10) › inimigos são cobras, morcegos e piranhas (os três aparecem)",
   "Fases especiais · Floresta (fase 10) › fora da floresta continuam os bichos de sempre",
   "Fases especiais · Floresta (fase 10) › bichos da floresta têm o tamanho de colisão dos que substituem",
@@ -256,5 +254,8 @@
   "Fases especiais · Espaço (fase 15) › o espaço toca a sua própria trilha (e não tem trenó)",
   "Fases especiais · Espaço (fase 15) › trilha do espaço: 16 compassos com colchão, arpejo, baixo, teremim e bipes",
   "Fases especiais · Espaço (fase 15) › trilha do espaço é sintetizada sem erro, respeita o mudo e para no fim de jogo",
-  "Fases especiais · Espaço (fase 15) › temperatura, vidas e regras continuam as mesmas no espaço"
+  "Fases especiais · Espaço (fase 15) › temperatura, vidas e regras continuam as mesmas no espaço",
+  "Fases especiais · registro › fase especial de Natal é mais lenta (80%) e o resto da dificuldade igual",
+  "Fases especiais · registro › toda fase especial criada tem ritmo próprio mais lento",
+  "Fases especiais · Floresta (fase 10) › a floresta é mais lenta (80%) e o resto da dificuldade igual"
 ]

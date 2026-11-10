@@ -101,18 +101,22 @@ suite('Fases especiais · Floresta (fase 10)', () => {
     expect(intro.sub).toContain('cabana');
   });
 
-  test('a floresta não muda a dificuldade da fase', () => {
+  // Regra mudada com aprovação do usuário: fases especiais são mais lentas (pace 0.8)
+  test('a floresta é mais lenta (80%) e o resto da dificuldade igual', () => {
     const p = levelParams(10);
     const before = levelParams(9);
     const after = levelParams(11);
-    expect(p.speed).toBeGreaterThan(before.speed);
-    expect(p.speed).toBeLessThan(after.speed);
+    expect(specialFor(10).pace).toBe(0.8);
+    expect(p.speed).toBeCloseTo((before.speed + after.speed) / 2 * 0.8);
+    expect(p.speed).toBeLessThan(before.speed);
+    expect(p.enemySpeed).toBeCloseTo((before.enemySpeed + after.enemySpeed) / 2 * 0.8);
+    expect(p.bearSpeed).toBeCloseTo((before.bearSpeed + after.bearSpeed) / 2 * 0.8);
     expect(p.fragmented, 'fase par: troncos em pedaços').toBe(true);
     expect(p.bear).toBe(true);
-    expect(p.enemySpeed).toBeGreaterThanOrEqual(before.enemySpeed);
-    expect(p.enemySpeed).toBeLessThanOrEqual(after.enemySpeed);
     expect(p.maxGroup).toBe(before.maxGroup);
     expect(p.fishChance).toBe(before.fishChance);
+    const g = makeGame({ level: 10 });
+    for (const r of g.rows) expect(r.speed).toBeCloseTo(p.speed);
   });
 
   test('inimigos são cobras, morcegos e piranhas (os três aparecem)', () => {
