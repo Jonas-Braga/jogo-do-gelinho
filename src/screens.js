@@ -64,6 +64,12 @@ export function drawTitle(ctx, game) {
   ctx.font = `600 20px ${FONT}`;
   ctx.fillText('Construa o iglu antes de congelar!', W / 2, 172);
 
+  // Sem conta aprovada, o painel de login (auth-ui.js, em HTML) fica por cima
+  if (game.locked) {
+    ctx.restore();
+    return;
+  }
+
   // Painel de instruções
   const px = W / 2 - 330;
   const py = 300;
@@ -93,7 +99,12 @@ export function drawTitle(ctx, game) {
 
   // Recorde e chamada para começar
   ctx.textAlign = 'center';
-  if (game.highScore > 0) {
+  if (game.account?.nickname) {
+    ctx.font = `700 18px ${FONT}`;
+    ctx.fillStyle = '#FFFFFF';
+    const rec = game.highScore > 0 ? `   ·   RECORDE  ${pad6(game.highScore)}` : '';
+    ctx.fillText(`Olá, ${game.account.nickname}!${rec}`, W / 2, 280);
+  } else if (game.highScore > 0) {
     ctx.font = `700 18px ${FONT}`;
     ctx.fillStyle = '#FFD36B';
     ctx.fillText(`RECORDE  ${pad6(game.highScore)}`, W / 2, 280);
@@ -160,12 +171,14 @@ export function drawGameOver(ctx, game) {
   ctx.save();
   ctx.fillStyle = 'rgba(4, 20, 34, 0.6)';
   ctx.fillRect(0, 0, W, H);
-  panel(ctx, W / 2 - 260, H / 2 - 150, 520, 300, 20, 0.78);
+  // Com ranking, o resultado vai para a esquerda e o ranking para a direita
+  const cx = game.ranking ? W / 2 - 270 : W / 2;
+  panel(ctx, cx - 260, H / 2 - 150, 520, 300, 20, 0.78);
   ctx.textAlign = 'center';
-  iceTitle(ctx, 'FIM DE JOGO', W / 2, H / 2 - 82, 50);
+  iceTitle(ctx, 'FIM DE JOGO', cx, H / 2 - 82, 50);
   ctx.font = `600 15px ${FONT}`;
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.fillText(`Você chegou à fase ${game.level}`, W / 2, H / 2 - 44);
+  ctx.fillText(`Você chegou à fase ${game.level}`, cx, H / 2 - 44);
 
   // Pontuação e recorde lado a lado
   const col = (x, label, value, color) => {
@@ -176,13 +189,13 @@ export function drawGameOver(ctx, game) {
     ctx.fillStyle = color;
     ctx.fillText(pad6(value), x, H / 2 + 36);
   };
-  col(W / 2 - 115, 'PONTUAÇÃO', game.score, '#FFFFFF');
-  col(W / 2 + 115, 'RECORDE', game.highScore, '#FFD36B');
+  col(cx - 115, 'PONTUAÇÃO', game.score, '#FFFFFF');
+  col(cx + 115, 'RECORDE', game.highScore, '#FFD36B');
 
   if (game.newRecord) {
     const s = 1 + Math.sin(t * 6) * 0.05;
     ctx.save();
-    ctx.translate(W / 2, H / 2 + 74);
+    ctx.translate(cx, H / 2 + 74);
     ctx.scale(s, s);
     ctx.fillStyle = '#FFD36B';
     ctx.beginPath();
@@ -197,7 +210,76 @@ export function drawGameOver(ctx, game) {
   ctx.font = `600 16px ${FONT}`;
   ctx.fillStyle = '#FFFFFF';
   ctx.fillText(game.input.touchMode ? 'Toque para jogar de novo' : 'Enter ou Espaço para jogar de novo',
-    W / 2, H / 2 + 126);
+    cx, H / 2 + 126);
+  ctx.restore();
+  if (game.ranking) drawRanking(ctx, game, W / 2 + 20, 480);
+}
+
+const ordinal = (n) => `${n}º`;
+
+// Ranking: os melhores com posição e apelido; a linha do jogador fica destacada.
+// Se ele estiver fora da lista, aparece embaixo, depois de "…", com a posição real.
+export const RANKING_ROW = 34;
+
+export function drawRanking(ctx, game, x, w) {
+  const r = game.ranking;
+  const myUid = game.account?.uid;
+  const list = r.top || [];
+  const outside = !!r.me && !list.some((e) => e.uid === myUid);
+  // A altura acompanha o número de linhas; o painel fica centralizado na vertical
+  const lines = list.length ? list.length + (outside ? 1.7 : 0) : 3;
+  const h = Math.max(300, 92 + lines * RANKING_ROW + 12);
+  const y = (H - h) / 2;
+  ctx.save();
+  panel(ctx, x, y, w, h, 20, 0.8);
+  ctx.textAlign = 'center';
+  ctx.font = `900 26px ${FONT}`;
+  ctx.fillStyle = '#FFD36B';
+  ctx.fillText('RANKING', x + w / 2, y + 44);
+
+  const msg = (text) => {
+    ctx.font = `600 16px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.fillText(text, x + w / 2, y + h / 2);
+  };
+  if (r.loading) msg('Carregando ranking…');
+  else if (r.error) msg('Não foi possível carregar o ranking.');
+  else if (!list.length) msg('Ninguém pontuou ainda. Seja o primeiro!');
+  else {
+    const rows = list.map((e) => ({ ...e, mine: e.uid === myUid }));
+    let ry = y + 92;
+    const row = (e) => {
+      if (e.mine) {
+        ctx.fillStyle = 'rgba(255, 211, 107, 0.2)';
+        ctx.beginPath();
+        ctx.roundRect(x + 16, ry - 23, w - 32, RANKING_ROW - 2, 8);
+        ctx.fill();
+      }
+      const medal = ['#FFD36B', '#D8E2E8', '#E0A060'][e.rank - 1];
+      ctx.textAlign = 'right';
+      ctx.font = `900 18px ${FONT}`;
+      ctx.fillStyle = medal || 'rgba(255,255,255,0.6)';
+      ctx.fillText(ordinal(e.rank), x + 74, ry);
+      ctx.textAlign = 'left';
+      ctx.font = `${e.mine ? 800 : 600} 18px ${FONT}`;
+      ctx.fillStyle = e.mine ? '#FFD36B' : '#FFFFFF';
+      ctx.fillText(e.mine ? `${e.nickname} (você)` : e.nickname, x + 92, ry);
+      ctx.textAlign = 'right';
+      ctx.font = `800 18px ${FONT}`;
+      ctx.fillStyle = e.mine ? '#FFD36B' : '#BDEBFA';
+      ctx.fillText(pad6(e.best), x + w - 32, ry);
+      ry += RANKING_ROW;
+    };
+    rows.forEach(row);
+    if (outside) {
+      ctx.textAlign = 'center';
+      ctx.font = `800 18px ${FONT}`;
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fillText('…', x + w / 2, ry - 8);
+      ry += RANKING_ROW - 10;
+      row({ ...r.me, mine: true });
+    }
+  }
   ctx.restore();
 }
 

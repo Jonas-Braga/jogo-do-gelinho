@@ -17,7 +17,9 @@ import { loadHighScore, saveHighScore } from './storage.js';
 export class Game {
   // `title: true` começa na tela inicial (o jogo de verdade); sem a opção, começa
   // direto numa partida (usado pelos testes).
-  constructor(canvas, { title = false } = {}) {
+  // `backend` (src/backend.js): com ele, só contas aprovadas jogam, o recorde fica
+  // na conta e o fim de jogo mostra o ranking. Sem ele, recorde no localStorage.
+  constructor(canvas, { title = false, backend = null } = {}) {
     this.ctx = canvas.getContext('2d');
     this.scale = 1;
     this.input = new Input();
@@ -33,7 +35,11 @@ export class Game {
     this.paused = false;
     this.fps = 60;
     this.shake = 0;
-    this.highScore = loadHighScore();
+    this.backend = backend;
+    this.account = null;   // sessão da conta (backend.js) ou null
+    this.ranking = null;   // ranking do fim de jogo: { loading } | { top, me } | { error }
+    this.pendingSave = null;
+    this.highScore = backend ? 0 : loadHighScore();
     this.newRecord = false;
     this.banner = null;
 
@@ -58,7 +64,7 @@ export class Game {
       if (this.state === 'gameOver' || this.state === 'title') this.newGame();
     });
 
-    if (title) this.showTitle();
+    if (title || this.locked) this.showTitle();
     else this.newGame();
   }
 
@@ -87,12 +93,34 @@ export class Game {
     this.rowsResetTimer = 0;
     this.smokeT = 0;
     this.banner = null;
+    this.ranking = null;
     this.special = null;
     this.sleigh.reset();
     this.sfx.setMusic(null);
   }
 
+  // Com backend, só quem tem conta aprovada pode jogar
+  get locked() {
+    return !!this.backend && this.account?.status !== 'approved';
+  }
+
+  // Chamado pela tela de conta (auth-ui.js) sempre que a sessão muda
+  setAccount(session) {
+    const before = this.account;
+    this.account = session ? { ...session } : null;
+    if (this.locked) {
+      this.highScore = 0;
+      // Saiu da conta (ou perdeu o acesso) no meio de uma partida: volta ao início
+      if (this.state !== 'title') this.showTitle();
+      return;
+    }
+    if (before?.uid !== session.uid) this.newRecord = false;
+    this.highScore = Math.max(session.best || 0, before?.uid === session.uid ? this.highScore : 0);
+  }
+
   newGame() {
+    if (this.locked) return;
+    this.ranking = null;
     this.score = 0;
     this.lives = RULES.startLives;
     this.level = 1;
@@ -104,12 +132,36 @@ export class Game {
     this.startLevel();
   }
 
-  // Salva o recorde se a pontuação atual o superou
+  // Salva o recorde se a pontuação atual o superou: na conta (com backend) ou no
+  // localStorage. Retorna a gravação em andamento (ou null).
   saveRecord() {
     if (this.score > this.highScore) {
       this.highScore = this.score;
       this.newRecord = true;
-      saveHighScore(this.highScore);
+      if (!this.backend) saveHighScore(this.highScore);
+    }
+    const acc = this.account;
+    if (this.backend && !this.locked && this.score > (acc.best || 0)) {
+      acc.best = this.score;
+      this.pendingSave = this.backend.submitScore(this.score, this.level).catch((e) => {
+        console.warn('[gelinho] recorde não foi salvo:', e);
+      });
+    }
+    return this.pendingSave;
+  }
+
+  // Ranking do fim de jogo: espera o recorde ser gravado e busca os melhores
+  async loadRanking(n = 10) {
+    if (!this.backend || this.locked) return;
+    const view = { loading: true };
+    this.ranking = view;
+    try {
+      await this.pendingSave;
+      const r = await this.backend.ranking(n);
+      if (this.ranking === view) this.ranking = r;
+    } catch (e) {
+      console.warn('[gelinho] ranking indisponível:', e);
+      if (this.ranking === view) this.ranking = { error: true };
     }
   }
 
@@ -330,6 +382,7 @@ export class Game {
       this.banner = null;
       this.sfx.setMusic(null);
       this.saveRecord();
+      this.loadRanking();
       this.sfx.play('gameover');
       return;
     }

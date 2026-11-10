@@ -1,0 +1,95 @@
+/* Página de administração: lista rolável, sem o layout centralizado do jogo */
+body.admin-page {
+  display: block;
+  overflow: auto;
+  background: linear-gradient(#0b3a52, var(--ink) 320px);
+  min-height: 100%;
+}
+
+#admin {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 20px 16px 48px;
+}
+
+.admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.admin-head h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  color: #e8f8fd;
+}
+
+.muted { color: var(--muted); }
+
+.admin-section {
+  margin: 0 0 22px;
+  padding: 16px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.admin-section h2 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.admin-row:first-of-type { border-top: none; }
+
+.admin-who {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.admin-who strong {
+  display: block;
+  font-size: 16px;
+}
+
+.admin-who span {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.admin-score {
+  font-weight: 800;
+  color: var(--ice);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-msg {
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-msg.error { background: rgba(255, 110, 90, 0.16); color: var(--danger); }

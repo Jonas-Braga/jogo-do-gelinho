@@ -9,5 +9,6 @@ export const SPEC_FILES = [
   'etapa4.test.js',
   'etapa5.test.js',
   'especiais.test.js',
+  'contas.test.js',
   'futuras.test.js',
 ];

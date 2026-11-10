@@ -1,9 +1,25 @@
 import { W, H } from './config.js';
 import { Game } from './game.js';
 import { MUTE_BUTTON } from './hud.js';
+import { createBackend } from './backend.js';
+import { AuthUI } from './auth-ui.js';
 
 const canvas = document.getElementById('game');
-const game = new Game(canvas, { title: true });
+
+// Contas no Firebase (ou em memória com ?backend=memoria). Se o servidor não
+// carregar, o painel de conta mostra o erro e o jogo fica bloqueado.
+let backend;
+try {
+  backend = await createBackend();
+} catch (e) {
+  console.error('[gelinho] não foi possível carregar o servidor de contas:', e);
+  backend = {
+    onChange: (cb) => cb({ status: 'error' }),
+    signOut: async () => location.reload(),
+  };
+}
+const game = new Game(canvas, { title: true, backend });
+new AuthUI(game, backend);
 
 // Escala responsiva com proporção mantida; backing store em alta densidade.
 function resize() {

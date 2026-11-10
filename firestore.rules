@@ -1,0 +1,79 @@
+rules_version = '2';
+
+// Regras do Firestore do Jogo do Gelinho. Cole no console do Firebase
+// (Firestore Database → Regras → Publicar) sempre que este arquivo mudar.
+//
+// - Qualquer um cria a própria conta, sempre como "pending".
+// - Só o administrador (documento admins/{uid}, criado à mão no console) aprova,
+//   recusa, zera pontuação e vê e-mails.
+// - Só jogadores aprovados leem o ranking e gravam recorde, e o recorde nunca diminui.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function self(uid) { return signedIn() && request.auth.uid == uid; }
+    function userDoc(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    function approved() {
+      return signedIn() && exists(userDoc(request.auth.uid))
+        && get(userDoc(request.auth.uid)).data.status == 'approved';
+    }
+    function validNick(n) {
+      return n is string && n.size() >= 3 && n.size() <= 16 && n.matches('^[\\p{L}\\p{N}_.-]+$');
+    }
+    function validScore(d) {
+      return d.keys().hasOnly(['nickname', 'best', 'level', 'updatedAt'])
+        && d.best is int && d.best >= 0 && d.best <= 9999999
+        && d.level is int && d.level >= 1 && d.level <= 999
+        && d.updatedAt == request.time;
+    }
+
+    match /admins/{uid} {
+      allow get: if self(uid);
+      allow list, write: if false;
+    }
+
+    match /users/{uid} {
+      allow get: if self(uid) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if self(uid)
+        && request.resource.data.keys().hasOnly(['nickname', 'email', 'status', 'createdAt'])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.createdAt == request.time
+        && validNick(request.resource.data.nickname)
+        && getAfter(/databases/$(database)/documents/nicknames/$(request.resource.data.nickname.lower())).data.uid == uid;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['pending', 'approved', 'rejected'];
+      allow delete: if isAdmin();
+    }
+
+    // Apelidos únicos: o documento só pode ser criado junto com o perfil do dono
+    match /nicknames/{key} {
+      allow get: if true;
+      allow list, update: if false;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(userDoc(request.auth.uid)).data.nickname.lower() == key;
+      allow delete: if isAdmin();
+    }
+
+    match /ranking/{uid} {
+      allow read: if approved() || isAdmin();
+      allow create: if self(uid) && approved()
+        && validScore(request.resource.data)
+        && request.resource.data.nickname == get(userDoc(uid)).data.nickname;
+      allow update: if (self(uid) && approved()
+          && validScore(request.resource.data)
+          && request.resource.data.nickname == resource.data.nickname
+          && request.resource.data.best >= resource.data.best)
+        || (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['best', 'updatedAt'])
+          && request.resource.data.best == 0);
+      allow delete: if isAdmin();
+    }
+  }
+}

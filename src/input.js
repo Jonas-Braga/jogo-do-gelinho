@@ -42,6 +42,12 @@ export const TOUCH_BUTTONS = [
   { id: 'pause', label: 'II', hold: false, x: W - 62, y: H - 100, w: 46, h: 40 },
 ];
 
+// Campos de texto e botões de formulário recebem as próprias teclas
+export function typingIn(target) {
+  const tag = target?.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || !!target?.isContentEditable;
+}
+
 const hit = (b, x, y) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
 
 export class Input {
@@ -52,23 +58,29 @@ export class Input {
     // Direcional analógico: dedo que o controla, deslocamento do pino e direções ativas
     this.stick = { pointerId: null, dx: 0, dy: 0, dirs: [] };
     this.listeners = {};
-    window.addEventListener('keydown', (e) => {
-      const a = MAP[e.code];
-      if (!a) return;
-      e.preventDefault();
-      if (!e.repeat && !this.held.has(a)) this.emit(a);
-      this.held.add(a);
-    });
-    window.addEventListener('keyup', (e) => {
-      const a = MAP[e.code];
-      if (a) this.held.delete(a);
-    });
+    window.addEventListener('keydown', (e) => this.keyDown(e));
+    window.addEventListener('keyup', (e) => this.keyUp(e));
     window.addEventListener('blur', () => {
       this.held.clear();
       this.touchHeld.clear();
       this.releaseStick();
       this.emit('blur');
     });
+  }
+
+  keyDown(e) {
+    // Digitando no formulário de conta: as teclas são do formulário, não do jogo
+    if (typingIn(e.target)) return;
+    const a = MAP[e.code];
+    if (!a) return;
+    e.preventDefault();
+    if (!e.repeat && !this.held.has(a)) this.emit(a);
+    this.held.add(a);
+  }
+
+  keyUp(e) {
+    const a = MAP[e.code];
+    if (a) this.held.delete(a);
   }
 
   on(action, fn) {
