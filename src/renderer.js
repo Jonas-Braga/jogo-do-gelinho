@@ -99,7 +99,7 @@ export class Renderer {
   draw(game) {
     const ctx = this.ctx;
     const t = game.time;
-    if (game.state !== 'levelEnd') {
+    if (game.state !== 'levelEnd' && game.state !== 'trophy') {
       this.skyF += (game.temp / RULES.tempStart - this.skyF) * 0.05;
     }
     const sky = skyAt(this.skyF);

@@ -4,6 +4,7 @@ import { FONT, panel, mix, pad6 } from './ui.js';
 import {
   drawTitle, drawPause, drawLevelEnd, drawGameOver, drawBanner, drawTouchButtons,
 } from './screens.js';
+import { drawCelebration } from './trophies.js';
 
 // Botão de mudo (área clicável em coordenadas lógicas; usado em main.js)
 export const MUTE_BUTTON = { x: W - 62, y: H - 48, w: 46, h: 36 };
@@ -151,6 +152,7 @@ export function drawHud(ctx, game) {
   // Telas por cima do jogo
   if (game.state === 'play' || game.state === 'entering') drawBanner(ctx, game);
   if (game.state === 'levelEnd') drawLevelEnd(ctx, game);
+  else if (game.state === 'trophy') drawCelebration(ctx, game);
   else if (game.state === 'gameOver') drawGameOver(ctx, game);
   if (game.paused) drawPause(ctx, game);
   ctx.restore();

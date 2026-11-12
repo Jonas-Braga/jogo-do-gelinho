@@ -60,6 +60,9 @@ function row(u) {
     h('div', { class: 'admin-who' },
       h('strong', {}, u.nickname),
       h('span', {}, `${u.email}${when ? ` · cadastro ${when}` : ''}`)),
+    u.status === 'approved' && u.trophies?.length
+      ? h('span', { class: 'admin-trophies', title: 'Troféus das fases especiais' }, `🏆 ${u.trophies.join(' · ')}`)
+      : null,
     u.status === 'approved' ? h('span', { class: 'admin-score' }, pad6(u.best)) : null,
     h('div', { class: 'admin-actions' }, ...actions(u)));
 }

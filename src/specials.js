@@ -20,11 +20,16 @@
 //   breath   false desliga o vapor da respiração no frio
 //   weather  'none' = nada caindo do céu (sem neve, folhas ou poeira)
 //   pace     ritmo próprio da fase (ex.: 0.8 = placas, bichos e urso a 80% da velocidade)
+//   trophy   troféu ganho ao concluir a fase pela primeira vez: { name, ribbon }
+//            (o emblema desenhado na taça fica em src/trophies.js, pelo `id`).
+//            Ao criar uma fase especial nova, inclua o nível dela na lista de
+//            troféus válidos de firestore.rules (validTrophies) e publique as regras.
 export const SPECIAL_EVERY = 5;
 
 export const SPECIALS = {
   5: {
     id: 'natal',
+    trophy: { name: 'Troféu do Natal', ribbon: '#C8323A' },
     title: 'FASE 5 · ESPECIAL DE NATAL',
     intro: 'Noite de Natal sob a aurora boreal. Feliz Natal!',
     music: 'natal',
@@ -35,6 +40,7 @@ export const SPECIALS = {
   },
   10: {
     id: 'floresta',
+    trophy: { name: 'Troféu da Floresta', ribbon: '#2F7D3A' },
     title: 'FASE 10 · ESPECIAL DA FLORESTA',
     intro: 'Pule nos troncos do rio e construa a cabana de madeira!',
     music: 'floresta',
@@ -49,6 +55,7 @@ export const SPECIALS = {
   },
   15: {
     id: 'espaco',
+    trophy: { name: 'Troféu do Espaço', ribbon: '#5B3FA8' },
     title: 'FASE 15 · ESPECIAL DO ESPAÇO',
     intro: 'Pule nos asteroides do rio de poeira estelar e monte a base lunar!',
     music: 'espaco',
@@ -64,6 +71,7 @@ export const SPECIALS = {
   },
   20: {
     id: 'praia',
+    trophy: { name: 'Troféu da Praia', ribbon: '#14A0A8' },
     title: 'FASE 20 · ESPECIAL DA PRAIA',
     intro: 'Pule nas pranchas de surfe e construa a cabana de palha!',
     music: 'praia',
@@ -83,4 +91,20 @@ export const SPECIALS = {
 export function specialFor(level) {
   if (level % SPECIAL_EVERY !== 0) return null;
   return SPECIALS[level] || null;
+}
+
+// ---------------------------------------------------------------- Troféus
+// Níveis que dão troféu (um por fase especial), em ordem
+export const TROPHY_LEVELS = Object.keys(SPECIALS).map(Number).filter((l) => SPECIALS[l].trophy).sort((a, b) => a - b);
+
+// Troféu da fase (com o id e o nível) ou null
+export function trophyFor(level) {
+  const sp = SPECIALS[level];
+  return sp?.trophy ? { ...sp.trophy, id: sp.id, level: Number(level) } : null;
+}
+
+// Lista de troféus limpa: só níveis válidos, sem repetição, em ordem
+export function normTrophies(...lists) {
+  const all = lists.flatMap((l) => (Array.isArray(l) ? l : [])).map(Number);
+  return [...new Set(all)].filter((l) => TROPHY_LEVELS.includes(l)).sort((a, b) => a - b);
 }

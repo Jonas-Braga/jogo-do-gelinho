@@ -143,6 +143,15 @@ export const SOUNDS = {
     [[60, 0], [64, 0.12], [67, 0.24], [72, 0.36], [67, 0.52], [72, 0.64]].forEach(([n, t]) =>
       s.tone({ type: 'triangle', f0: NOTE(n), dur: t > 0.6 ? 0.5 : 0.14, vol: 0.14, t }));
   },
+  trophy(s) {
+    // Troféu novo: arpejo de metais subindo, acorde final e brilho de sininhos
+    [[60, 0], [64, 0.1], [67, 0.2], [72, 0.3], [76, 0.42], [79, 0.54]].forEach(([n, t]) =>
+      s.tone({ type: 'sawtooth', f0: NOTE(n), dur: 0.16, vol: 0.06, t, filter: 2600 }));
+    [72, 76, 79, 84].forEach((n) => s.tone({ type: 'triangle', f0: NOTE(n), dur: 1.1, vol: 0.07, t: 0.7 }));
+    for (let i = 0; i < 8; i++) {
+      s.tone({ type: 'sine', f0: NOTE(96 + (i % 4) * 3), dur: 0.12, vol: 0.035, t: 0.75 + i * 0.09 });
+    }
+  },
   cold(s) {
     s.tone({ type: 'sine', f0: 1500, dur: 0.05, vol: 0.06 });
   },

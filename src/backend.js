@@ -6,20 +6,26 @@
 //   signIn(email, password) · signOut() · resetPassword(email)
 //   completeProfile(nickname)         conta criada sem perfil (cadastro interrompido)
 //   submitScore(score, level)         grava o recorde se for maior → recorde atual
-//   ranking(n)                        { top: [{ uid, nickname, best, level, rank }], me }
+//   awardTrophy(level)                guarda o troféu da fase especial → lista de troféus
+//   ranking(n)                        { top: [{ uid, nickname, best, level, trophies, rank }], me }
 //   admin: listUsers() · setStatus(uid, status) · resetScore(uid) · pendingCount()
 //
 // Sessão: { uid, email, nickname, status: 'pending'|'approved'|'rejected'|'incomplete',
-//           best, isAdmin }
+//           best, trophies: [níveis], isAdmin }
+// Troféus: lista de níveis das fases especiais concluídas (só cresce; o "zerar" do
+// admin apaga a pontuação, não os troféus).
 //
 // Duas implementações: FirebaseBackend (src/firebase-backend.js, o jogo de verdade) e
 // MemoryBackend (abaixo: testes e `?backend=memoria` para testar a interface sem rede).
 // As duas seguem as mesmas regras de firestore.rules.
 
+import { TROPHY_LEVELS, normTrophies } from './specials.js';
+
 export const NICK_MIN = 3;
 export const NICK_MAX = 16;
 export const PASSWORD_MIN = 6; // mínimo do Firebase Auth
 export const STATUSES = ['pending', 'approved', 'rejected'];
+export { normTrophies };
 
 const NICK_RE = /^[\p{L}\p{N}_.-]+$/u;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -107,12 +113,12 @@ export class MemoryBackend {
   }
 
   // Cria uma conta já num status (atalho para testes e para a demonstração)
-  seed({ email, nickname, password = 'senha123', status = 'approved', best = 0, admin = false }) {
+  seed({ email, nickname, password = 'senha123', status = 'approved', best = 0, admin = false, trophies = [] }) {
     const uid = `u${++this.seq}`;
     this.accounts.set(email, { uid, password });
     this.users.set(uid, { nickname, email, status, createdAt: this.seq });
     this.nicknames.set(nickKey(nickname), uid);
-    if (best > 0) this.scores.set(uid, { nickname, best, level: 1 });
+    if (best > 0 || trophies.length) this.scores.set(uid, { nickname, best, level: 1, trophies: normTrophies(trophies) });
     if (admin) this.admins.add(uid);
     return uid;
   }
@@ -121,13 +127,14 @@ export class MemoryBackend {
     if (!this.uid) return null;
     const u = this.users.get(this.uid);
     const email = [...this.accounts].find(([, a]) => a.uid === this.uid)?.[0];
-    if (!u) return { uid: this.uid, email, nickname: null, status: 'incomplete', best: 0, isAdmin: this.admins.has(this.uid) };
+    if (!u) return { uid: this.uid, email, nickname: null, status: 'incomplete', best: 0, trophies: [], isAdmin: this.admins.has(this.uid) };
     return {
       uid: this.uid,
       email: u.email,
       nickname: u.nickname,
       status: u.status,
       best: this.scores.get(this.uid)?.best || 0,
+      trophies: [...(this.scores.get(this.uid)?.trophies || [])],
       isAdmin: this.admins.has(this.uid),
     };
   }
@@ -193,8 +200,20 @@ export class MemoryBackend {
     const cur = this.scores.get(this.uid);
     if (cur && cur.best >= score) return cur.best;
     const nickname = this.users.get(this.uid).nickname;
-    this.scores.set(this.uid, { nickname, best: Math.floor(score), level });
+    this.scores.set(this.uid, { nickname, best: Math.floor(score), level, trophies: cur?.trophies || [] });
     return Math.floor(score);
+  }
+
+  async awardTrophy(level) {
+    if (!this.approved()) throw new AccountError('score/not-approved');
+    if (!TROPHY_LEVELS.includes(Number(level))) throw new AccountError('permission-denied');
+    let cur = this.scores.get(this.uid);
+    if (!cur) {
+      cur = { nickname: this.users.get(this.uid).nickname, best: 0, level: 1, trophies: [] };
+      this.scores.set(this.uid, cur);
+    }
+    cur.trophies = normTrophies(cur.trophies, [level]);
+    return [...cur.trophies];
   }
 
   async ranking(n = 10) {
@@ -202,7 +221,7 @@ export class MemoryBackend {
     const all = withRanks(
       [...this.scores]
         .filter(([, s]) => s.best > 0)
-        .map(([uid, s]) => ({ uid, nickname: s.nickname, best: s.best, level: s.level }))
+        .map(([uid, s]) => ({ uid, nickname: s.nickname, best: s.best, level: s.level, trophies: [...(s.trophies || [])] }))
         .sort((a, b) => b.best - a.best),
     );
     const mine = all.find((e) => e.uid === this.uid) || null;
@@ -217,7 +236,7 @@ export class MemoryBackend {
   async listUsers() {
     this.requireAdmin();
     return [...this.users]
-      .map(([uid, u]) => ({ uid, ...u, best: this.scores.get(uid)?.best || 0 }))
+      .map(([uid, u]) => ({ uid, ...u, best: this.scores.get(uid)?.best || 0, trophies: [...(this.scores.get(uid)?.trophies || [])] }))
       .sort((a, b) => a.createdAt - b.createdAt);
   }
 
@@ -251,8 +270,8 @@ export async function createBackend(search = globalThis.location?.search || '') 
     const b = new MemoryBackend();
     // Contas de demonstração (senha de todas: senha123)
     b.seed({ email: 'admin@teste.com', nickname: 'Admin', admin: true, best: 4200 });
-    b.seed({ email: 'pinguim@teste.com', nickname: 'Pinguim', best: 3100 });
-    b.seed({ email: 'foca@teste.com', nickname: 'Foca', best: 1800 });
+    b.seed({ email: 'pinguim@teste.com', nickname: 'Pinguim', best: 3100, trophies: [5, 10, 15, 20] });
+    b.seed({ email: 'foca@teste.com', nickname: 'Foca', best: 1800, trophies: [5] });
     b.seed({ email: 'novo@teste.com', nickname: 'Novato', status: 'pending' });
     return b;
   }

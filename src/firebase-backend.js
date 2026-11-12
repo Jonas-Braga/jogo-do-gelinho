@@ -4,10 +4,11 @@
 // Coleções (as regras de acesso estão em firestore.rules):
 //   users/{uid}       { nickname, email, status, createdAt }   próprio jogador e admin
 //   nicknames/{chave} { uid }                                  garante apelido único
-//   ranking/{uid}     { nickname, best, level, updatedAt }      lido por aprovados
+//   ranking/{uid}     { nickname, best, level, trophies, updatedAt }  lido por aprovados
 //   admins/{uid}      {}                                        criado à mão no console
 import { FIREBASE_CONFIG } from './firebase-config.js';
-import { AccountError, checkSignUp, nickKey, nicknameProblem, withRanks, STATUSES } from './backend.js';
+import { AccountError, checkSignUp, nickKey, nicknameProblem, withRanks, STATUSES, normTrophies } from './backend.js';
+import { TROPHY_LEVELS } from './specials.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2';
 
@@ -60,8 +61,11 @@ export class FirebaseBackend {
         }
         const d = snap.exists() ? snap.data() : null;
         let best = 0;
+        let trophies = [];
         if (d?.status === 'approved') {
-          best = await this.F.getDoc(this.ref('ranking', user.uid)).then((r) => r.data()?.best || 0, () => 0);
+          const r = await this.F.getDoc(this.ref('ranking', user.uid)).then((x) => x.data() || {}, () => ({}));
+          best = r.best || 0;
+          trophies = normTrophies(r.trophies);
         }
         if (v !== this.version) return; // trocou de conta enquanto carregava
         this.publish({
@@ -70,11 +74,12 @@ export class FirebaseBackend {
           nickname: d?.nickname || null,
           status: d ? d.status : 'incomplete',
           best,
+          trophies,
           isAdmin,
         });
       },
       () => {
-        if (v === this.version) this.publish({ uid: user.uid, email: user.email, status: 'error', best: 0, isAdmin: false });
+        if (v === this.version) this.publish({ uid: user.uid, email: user.email, status: 'error', best: 0, trophies: [], isAdmin: false });
       },
     );
   }
@@ -153,9 +158,27 @@ export class FirebaseBackend {
       best: Math.floor(score),
       level: Math.max(1, Math.floor(level)),
       updatedAt: this.F.serverTimestamp(),
-    });
+    }, { merge: true }); // merge: preserva os troféus
     s.best = Math.floor(score);
     return s.best;
+  }
+
+  // Troféu da fase especial: entra na lista (arrayUnion) sem mexer na pontuação
+  async awardTrophy(level) {
+    const s = this.current;
+    if (!s || s.status !== 'approved') throw new AccountError('score/not-approved');
+    level = Number(level);
+    if (!TROPHY_LEVELS.includes(level)) throw new AccountError('permission-denied');
+    const F = this.F;
+    const ref = this.ref('ranking', s.uid);
+    const cur = (await F.getDoc(ref)).data();
+    if (cur) {
+      await F.updateDoc(ref, { trophies: F.arrayUnion(level), updatedAt: F.serverTimestamp() });
+    } else {
+      await F.setDoc(ref, { nickname: s.nickname, best: 0, level: 1, trophies: [level], updatedAt: F.serverTimestamp() });
+    }
+    s.trophies = normTrophies(s.trophies, cur?.trophies, [level]);
+    return s.trophies;
   }
 
   async ranking(n = 10) {
@@ -186,11 +209,12 @@ export class FirebaseBackend {
       F.getDocs(F.collection(this.db, 'users')),
       F.getDocs(F.collection(this.db, 'ranking')),
     ]);
-    const best = new Map(scores.docs.map((d) => [d.id, d.data().best || 0]));
+    const score = new Map(scores.docs.map((d) => [d.id, d.data()]));
     return users.docs
       .map((d) => {
         const u = d.data();
-        return { uid: d.id, ...u, createdAt: u.createdAt?.toMillis?.() || 0, best: best.get(d.id) || 0 };
+        const r = score.get(d.id) || {};
+        return { uid: d.id, ...u, createdAt: u.createdAt?.toMillis?.() || 0, best: r.best || 0, trophies: normTrophies(r.trophies) };
       })
       .sort((a, b) => a.createdAt - b.createdAt);
   }
@@ -215,4 +239,4 @@ export class FirebaseBackend {
   }
 }
 
-const pick = (d) => ({ nickname: d.nickname, best: d.best || 0, level: d.level || 1 });
+const pick = (d) => ({ nickname: d.nickname, best: d.best || 0, level: d.level || 1, trophies: normTrophies(d.trophies) });

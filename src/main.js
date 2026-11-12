@@ -52,7 +52,7 @@ const inMute = ({ x, y }) => {
   return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
 };
 
-// Clique/toque: botão de mudo, botões de toque e "toque para começar"
+// Clique/toque: botão de mudo, botões de toque e "toque para começar/continuar"
 canvas.addEventListener('pointerdown', (e) => {
   const p = toLogical(e);
   game.sfx.unlock();
@@ -61,14 +61,15 @@ canvas.addEventListener('pointerdown', (e) => {
     return;
   }
   if (e.pointerType === 'mouse') {
-    // Mouse: clicar na tela inicial / fim de jogo também começa
-    if (game.state === 'title' || game.state === 'gameOver') game.input.emit('start');
+    // Mouse: clicar na tela inicial / fim de jogo também começa (e encerra a
+    // comemoração do troféu)
+    if (['title', 'gameOver', 'trophy'].includes(game.state)) game.input.emit('start');
     return;
   }
   e.preventDefault();
   canvas.setPointerCapture?.(e.pointerId);
   const hitId = game.input.pointerDown(e.pointerId, p.x, p.y);
-  if (!hitId && (game.state === 'title' || game.state === 'gameOver')) game.input.emit('start');
+  if (!hitId && ['title', 'gameOver', 'trophy'].includes(game.state)) game.input.emit('start');
 });
 canvas.addEventListener('pointermove', (e) => {
   if (e.pointerType === 'mouse') return;

@@ -10,7 +10,9 @@ import { Bear } from './bear.js';
 import { Sleigh } from './christmas.js';
 import { Sfx } from './audio.js';
 import { levelParams, levelIntro } from './levels.js';
-import { loadHighScore, saveHighScore } from './storage.js';
+import { loadHighScore, saveHighScore, loadTrophies, saveTrophies } from './storage.js';
+import { normTrophies } from './specials.js';
+import { Celebration } from './trophies.js';
 import { DUST } from './space.js';
 import { SEA } from './beach.js';
 
@@ -23,7 +25,8 @@ const LAND_FX = {
 };
 
 // Estados: title (tela inicial), play (jogando, incluindo animações de morte),
-// entering (entrando no iglu), levelEnd (contagem do bônus), gameOver.
+// entering (entrando no iglu), levelEnd (contagem do bônus), trophy (comemoração de
+// um troféu novo, ao concluir uma fase especial pela primeira vez), gameOver.
 export class Game {
   // `title: true` começa na tela inicial (o jogo de verdade); sem a opção, começa
   // direto numa partida (usado pelos testes).
@@ -50,6 +53,9 @@ export class Game {
     this.ranking = null;   // ranking do fim de jogo: { loading } | { top, me } | { error }
     this.pendingSave = null;
     this.highScore = backend ? 0 : loadHighScore();
+    // Troféus das fases especiais (níveis): na conta (com backend) ou no localStorage
+    this.trophies = backend ? [] : normTrophies(loadTrophies());
+    this.celebration = null;
     this.newRecord = false;
     this.banner = null;
 
@@ -68,10 +74,12 @@ export class Game {
     });
     this.input.on('action', () => {
       if (this.state === 'gameOver' || this.state === 'title') this.newGame();
+      else if (this.state === 'trophy') this.endCelebration();
       else this.reverseRow();
     });
     this.input.on('start', () => {
       if (this.state === 'gameOver' || this.state === 'title') this.newGame();
+      else if (this.state === 'trophy') this.endCelebration();
     });
 
     if (title || this.locked) this.showTitle();
@@ -98,7 +106,7 @@ export class Game {
     this.igloo.lit = true;
     this.igloo.curtain = 1;
     this.player = new Player(this);
-    this.player.x = 420;
+    this.player.x = 300; // à esquerda da prateleira de troféus
     this.player.invuln = 0;
     this.critters.reset(this.params);
     this.critters.timers = this.critters.timers.map(() => Infinity);
@@ -108,6 +116,7 @@ export class Game {
     this.smokeT = 0;
     this.banner = null;
     this.ranking = null;
+    this.celebration = null;
     this.special = null;
     this.sleigh.reset();
     this.sfx.setMusic(null);
@@ -124,12 +133,14 @@ export class Game {
     this.account = session ? { ...session } : null;
     if (this.locked) {
       this.highScore = 0;
+      this.trophies = [];
       // Saiu da conta (ou perdeu o acesso) no meio de uma partida: volta ao início
       if (this.state !== 'title') this.showTitle();
       return;
     }
     if (before?.uid !== session.uid) this.newRecord = false;
     this.highScore = Math.max(session.best || 0, before?.uid === session.uid ? this.highScore : 0);
+    this.trophies = normTrophies(session.trophies, before?.uid === session.uid ? this.trophies : []);
   }
 
   newGame() {
@@ -164,6 +175,31 @@ export class Game {
     return this.pendingSave;
   }
 
+  // Troféu da fase especial concluída: só na primeira vez. Grava na conta (depois
+  // do recorde, na mesma fila) ou no localStorage e prepara a comemoração.
+  awardTrophy() {
+    const lv = this.level;
+    if (!this.special?.trophy || this.trophies.includes(lv)) return false;
+    this.trophies = normTrophies(this.trophies, [lv]);
+    if (!this.backend) saveTrophies(this.trophies);
+    else if (!this.locked) {
+      this.account.trophies = [...this.trophies];
+      this.pendingSave = Promise.resolve(this.pendingSave)
+        .then(() => this.backend.awardTrophy(lv))
+        .catch((e) => console.warn('[gelinho] troféu não foi salvo:', e));
+    }
+    this.celebration = new Celebration(lv);
+    return true;
+  }
+
+  // Fim da comemoração (tecla ou toque, depois de um instante): próxima fase
+  endCelebration() {
+    if (this.state !== 'trophy' || !this.celebration?.ready) return;
+    this.celebration = null;
+    this.level++;
+    this.startLevel();
+  }
+
   // Ranking do fim de jogo: espera o recorde ser gravado e busca os melhores
   async loadRanking(n = 10) {
     if (!this.backend || this.locked) return;
@@ -180,6 +216,9 @@ export class Game {
   }
 
   startLevel() {
+    // Comemoração de um troféu que ficou aberta (ex.: partida nova no meio dela)
+    // não pode reaparecer no fim da próxima fase
+    this.celebration = null;
     this.params = levelParams(this.level);
     this.rows = createRows(this.level);
     this.igloo.reset();
@@ -267,6 +306,17 @@ export class Game {
     }
     if (this.state === 'gameOver') return;
     this.sfx.updateMusic(dt);
+    if (this.state === 'trophy') {
+      // Comemoração: o jogo espera a tecla; a fumaça do iglu continua saindo
+      this.celebration.update(dt);
+      this.smokeT -= dt;
+      if (this.smokeT <= 0) {
+        this.smokeT = 0.28;
+        const v = this.igloo.ventPos;
+        this.particles.smoke(v.x, v.y);
+      }
+      return;
+    }
     if (this.special?.sleigh && this.sleigh.update(dt)) this.sfx.play('sleigh');
     this.player.update(dt, this.input);
     if (this.state === 'play' || this.state === 'entering') {
@@ -320,6 +370,11 @@ export class Game {
           this.bonusTimer = 1.6;
           this.sfx.play('fanfare');
           this.saveRecord();
+          this.awardTrophy();
+        } else if (this.celebration) {
+          this.state = 'trophy';
+          this.banner = null;
+          this.sfx.play('trophy');
         } else {
           this.level++;
           this.startLevel();

@@ -7,6 +7,10 @@ rules_version = '2';
 // - Só o administrador (documento admins/{uid}, criado à mão no console) aprova,
 //   recusa, zera pontuação e vê e-mails.
 // - Só jogadores aprovados leem o ranking e gravam recorde, e o recorde nunca diminui.
+// - Troféus (níveis das fases especiais concluídas) ficam no documento do ranking:
+//   a lista só cresce e só aceita fases especiais que existem. Ao criar uma fase
+//   especial nova, inclua o nível em validTrophies e publique as regras de novo.
+//   O "zerar" do admin apaga só a pontuação, não os troféus.
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
@@ -22,8 +26,13 @@ service cloud.firestore {
     function validNick(n) {
       return n is string && n.size() >= 3 && n.size() <= 16 && n.matches('^[\\p{L}\\p{N}_.-]+$');
     }
+    function validTrophies(t) {
+      return t is list && t.size() <= 50 && t.toSet().size() == t.size()
+        && t.hasOnly([5, 10, 15, 20]);
+    }
     function validScore(d) {
-      return d.keys().hasOnly(['nickname', 'best', 'level', 'updatedAt'])
+      return d.keys().hasOnly(['nickname', 'best', 'level', 'trophies', 'updatedAt'])
+        && validTrophies(d.get('trophies', []))
         && d.best is int && d.best >= 0 && d.best <= 9999999
         && d.level is int && d.level >= 1 && d.level <= 999
         && d.updatedAt == request.time;
@@ -69,7 +78,8 @@ service cloud.firestore {
       allow update: if (self(uid) && approved()
           && validScore(request.resource.data)
           && request.resource.data.nickname == resource.data.nickname
-          && request.resource.data.best >= resource.data.best)
+          && request.resource.data.best >= resource.data.best
+          && request.resource.data.get('trophies', []).hasAll(resource.data.get('trophies', [])))
         || (isAdmin()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['best', 'updatedAt'])
           && request.resource.data.best == 0);

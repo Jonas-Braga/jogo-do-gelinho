@@ -37,3 +37,17 @@ export function loadHighScore() {
 export function saveHighScore(v) {
   return writeItem('highscore', Math.max(0, Math.floor(v)));
 }
+
+// Troféus das fases especiais (só sem conta; com conta eles ficam no servidor)
+export function loadTrophies() {
+  try {
+    const v = JSON.parse(readItem('trophies') ?? '[]');
+    return Array.isArray(v) ? v.map(Number).filter(Number.isFinite) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveTrophies(list) {
+  return writeItem('trophies', JSON.stringify(list));
+}

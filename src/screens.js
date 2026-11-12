@@ -2,6 +2,7 @@
 import { W, H } from './config.js';
 import { TOUCH_BUTTONS, JOYSTICK } from './input.js';
 import { FONT, panel, pad6 } from './ui.js';
+import { drawTrophyShelf, drawTrophyIcons } from './trophies.js';
 
 // Palavras de cada construção: o que se pula e o que se constrói
 const WORDS = {
@@ -82,9 +83,12 @@ export function drawTitle(ctx, game) {
     return;
   }
 
+  // Prateleira com a coleção de troféus das fases especiais
+  drawTrophyShelf(ctx, game.trophies, t);
+
   // Painel de instruções
   const px = W / 2 - 330;
-  const py = 300;
+  const py = 346;
   panel(ctx, px, py, 660, 250, 18, 0.72);
   ctx.textAlign = 'left';
   ctx.font = `700 15px ${FONT}`;
@@ -115,17 +119,17 @@ export function drawTitle(ctx, game) {
     ctx.font = `700 18px ${FONT}`;
     ctx.fillStyle = '#FFFFFF';
     const rec = game.highScore > 0 ? `   ·   RECORDE  ${pad6(game.highScore)}` : '';
-    ctx.fillText(`Olá, ${game.account.nickname}!${rec}`, W / 2, 280);
+    ctx.fillText(`Olá, ${game.account.nickname}!${rec}`, W / 2, 333);
   } else if (game.highScore > 0) {
     ctx.font = `700 18px ${FONT}`;
     ctx.fillStyle = '#FFD36B';
-    ctx.fillText(`RECORDE  ${pad6(game.highScore)}`, W / 2, 280);
+    ctx.fillText(`RECORDE  ${pad6(game.highScore)}`, W / 2, 333);
   }
   ctx.globalAlpha = blink(t);
   ctx.font = `800 24px ${FONT}`;
   ctx.fillStyle = '#FFFFFF';
   const start = game.input.touchMode ? 'Toque para começar' : 'Pressione Enter ou Espaço para começar';
-  ctx.fillText(start, W / 2, 600);
+  ctx.fillText(start, W / 2, 638);
   ctx.restore();
 }
 
@@ -224,7 +228,7 @@ export function drawGameOver(ctx, game) {
   ctx.fillText(game.input.touchMode ? 'Toque para jogar de novo' : 'Enter ou Espaço para jogar de novo',
     cx, H / 2 + 126);
   ctx.restore();
-  if (game.ranking) drawRanking(ctx, game, W / 2 + 20, 480);
+  if (game.ranking) drawRanking(ctx, game, W / 2 + 10, RANKING_W);
 }
 
 const ordinal = (n) => `${n}º`;
@@ -232,6 +236,9 @@ const ordinal = (n) => `${n}º`;
 // Ranking: os melhores com posição e apelido; a linha do jogador fica destacada.
 // Se ele estiver fora da lista, aparece embaixo, depois de "…", com a posição real.
 export const RANKING_ROW = 34;
+export const RANKING_W = 530;
+// Coluna dos troféus: termina antes da pontuação
+const TROPHY_COL = 124;
 
 export function drawRanking(ctx, game, x, w) {
   const r = game.ranking;
@@ -272,10 +279,13 @@ export function drawRanking(ctx, game, x, w) {
       ctx.font = `900 18px ${FONT}`;
       ctx.fillStyle = medal || 'rgba(255,255,255,0.6)';
       ctx.fillText(ordinal(e.rank), x + 74, ry);
+      // Troféus das fases especiais ao lado do apelido (o apelido encolhe se faltar espaço)
+      const tw = drawTrophyIcons(ctx, e.trophies, x + w - TROPHY_COL, ry + 6);
       ctx.textAlign = 'left';
       ctx.font = `${e.mine ? 800 : 600} 18px ${FONT}`;
       ctx.fillStyle = e.mine ? '#FFD36B' : '#FFFFFF';
-      ctx.fillText(e.mine ? `${e.nickname} (você)` : e.nickname, x + 92, ry);
+      const room = w - TROPHY_COL - 92 - (tw ? tw + 14 : 0);
+      ctx.fillText(e.mine ? `${e.nickname} (você)` : e.nickname, x + 92, ry, room);
       ctx.textAlign = 'right';
       ctx.font = `800 18px ${FONT}`;
       ctx.fillStyle = e.mine ? '#FFD36B' : '#BDEBFA';

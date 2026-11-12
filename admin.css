@@ -81,6 +81,13 @@ body.admin-page {
   font-variant-numeric: tabular-nums;
 }
 
+.admin-trophies {
+  font-size: 13px;
+  font-weight: 700;
+  color: #FFD36B;
+  white-space: nowrap;
+}
+
 .admin-actions {
   display: flex;
   gap: 8px;
