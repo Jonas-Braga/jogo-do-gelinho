@@ -369,5 +369,13 @@
   "App instalável (PWA) › se o usuário cancelar, o botão some até o navegador oferecer de novo",
   "App instalável (PWA) › instalado por outro caminho (menu do navegador), o botão some",
   "App instalável (PWA) › index.html guarda o aviso de instalação logo no início; o jogo cria o botão",
-  "App instalável (PWA) › o service worker não guarda cache (tudo vem da rede) e só cuida do próprio site"
+  "App instalável (PWA) › o service worker não guarda cache (tudo vem da rede) e só cuida do próprio site",
+  "Etapa 5 · telas, recorde, toque e dificuldade › andar com o dedo torto nunca faz pular: ◀ ▶ só mexem para os lados",
+  "Etapa 5 · telas, recorde, toque e dificuldade › dedo pode sair dos botões de andar sem perder o controle; soltar para",
+  "Etapa 5 · telas, recorde, toque e dificuldade › os botões de andar pegam o toque com folga em volta, mas não o resto da tela",
+  "Etapa 5 · telas, recorde, toque e dificuldade › ▲ e ▼ pulam uma fileira por toque; soltar para de pular",
+  "Etapa 5 · telas, recorde, toque e dificuldade › deslizar o dedo de ▲ para ▼ troca o pulo; sair do botão solta",
+  "Etapa 5 · telas, recorde, toque e dificuldade › ▲ em frente à porta do iglu completo faz o personagem entrar",
+  "Etapa 5 · telas, recorde, toque e dificuldade › botões de andar e de pular são grandes (fáceis de acertar com o polegar)",
+  "Etapa 5 · telas, recorde, toque e dificuldade › pausa no toque mostra os botões da tela, não as teclas"
 ]
