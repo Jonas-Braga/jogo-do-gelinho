@@ -16,6 +16,7 @@ import { Celebration } from './trophies.js';
 import { DUST } from './space.js';
 import { SEA } from './beach.js';
 import { HAUNT } from './halloween.js';
+import { BONUS } from './bonus.js';
 
 // Cores das partículas de pouso por cenário: poeira na costa, lascas ao pousar
 // numa placa e brilhos da fileira que acende (padrão = neve e gelo)
@@ -462,6 +463,22 @@ export class Game {
     this.particles.text(c.x, y - 60, `+${pts}`, '#FFC56B');
     this.particles.puff(c.x, y, 12, '#FFD58A');
     this.sfx.play('fish');
+  }
+
+  // Prêmio da fase especial: saco de dinheiro (pontos) ou coração (+1 vida)
+  onBonus(c) {
+    const y = this.rows[c.row].y;
+    if (c.kind === 'heart') {
+      this.lives++;
+      this.particles.text(c.x, y - 70, '+1 VIDA', '#FF6B7E');
+      this.particles.puff(c.x, y - 16, 14, '#FF8A98');
+      this.sfx.play('life');
+    } else {
+      this.addScore(BONUS.bagPoints);
+      this.particles.text(c.x, y - 70, `+${BONUS.bagPoints}`, '#FFD36B');
+      this.particles.puff(c.x, y - 12, 16, '#FFE08A');
+      this.sfx.play('coins');
+    }
   }
 
   onHit() {

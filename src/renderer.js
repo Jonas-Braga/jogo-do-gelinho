@@ -21,6 +21,7 @@ import {
   drawEyeball, drawCandy, drawHaunted, drawHauntedDoorFront, HAUNT,
 } from './halloween.js';
 import { drawHud } from './hud.js';
+import { drawMoneyBag, drawHeart } from './bonus.js';
 
 const CRITTER_DRAW = {
   goose: drawGoose, crab: drawCrab, clam: drawClam, fish: drawFish,
@@ -28,6 +29,7 @@ const CRITTER_DRAW = {
   ufo: drawUfo, crawler: drawCrawler, comet: drawComet,
   gull: drawGull, siri: drawSiri, jellyfish: drawJellyfish,
   ghost: drawGhost, spider: drawSpider, eyeball: drawEyeball,
+  bag: drawMoneyBag, heart: drawHeart,
 };
 
 // Construções das fases especiais (o iglu se desenha sozinho)

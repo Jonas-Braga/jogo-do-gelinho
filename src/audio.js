@@ -156,6 +156,12 @@ export const SOUNDS = {
   life(s) {
     [72, 76, 79, 84, 88].forEach((n, i) => s.tone({ type: 'square', f0: NOTE(n), dur: 0.09, vol: 0.07, t: i * 0.07, filter: 3000 }));
   },
+  coins(s) {
+    // Moedas tilintando: notas agudas rápidas subindo, com brilho
+    [84, 88, 91, 96, 91, 96].forEach((n, i) =>
+      s.tone({ type: 'square', f0: NOTE(n), dur: 0.07, vol: 0.05, t: i * 0.05, filter: 5000 }));
+    s.noise({ dur: 0.25, vol: 0.04, filter: 'highpass', f0: 7000, t: 0.05 });
+  },
   tick(s) {
     s.tone({ type: 'square', f0: 1100, dur: 0.03, vol: 0.05, filter: 4000 });
   },

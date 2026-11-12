@@ -17,10 +17,12 @@ export function makeGame({ level = 1, quiet = true } = {}) {
   return g;
 }
 
-// Desliga o surgimento de bichos e o urso (para testar mecânicas isoladas).
+// Desliga o surgimento de bichos, os prêmios das fases especiais e o urso (para
+// testar mecânicas isoladas).
 export function silence(g) {
   g.critters.list = [];
   g.critters.timers = g.critters.timers.map(() => Infinity);
+  g.critters.bonusQueue = [];
   g.bear.active = false;
 }
 

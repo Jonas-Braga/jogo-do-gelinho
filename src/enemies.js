@@ -1,4 +1,5 @@
 import { W, ROW_Y } from './config.js';
+import { BONUS, BONUS_KINDS } from './bonus.js';
 
 // Largura de colisão de cada tipo. Os bichos das fases especiais têm o tamanho dos
 // que substituem (morcego, disco voador e gaivota = ganso; cobra, bichinho lunar e
@@ -10,11 +11,20 @@ export const SIZE = {
   ufo: 44, crawler: 40, comet: 34,
   gull: 44, siri: 40, jellyfish: 34,
   ghost: 44, spider: 40, eyeball: 34,
+  bag: BONUS.size, heart: BONUS.size,
 };
 const SPACING = 52;
 const PLAYER_HALF = 12;
 
 const rand = (a, b) => a + Math.random() * (b - a);
+
+function shuffle(list) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
 
 // Bichos que atravessam as fileiras: inimigos empurram o jogador, peixes dão pontos.
 export class Critters {
@@ -29,6 +39,32 @@ export class Critters {
     this.list = [];
     // Atraso inicial escalonado para as fileiras não começarem todas juntas
     this.timers = ROW_Y.map((_, i) => rand(1.5, 3.5) + i * 1.2);
+    // Fase especial: prêmios (sacos de dinheiro e corações), sempre todos, um de
+    // cada vez, em ordem sorteada
+    this.bonusQueue = params.special ? shuffle([
+      ...Array(BONUS.bags).fill('bag'), ...Array(BONUS.hearts).fill('heart'),
+    ]) : [];
+    this.bonusTimer = BONUS.first;
+  }
+
+  // A entrada da fileira está livre? (nenhum bicho perto da borda por onde o prêmio
+  // entra, nem esperando fora da tela para entrar). Os bichos da fileira podem
+  // estar mais adiante: o prêmio vai na mesma velocidade deles e não os alcança.
+  entryClear(row) {
+    const dir = -this.game.rows[row].dir;
+    return this.list.every((c) => c.row !== row || (dir > 0 ? c.x > BONUS.clearance : c.x < W - BONUS.clearance));
+  }
+
+  // Solta o próximo prêmio numa fileira com a entrada livre, contra o fluxo das placas
+  spawnBonus() {
+    const free = ROW_Y.map((_, i) => i).filter((r) => this.entryClear(r));
+    if (!free.length) return false;
+    const row = free[Math.floor(Math.random() * free.length)];
+    const kind = this.bonusQueue.shift();
+    const dir = -this.game.rows[row].dir;
+    const speed = this.params.enemySpeed * BONUS.speed;
+    this.list.push({ kind, row, dir, vx: dir * speed, x: dir > 0 ? -40 : W + 40, w: SIZE[kind], ph: Math.random() * 6, bonus: true });
+    return true;
   }
 
   rowBusy(row) {
@@ -65,6 +101,12 @@ export class Critters {
         this.timers[r] = rand(this.params.spawnMin, this.params.spawnMax);
       }
     }
+    if (this.bonusQueue.length) {
+      this.bonusTimer -= dt;
+      if (this.bonusTimer <= 0) {
+        this.bonusTimer = this.spawnBonus() ? rand(BONUS.gapMin, BONUS.gapMax) : 0.5;
+      }
+    }
     for (const c of this.list) {
       // Se a fileira foi invertida, os bichos dela também viram.
       const want = -game.rows[c.row].dir;
@@ -89,6 +131,9 @@ export class Critters {
       if (c.kind === 'fish') {
         c.dead = true;
         game.onFish(c);
+      } else if (BONUS_KINDS.includes(c.kind)) {
+        c.dead = true;
+        game.onBonus(c);
       } else if (Math.sign(dx || c.dir) === c.dir) {
         // Jogador está à frente do bicho: é empurrado junto com ele.
         pl.push(c.x + c.dir * half);
