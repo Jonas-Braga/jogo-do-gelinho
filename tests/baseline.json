@@ -357,5 +357,19 @@
   "Fases especiais · prêmios (sacos de dinheiro e corações) › o título das fases especiais não muda",
   "Fases especiais · prêmios (sacos de dinheiro e corações) › saco e coração desenhados nos dois sentidos, com as suas cores",
   "Fases especiais · prêmios (sacos de dinheiro e corações) › os prêmios aparecem no desenho de todas as fases especiais",
-  "Fases especiais · prêmios (sacos de dinheiro e corações) › há um som de moedas"
+  "Fases especiais · prêmios (sacos de dinheiro e corações) › há um som de moedas",
+  "App instalável (PWA) › manifesto com nome, tela cheia deitada, cores e endereço relativo (funciona no GitHub Pages)",
+  "App instalável (PWA) › ícones de 192 e 512 px (e um \"maskable\" para o recorte do Android) existem e têm o tamanho certo",
+  "App instalável (PWA) › index.html liga o manifesto, os ícones e a cor da barra",
+  "App instalável (PWA) › o jogo registra o service worker",
+  "App instalável (PWA) › regra do botão \"Instalar como app\": só no celular, na tela inicial, fora do app e quando o navegador oferece",
+  "App instalável (PWA) › aberto como app (tela cheia ou standalone) é detectado",
+  "App instalável (PWA) › botão aparece no rodapé da tela inicial do celular e some ao começar a partida",
+  "App instalável (PWA) › botão não aparece no app instalado, no computador nem sem o aviso do navegador",
+  "App instalável (PWA) › o aviso do navegador chegando depois faz o botão aparecer",
+  "App instalável (PWA) › tocar no botão abre a instalação; instalado, o botão não volta",
+  "App instalável (PWA) › se o usuário cancelar, o botão some até o navegador oferecer de novo",
+  "App instalável (PWA) › instalado por outro caminho (menu do navegador), o botão some",
+  "App instalável (PWA) › index.html guarda o aviso de instalação logo no início; o jogo cria o botão",
+  "App instalável (PWA) › o service worker não guarda cache (tudo vem da rede) e só cuida do próprio site"
 ]

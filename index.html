@@ -4,7 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Jogo do Gelinho</title>
+  <!-- App instalável (PWA): manifesto, ícones e cor da barra do sistema -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0B3A52">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="style.css">
+  <script>
+    // Guarda o aviso "pode instalar" do navegador o quanto antes (ele pode chegar
+    // antes do jogo terminar de carregar); o botão está em src/install.js
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      window.__installPrompt = e;
+      window.dispatchEvent(new Event('gelinho-install'));
+    });
+  </script>
 </head>
 <body>
   <canvas id="game" aria-label="Jogo do Gelinho"></canvas>

@@ -16,5 +16,6 @@ export const SPEC_FILES = [
   'trofeus.test.js',
   'halloween.test.js',
   'premios.test.js',
+  'app.test.js',
   'futuras.test.js',
 ];

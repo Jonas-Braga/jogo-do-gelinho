@@ -17,6 +17,7 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         **http.server.SimpleHTTPRequestHandler.extensions_map,
         ".js": "text/javascript",
         ".json": "application/json",
+        ".webmanifest": "application/manifest+json",
     }
 
     def __init__(self, *args, **kwargs):

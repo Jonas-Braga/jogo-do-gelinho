@@ -3,6 +3,7 @@ import { Game } from './game.js';
 import { MUTE_BUTTON } from './hud.js';
 import { createBackend } from './backend.js';
 import { AuthUI } from './auth-ui.js';
+import { InstallButton } from './install.js';
 
 const canvas = document.getElementById('game');
 
@@ -20,6 +21,7 @@ try {
 }
 const game = new Game(canvas, { title: true, backend });
 new AuthUI(game, backend);
+new InstallButton(game);
 
 // Escala responsiva com proporção mantida; backing store em alta densidade.
 function resize() {
@@ -79,6 +81,12 @@ canvas.addEventListener('pointermove', (e) => {
 const release = (e) => game.input.pointerUp(e.pointerId);
 canvas.addEventListener('pointerup', release);
 canvas.addEventListener('pointercancel', release);
+
+// App instalável (PWA): o service worker permite "Instalar app" / "Adicionar à
+// tela inicial" no Chrome e no Edge do Android. Ele não guarda cache (sw.js).
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').catch((e) => console.warn('[gelinho] service worker:', e));
+}
 
 // Exposto para depuração no console.
 window.__game = game;

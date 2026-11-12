@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Ícone do app</title>
+  <style>body { background: #333; margin: 0; } canvas { margin: 8px; }</style>
+</head>
+<body>
+  <!-- Gera os ícones do app (PWA). tools/make-icons.py abre esta página e salva os PNGs. -->
+  <script type="module">
+    import { drawPlayer } from '../src/sprites.js';
+
+    // Desenha o ícone num quadrado de `size` px. maskable = área segura de 80%
+    // (o Android recorta o ícone em círculo ou gota), sem cantos arredondados.
+    function drawIcon(size, maskable) {
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const s = size / 512;
+      ctx.scale(s, s);
+      if (!maskable) {
+        ctx.beginPath();
+        ctx.roundRect(0, 0, 512, 512, 96);
+        ctx.clip();
+      }
+      // Céu e sol baixo
+      const sky = ctx.createLinearGradient(0, 0, 0, 512);
+      sky.addColorStop(0, '#2A9CC0');
+      sky.addColorStop(0.62, '#9ED6E6');
+      sky.addColorStop(0.62, '#F4FBFE');
+      sky.addColorStop(1, '#CFE8F1');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, 512, 512);
+      const sun = ctx.createRadialGradient(110, 120, 6, 110, 120, 110);
+      sun.addColorStop(0, 'rgba(255, 244, 200, 0.95)');
+      sun.addColorStop(0.3, 'rgba(255, 244, 200, 0.5)');
+      sun.addColorStop(1, 'rgba(255, 244, 200, 0)');
+      ctx.fillStyle = sun;
+      ctx.fillRect(0, 0, 260, 260);
+      // Montanhas de gelo ao fundo
+      ctx.fillStyle = '#D6ECF2';
+      ctx.beginPath();
+      ctx.moveTo(0, 318);
+      ctx.lineTo(70, 250);
+      ctx.lineTo(150, 300);
+      ctx.lineTo(260, 228);
+      ctx.lineTo(370, 290);
+      ctx.lineTo(450, 240);
+      ctx.lineTo(512, 280);
+      ctx.lineTo(512, 318);
+      ctx.fill();
+
+      // Iglu (cúpula de blocos com a porta em arco)
+      const ix = 330, iy = 372, rx = 128, ry = 118;
+      ctx.fillStyle = 'rgba(40, 90, 120, 0.25)';
+      ctx.beginPath();
+      ctx.ellipse(ix + 10, iy + 4, rx + 16, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const dome = ctx.createRadialGradient(ix - 50, iy - 80, 10, ix, iy - 40, rx * 1.2);
+      dome.addColorStop(0, '#FFFFFF');
+      dome.addColorStop(1, '#BFE0EC');
+      ctx.fillStyle = dome;
+      ctx.beginPath();
+      ctx.ellipse(ix, iy, rx, ry, 0, Math.PI, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(80, 140, 170, 0.55)';
+      ctx.lineWidth = 4;
+      for (let k = 1; k < 5; k++) {
+        const y = iy - (ry * k) / 5;
+        const hw = rx * Math.sqrt(1 - (k / 5) ** 2);
+        ctx.beginPath();
+        ctx.moveTo(ix - hw, y);
+        ctx.lineTo(ix + hw, y);
+        ctx.stroke();
+        for (let j = 0; j < 5 - k + 1; j++) {
+          const x = ix - hw + ((j + (k % 2) * 0.5) * (hw * 2)) / (5 - k + 1.5);
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x, y + ry / 5);
+          ctx.stroke();
+        }
+      }
+      // Pórtico e porta
+      ctx.fillStyle = '#EAF6FB';
+      ctx.beginPath();
+      ctx.ellipse(ix, iy, 52, 92, 0, Math.PI, 0);
+      ctx.fill();
+      const door = ctx.createLinearGradient(0, iy - 70, 0, iy);
+      door.addColorStop(0, '#3E6A86');
+      door.addColorStop(1, '#1D3A4E');
+      ctx.fillStyle = door;
+      ctx.beginPath();
+      ctx.ellipse(ix, iy, 32, 70, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 200, 120, 0.55)';
+      ctx.beginPath();
+      ctx.ellipse(ix, iy, 24, 58, 0, Math.PI, 0);
+      ctx.fill();
+
+      // Personagem do jogo (parka e capuz de pelo), grande, à esquerda
+      ctx.save();
+      ctx.translate(150, 402);
+      ctx.scale(2.6, 2.6);
+      const p = {
+        x: 0, y: 0, state: 'stand', facing: 1, alpha: 1, squash: 0, scale: 1, anim: 'still',
+        crouch: 0, moving: false, t: 0, back: false, row: -1,
+      };
+      drawPlayer(ctx, p, 0.3, 0, 0, 'parka');
+      ctx.restore();
+
+      // Neve caindo
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      for (const [x, y, r] of [[60, 60, 5], [200, 40, 4], [420, 70, 6], [470, 170, 4], [250, 150, 3.5], [40, 200, 4]]) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return c;
+    }
+
+    const out = {};
+    for (const [name, size, maskable] of [
+      ['icon-192', 192, false], ['icon-512', 512, false], ['maskable-512', 512, true], ['apple-touch-icon', 180, true],
+    ]) {
+      const c = drawIcon(size, maskable);
+      document.body.append(c);
+      out[name] = c.toDataURL('image/png');
+    }
+    window.__icons = out;
+  </script>
+</body>
+</html>

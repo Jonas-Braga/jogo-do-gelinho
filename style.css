@@ -220,3 +220,23 @@ canvas {
   line-height: 18px;
   text-align: center;
 }
+
+/* ---------------------------------------------------------------- Instalar como app */
+/* Canto inferior esquerdo da tela inicial, no celular (do lado oposto ao botão de
+   som; src/install.js decide quando aparece) */
+.install-app {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 20;
+  padding: 8px 14px;
+  font: 700 14px var(--font);
+  color: var(--ink);
+  background: var(--gold);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0, 10, 20, 0.45);
+  cursor: pointer;
+}
+
+.install-app:active { transform: scale(0.96); }
