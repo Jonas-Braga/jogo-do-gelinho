@@ -3,8 +3,9 @@ import { suite, test, expect } from '../harness.js';
 import { fakeCanvas, isNode } from '../env.js';
 import { makeGame, step, stepUntil, press, placeOnFloe } from '../helpers.js';
 import { Game } from '../../src/game.js';
-import { TOUCH_BUTTONS, JOYSTICK, stickDirections } from '../../src/input.js';
+import { TOUCH_BUTTONS, WALK_PAD, walkDirection } from '../../src/input.js';
 import { MUTE_BUTTON } from '../../src/hud.js';
+import { controlsFor } from '../../src/screens.js';
 import { levelParams, levelIntro } from '../../src/levels.js';
 import { loadHighScore, saveHighScore, removeItem, STORE } from '../../src/storage.js';
 import { W, H, PLAYER, RULES } from '../../src/config.js';
@@ -165,11 +166,22 @@ suite('Etapa 5 · telas, recorde, toque e dificuldade', () => {
     }
   });
 
-  // (Adaptados ao direcional analógico, que substituiu os 4 botões a pedido do usuário)
+  // Pontos de toque: meio de ◀, meio de ▶ e meio de um botão pelo id
+  const padY = WALK_PAD.y + WALK_PAD.h / 2;
+  const padMid = WALK_PAD.x + WALK_PAD.w / 2;
+  const LEFT = [WALK_PAD.x + WALK_PAD.w * 0.25, padY];
+  const RIGHT = [WALK_PAD.x + WALK_PAD.w * 0.75, padY];
+  const mid = (id) => {
+    const b = TOUCH_BUTTONS.find((t) => t.id === id);
+    return [b.x + b.w / 2, b.y + b.h / 2];
+  };
+
+  // (Adaptados aos botões ◀ ▶ / ▲ ▼ de dois polegares, que substituíram o
+  // direcional analógico a pedido do usuário: mesmos nomes e verificações)
   test('segurar o direcional de toque move o personagem; soltar para', () => {
     const g = makeGame();
     const x0 = g.player.x;
-    expect(g.input.pointerDown(1, JOYSTICK.cx + JOYSTICK.r, JOYSTICK.cy)).toBe('stick');
+    expect(g.input.pointerDown(1, ...RIGHT)).toBe('walk');
     expect(g.input.touchMode).toBe(true);
     step(g, 0.5);
     expect(g.player.x).toBeGreaterThan(x0 + 50);
@@ -181,47 +193,38 @@ suite('Etapa 5 · telas, recorde, toque e dificuldade', () => {
 
   test('arrastar o dedo no direcional troca de direção', () => {
     const g = makeGame();
-    const { cx, cy, r } = JOYSTICK;
-    g.input.pointerDown(7, cx - r, cy);
+    g.input.pointerDown(7, ...LEFT);
     expect(g.input.axisX()).toBe(-1);
-    g.input.pointerMove(7, cx + r, cy);
+    g.input.pointerMove(7, ...RIGHT);
     expect(g.input.axisX()).toBe(1);
-    g.input.pointerMove(7, cx + 2, cy + 1); // voltou ao centro (zona morta)
+    g.input.pointerMove(7, padMid + 2, padY + 1); // voltou ao centro (zona morta)
     expect(g.input.axisX()).toBe(0);
   });
 
   test('toque e teclado ao mesmo tempo não se atrapalham', () => {
     const g = makeGame();
     g.input.held.add('left');
-    g.input.pointerDown(3, JOYSTICK.cx - JOYSTICK.r, JOYSTICK.cy);
+    g.input.pointerDown(3, ...LEFT);
     g.input.pointerUp(3);
     expect(g.input.isDown('left'), 'tecla continua segurada').toBe(true);
     g.input.held.delete('left');
   });
 
-  // ---- Direcional analógico (8 direções)
+  // ---- 8 direções: ◀ ▶ num polegar, ▲ ▼ no outro
   test('direcional reconhece as 8 direções, incluindo as diagonais', () => {
     const g = makeGame();
-    const { cx, cy, r } = JOYSTICK;
     const cases = [
       [1, 0, ['right']], [1, 1, ['down', 'right']], [0, 1, ['down']], [-1, 1, ['down', 'left']],
       [-1, 0, ['left']], [-1, -1, ['up', 'left']], [0, -1, ['up']], [1, -1, ['up', 'right']],
     ];
     for (const [dx, dy, want] of cases) {
-      const k = r / Math.hypot(dx, dy);
-      g.input.pointerDown(5, cx + dx * k, cy + dy * k);
+      if (dx) g.input.pointerDown(5, ...(dx > 0 ? RIGHT : LEFT));
+      if (dy) g.input.pointerDown(6, ...mid(dy > 0 ? 'down' : 'up'));
       for (const a of ['up', 'down', 'left', 'right']) {
         expect(g.input.isDown(a), `(${dx},${dy}) ${a}`).toBe(want.includes(a));
       }
       g.input.pointerUp(5);
-    }
-  });
-
-  test('cada diagonal tem uma faixa larga (45°), fácil de acertar com o dedo', () => {
-    const { r } = JOYSTICK;
-    for (const deg of [-62, -45, -28]) { // em volta de cima-direita
-      const a = (deg * Math.PI) / 180;
-      expect(stickDirections(Math.cos(a) * r, Math.sin(a) * r), `${deg}°`).toEqual(['up', 'right']);
+      g.input.pointerUp(6);
     }
   });
 
@@ -230,58 +233,149 @@ suite('Etapa 5 · telas, recorde, toque e dificuldade', () => {
     for (const row of g.rows) row.speed = 0;
     placeOnFloe(g, 1);
     const x0 = g.player.x;
-    const { cx, cy, r } = JOYSTICK;
-    g.input.pointerDown(2, cx + r * 0.7, cy - r * 0.7); // cima-direita
+    g.input.pointerDown(2, ...RIGHT);       // um polegar anda
+    g.input.pointerDown(3, ...mid('up'));   // o outro pula
     stepUntil(g, () => g.player.state === 'jump', 0.3);
     expect(g.player.state).toBe('jump');
     expect(g.player.to, 'subindo').toBe(0);
     step(g, 0.2);
     g.input.pointerUp(2);
+    g.input.pointerUp(3);
     expect(g.player.x, 'andando para a direita no ar').toBeGreaterThan(x0 + 20);
   });
 
   test('toque leve no centro (zona morta) não move', () => {
     const g = makeGame();
-    g.input.pointerDown(4, JOYSTICK.cx + 8, JOYSTICK.cy - 6);
+    g.input.pointerDown(4, padMid + 8, padY - 6);
     expect(g.input.axisX()).toBe(0);
     expect(g.input.axisY()).toBe(0);
   });
 
-  test('pino fica limitado à base, mas o dedo pode sair dela sem perder o controle', () => {
-    const g = makeGame();
-    const { cx, cy, r } = JOYSTICK;
-    g.input.pointerDown(6, cx + 20, cy);
-    g.input.pointerMove(6, cx + 400, cy); // muito além da base
-    expect(Math.hypot(g.input.stick.dx, g.input.stick.dy)).toBeCloseTo(r, 1e-6);
-    expect(g.input.isDown('right')).toBe(true);
-    g.input.pointerUp(6);
-    expect(g.input.stick.dirs.length).toBe(0);
-    expect(g.input.stick.dx).toBe(0);
-  });
-
   test('dá para usar o direcional e o botão de inverter ao mesmo tempo (multitoque)', () => {
     const g = makeGame();
-    const action = TOUCH_BUTTONS.find((b) => b.id === 'action');
     g.igloo.add();
     for (const row of g.rows) row.speed = 0;
     placeOnFloe(g, 1);
     const dir = g.rows[1].dir;
-    g.input.pointerDown(1, JOYSTICK.cx + JOYSTICK.r, JOYSTICK.cy);
-    g.input.pointerDown(2, action.x + action.w / 2, action.y + action.h / 2);
+    g.input.pointerDown(1, ...RIGHT);
+    g.input.pointerDown(2, ...mid('action'));
     expect(g.rows[1].dir).toBe(-dir);
     expect(g.input.isDown('right'), 'direcional continua segurado').toBe(true);
   });
 
   test('direcional fica dentro da tela e longe dos outros botões', () => {
-    const { cx, cy, grab } = JOYSTICK;
-    expect(cx - grab).toBeGreaterThanOrEqual(0);
-    expect(cy + grab).toBeLessThanOrEqual(H);
+    const { x, y, w, h, grab } = WALK_PAD;
+    expect(x).toBeGreaterThanOrEqual(0);
+    expect(y + h).toBeLessThanOrEqual(H);
     for (const b of [...TOUCH_BUTTONS, { id: 'mute', ...MUTE_BUTTON }]) {
-      // ponto do botão mais próximo do centro do direcional
-      const px = Math.max(b.x, Math.min(cx, b.x + b.w));
-      const py = Math.max(b.y, Math.min(cy, b.y + b.h));
-      expect(Math.hypot(px - cx, py - cy), b.id).toBeGreaterThan(grab);
+      // distância entre o retângulo do botão e o dos botões de andar
+      const gapX = Math.max(0, b.x - (x + w), x - (b.x + b.w));
+      const gapY = Math.max(0, b.y - (y + h), y - (b.y + b.h));
+      expect(Math.hypot(gapX, gapY), b.id).toBeGreaterThan(grab);
     }
+  });
+
+  // ---- Controle de dois polegares (substituiu o direcional analógico, que no
+  // celular era pequeno e sensível demais: o personagem pulava sem querer)
+  test('andar com o dedo torto nunca faz pular: ◀ ▶ só mexem para os lados', () => {
+    const g = makeGame();
+    for (const row of g.rows) row.speed = 0;
+    placeOnFloe(g, 1);
+    const { x, y, w, h, grab } = WALK_PAD;
+    g.input.pointerDown(1, ...RIGHT);
+    // o dedo sobe, desce e sai dos botões enquanto anda
+    for (const [px, py] of [[x + w, y - grab], [x + w, y + h + grab], [x + w + 200, y - 300], [x + w * 0.8, H]]) {
+      g.input.pointerMove(1, px, py);
+      expect(g.input.axisX(), `(${px},${py})`).toBe(1);
+      expect(g.input.axisY(), `(${px},${py})`).toBe(0);
+      step(g, 0.02);
+      expect(g.player.state, 'não pulou').not.toBe('jump');
+      expect(g.player.row).toBe(1);
+    }
+  });
+
+  test('dedo pode sair dos botões de andar sem perder o controle; soltar para', () => {
+    const g = makeGame();
+    g.input.pointerDown(6, ...RIGHT);
+    g.input.pointerMove(6, WALK_PAD.x + WALK_PAD.w + 400, padY - 200); // muito além dos botões
+    expect(g.input.isDown('right')).toBe(true);
+    g.input.pointerMove(6, 0, padY); // atravessou para o outro lado
+    expect(g.input.isDown('left')).toBe(true);
+    expect(g.input.isDown('right')).toBe(false);
+    g.input.pointerUp(6);
+    expect(g.input.axisX()).toBe(0);
+    expect(g.input.walk.pointerId).toBe(null);
+  });
+
+  test('os botões de andar pegam o toque com folga em volta, mas não o resto da tela', () => {
+    const g = makeGame();
+    const { x, y, w, h, grab } = WALK_PAD;
+    expect(g.input.pointerDown(1, x + w + grab - 1, y - grab + 1)).toBe('walk');
+    expect(g.input.axisX()).toBe(1);
+    g.input.pointerUp(1);
+    expect(g.input.pointerDown(1, x + w + grab + 5, y + h / 2)).toBe(null);
+    expect(walkDirection(x)).toBe(-1);
+    expect(walkDirection(x + w)).toBe(1);
+    expect(walkDirection(x + w / 2)).toBe(0);
+  });
+
+  test('▲ e ▼ pulam uma fileira por toque; soltar para de pular', () => {
+    const g = makeGame();
+    for (const row of g.rows) row.speed = 0;
+    placeOnFloe(g, 1);
+    expect(g.input.pointerDown(1, ...mid('down'))).toBe('down');
+    expect(g.input.axisY()).toBe(1);
+    stepUntil(g, () => g.player.state === 'jump', 0.3);
+    expect(g.player.to, 'descendo').toBe(2);
+    g.input.pointerUp(1);
+    expect(g.input.axisY()).toBe(0);
+    g.input.pointerDown(1, ...mid('up'));
+    expect(g.input.axisY()).toBe(-1);
+    g.input.pointerUp(1);
+  });
+
+  test('deslizar o dedo de ▲ para ▼ troca o pulo; sair do botão solta', () => {
+    const g = makeGame();
+    g.input.pointerDown(1, ...mid('up'));
+    g.input.pointerMove(1, ...mid('down'));
+    expect(g.input.axisY()).toBe(1);
+    g.input.pointerMove(1, W / 2, H / 2);
+    expect(g.input.axisY()).toBe(0);
+  });
+
+  test('▲ em frente à porta do iglu completo faz o personagem entrar', () => {
+    const g = makeGame();
+    while (!g.igloo.complete) g.igloo.add();
+    g.igloo.update(5);
+    g.player.x = g.igloo.doorX;
+    expect(g.atDoor).toBe(true);
+    g.input.pointerDown(1, ...mid('up'));
+    step(g, 0.05);
+    expect(g.state).toBe('entering');
+  });
+
+  test('botões de andar e de pular são grandes (fáceis de acertar com o polegar)', () => {
+    const side = WALK_PAD.w / 2 - WALK_PAD.dead;
+    expect(side, 'largura de ◀ e de ▶').toBeGreaterThanOrEqual(110);
+    expect(WALK_PAD.h).toBeGreaterThanOrEqual(110);
+    for (const id of ['up', 'down']) {
+      const b = TOUCH_BUTTONS.find((t) => t.id === id);
+      expect(b.w, id).toBeGreaterThanOrEqual(110);
+      expect(b.h, id).toBeGreaterThanOrEqual(110);
+      expect(b.hold, id).toBe(true);
+    }
+    // andar à esquerda da tela, pular à direita: um polegar de cada lado
+    expect(WALK_PAD.x + WALK_PAD.w).toBeLessThan(W / 2);
+    expect(TOUCH_BUTTONS.find((t) => t.id === 'up').x).toBeGreaterThan(W / 2);
+  });
+
+  test('pausa no toque mostra os botões da tela, não as teclas', () => {
+    const touch = controlsFor('igloo', true).map(([k]) => k).join(' ');
+    expect(touch.includes('◀ ▶')).toBe(true);
+    expect(touch.includes('▲ ▼')).toBe(true);
+    expect(touch.includes('⇄')).toBe(true);
+    expect(touch.includes('Espaço')).toBe(false);
+    expect(controlsFor('igloo').map(([k]) => k).join(' ').includes('Espaço')).toBe(true);
   });
 
   test('botões de toque de inverter e pausar funcionam', () => {

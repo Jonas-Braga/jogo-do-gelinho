@@ -1,6 +1,6 @@
 // Telas: inicial, pausa, fim de fase, fim de jogo, aviso de fase e botões de toque.
 import { W, H } from './config.js';
-import { TOUCH_BUTTONS, JOYSTICK } from './input.js';
+import { TOUCH_BUTTONS, WALK_PAD } from './input.js';
 import { FONT, panel, pad6 } from './ui.js';
 import { drawTrophyShelf, drawTrophyIcons } from './trophies.js';
 
@@ -13,14 +13,18 @@ const WORDS = {
   haunted: { floes: 'as abóboras', floe: 'a abóbora', house: 'na casa assombrada pronta' },
 };
 
-export function controlsFor(style = 'igloo') {
+// touch = true: mostra os botões da tela no lugar das teclas
+export function controlsFor(style = 'igloo', touch = false) {
   const w = WORDS[style] || WORDS.igloo;
+  const k = touch
+    ? { walk: '◀ ▶', jump: '▲ ▼', flip: '⇄', enter: '▲ na porta', misc: 'II', miscWhat: 'pausar' }
+    : { walk: '← →', jump: '↑ ↓', flip: 'Espaço', enter: '↑ na porta', misc: 'P / M', miscWhat: 'pausar / som' };
   return [
-    ['← →', 'andar'],
-    ['↑ ↓', `pular entre a costa e ${w.floes}`],
-    ['Espaço', `inverter ${w.floe} (custa 1 bloco)`],
-    ['↑ na porta', `entrar ${w.house}`],
-    ['P / M', 'pausar / som'],
+    [k.walk, 'andar'],
+    [k.jump, `pular entre a costa e ${w.floes}`],
+    [k.flip, `inverter ${w.floe} (custa 1 bloco)`],
+    [k.enter, `entrar ${w.house}`],
+    [k.misc, k.miscWhat],
   ];
 }
 const CONTROLS = controlsFor();
@@ -144,7 +148,7 @@ export function drawPause(ctx, game) {
   ctx.font = `900 52px ${FONT}`;
   ctx.fillText('PAUSA', W / 2, H / 2 - 62);
   ctx.textAlign = 'left';
-  controlsFor(game.igloo.style).forEach(([key, what], i) => {
+  controlsFor(game.igloo.style, game.input.touchMode).forEach(([key, what], i) => {
     const y = H / 2 - 18 + i * 24;
     ctx.font = `800 14px ${FONT}`;
     ctx.fillStyle = '#BDEBFA';
@@ -332,69 +336,37 @@ export function drawBanner(ctx, game) {
   return k;
 }
 
-// Direcional analógico: base com marcas das 8 direções, fatia acesa na direção
-// ativa e o pino seguindo o dedo.
-function drawJoystick(ctx, game) {
-  const { cx, cy, r, knob } = JOYSTICK;
-  const s = game.input.stick;
-  const active = s.pointerId !== null;
+// Botões de andar: ◀ e ▶ grandes, com um vão no meio; o lado apertado acende.
+function drawWalkPad(ctx, game) {
+  const { x, y, w, h, dead } = WALK_PAD;
+  const bw = w / 2 - dead;
+  const dir = game.input.walk.dir;
   ctx.save();
-  // Base
-  ctx.fillStyle = 'rgba(6, 30, 45, 0.38)';
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r + knob * 0.6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  // Fatia da direção ativa (45°)
-  if (s.dirs.length) {
-    const a = Math.atan2(s.dy, s.dx);
-    const snapped = Math.round(a / (Math.PI / 4)) * (Math.PI / 4);
-    ctx.fillStyle = 'rgba(189, 235, 250, 0.28)';
+  for (const side of [-1, 1]) {
+    const bx = side < 0 ? x : x + w - bw;
+    ctx.fillStyle = dir === side ? 'rgba(189, 235, 250, 0.45)' : 'rgba(6, 30, 45, 0.38)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, r + knob * 0.6, snapped - Math.PI / 8, snapped + Math.PI / 8);
+    ctx.roundRect(bx, y, bw, h, 22);
+    ctx.fill();
+    ctx.stroke();
+    // Seta
+    const cx = bx + bw / 2;
+    const cy = y + h / 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(cx + side * 24, cy);
+    ctx.lineTo(cx - side * 16, cy - 26);
+    ctx.lineTo(cx - side * 16, cy + 26);
     ctx.closePath();
     ctx.fill();
   }
-  // Marcas das 8 direções (setas nas 4 principais)
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-  for (let i = 0; i < 8; i++) {
-    const a = (i * Math.PI) / 4;
-    const big = i % 2 === 0;
-    const d = r + knob * 0.6 - (big ? 13 : 10);
-    ctx.save();
-    ctx.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d);
-    ctx.rotate(a);
-    ctx.beginPath();
-    if (big) {
-      ctx.moveTo(6, 0);
-      ctx.lineTo(-4, -6);
-      ctx.lineTo(-4, 6);
-    } else {
-      ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
-    }
-    ctx.fill();
-    ctx.restore();
-  }
-  // Pino
-  const kx = cx + s.dx;
-  const ky = cy + s.dy;
-  const g = ctx.createRadialGradient(kx - 8, ky - 10, 4, kx, ky, knob);
-  g.addColorStop(0, active ? 'rgba(235, 250, 255, 0.95)' : 'rgba(235, 250, 255, 0.75)');
-  g.addColorStop(1, active ? 'rgba(140, 205, 230, 0.9)' : 'rgba(120, 170, 195, 0.6)');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(kx, ky, knob, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-  ctx.stroke();
   ctx.restore();
 }
 
 export function drawTouchButtons(ctx, game) {
-  drawJoystick(ctx, game);
+  drawWalkPad(ctx, game);
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -409,7 +381,7 @@ export function drawTouchButtons(ctx, game) {
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.font = `800 ${b.round ? 40 : b.w > 60 ? 28 : 16}px ${FONT}`;
+    ctx.font = `800 ${b.round ? (b.w > 100 ? 46 : 40) : b.w > 60 ? 28 : 16}px ${FONT}`;
     ctx.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 + 1);
   }
   ctx.restore();

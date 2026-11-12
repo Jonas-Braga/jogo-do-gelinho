@@ -71,7 +71,9 @@ canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   canvas.setPointerCapture?.(e.pointerId);
   const hitId = game.input.pointerDown(e.pointerId, p.x, p.y);
-  if (!hitId && ['title', 'gameOver', 'trophy'].includes(game.state)) game.input.emit('start');
+  // Nessas telas os botões de andar e pular não mandam nada: tocar ali também começa
+  const free = !hitId || ['walk', 'up', 'down'].includes(hitId);
+  if (free && ['title', 'gameOver', 'trophy'].includes(game.state)) game.input.emit('start');
 });
 canvas.addEventListener('pointermove', (e) => {
   if (e.pointerType === 'mouse') return;

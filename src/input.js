@@ -13,32 +13,27 @@ export const MAP = {
   NumpadEnter: 'start',
 };
 
-// Controles de toque (coordenadas lógicas 1280x720).
-// Esquerda: direcional analógico de 8 direções (permite diagonais, ex.: pular
-// para cima já andando para a direita). Direita: inverter e pausa, acima do mudo.
-export const JOYSTICK = {
-  cx: 150, cy: H - 150,
-  r: 72,        // raio da base (curso máximo do pino)
-  knob: 32,     // raio do pino
-  grab: 120,    // raio da área onde um toque "pega" o direcional
-  dead: 0.3,    // zona morta (fração do raio): toque leve não move
+// Controles de toque (coordenadas lógicas 1280x720), um polegar de cada lado.
+// Esquerda: ◀ ▶ só para andar. Direita: ▲ ▼ para pular (e ▲ para entrar no
+// iglu) e ⇄ para inverter; pausa acima do mudo. O pulo só sai quando o botão é
+// apertado, nunca por o dedo escorregar enquanto anda. Pular já andando = um
+// polegar em cada lado.
+export const WALK_PAD = {
+  x: 20, y: H - 180, w: 300, h: 140,
+  dead: 14,   // meia largura do vão entre ◀ e ▶: ali o personagem fica parado
+  grab: 36,   // folga em volta dos botões onde o toque ainda "pega"
 };
 
-// Setor de 45° → direções seguradas (0 = direita, sentido horário, y para baixo)
-const SECTORS = [
-  ['right'], ['down', 'right'], ['down'], ['down', 'left'],
-  ['left'], ['up', 'left'], ['up'], ['up', 'right'],
-];
-
-export function stickDirections(dx, dy) {
-  const { r, dead } = JOYSTICK;
-  if (Math.hypot(dx, dy) < r * dead) return [];
-  const sector = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
-  return SECTORS[sector];
+// Lado do dedo em relação ao meio dos botões de andar: -1 esquerda, +1 direita, 0 no vão
+export function walkDirection(x) {
+  const d = x - (WALK_PAD.x + WALK_PAD.w / 2);
+  return Math.abs(d) < WALK_PAD.dead ? 0 : Math.sign(d);
 }
 
 export const TOUCH_BUTTONS = [
-  { id: 'action', label: '⇄', hold: false, x: W - 180, y: H - 214, w: 100, h: 100, round: true },
+  { id: 'up', label: '▲', hold: true, x: W - 204, y: H - 310, w: 120, h: 120, round: true },
+  { id: 'down', label: '▼', hold: true, x: W - 204, y: H - 170, w: 120, h: 120, round: true },
+  { id: 'action', label: '⇄', hold: false, x: W - 340, y: H - 150, w: 100, h: 100, round: true },
   { id: 'pause', label: 'II', hold: false, x: W - 62, y: H - 100, w: 46, h: 40 },
 ];
 
@@ -55,15 +50,15 @@ export class Input {
     this.held = new Set();       // teclado
     this.touchHeld = new Map();  // pointerId → id do botão segurado
     this.touchMode = false;      // vira true no primeiro toque: mostra os botões
-    // Direcional analógico: dedo que o controla, deslocamento do pino e direções ativas
-    this.stick = { pointerId: null, dx: 0, dy: 0, dirs: [] };
+    // Botões de andar: dedo que os controla e o lado apertado (-1, 0, +1)
+    this.walk = { pointerId: null, dir: 0 };
     this.listeners = {};
     window.addEventListener('keydown', (e) => this.keyDown(e));
     window.addEventListener('keyup', (e) => this.keyUp(e));
     window.addEventListener('blur', () => {
       this.held.clear();
       this.touchHeld.clear();
-      this.releaseStick();
+      this.releaseWalk();
       this.emit('blur');
     });
   }
@@ -93,7 +88,8 @@ export class Input {
 
   isDown(a) {
     if (this.held.has(a)) return true;
-    if (this.stick.dirs.includes(a)) return true;
+    if (a === 'left' && this.walk.dir < 0) return true;
+    if (a === 'right' && this.walk.dir > 0) return true;
     for (const id of this.touchHeld.values()) if (id === a) return true;
     return false;
   }
@@ -112,17 +108,18 @@ export class Input {
     return TOUCH_BUTTONS.find((b) => hit(b, x, y)) || null;
   }
 
-  // O toque cai na área do direcional?
-  inStick(x, y) {
-    return Math.hypot(x - JOYSTICK.cx, y - JOYSTICK.cy) <= JOYSTICK.grab;
+  // O toque cai nos botões de andar (com a folga em volta)?
+  inWalkPad(x, y) {
+    const { x: px, y: py, w, h, grab } = WALK_PAD;
+    return x >= px - grab && x <= px + w + grab && y >= py - grab && y <= py + h + grab;
   }
 
   pointerDown(pointerId, x, y) {
     this.touchMode = true;
-    if (this.stick.pointerId === null && this.inStick(x, y)) {
-      this.stick.pointerId = pointerId;
-      this.moveStick(x, y);
-      return 'stick';
+    if (this.walk.pointerId === null && this.inWalkPad(x, y)) {
+      this.walk.pointerId = pointerId;
+      this.walk.dir = walkDirection(x);
+      return 'walk';
     }
     const b = this.buttonAt(x, y);
     if (!b) return null;
@@ -134,10 +131,12 @@ export class Input {
     return b.id;
   }
 
-  // O dedo que pegou o direcional continua controlando mesmo saindo da base
+  // O dedo que pegou os botões de andar continua mandando mesmo saindo deles:
+  // vale o lado em que ele está. Nos de pular, deslizar de ▲ para ▼ troca;
+  // sair do botão solta.
   pointerMove(pointerId, x, y) {
-    if (pointerId === this.stick.pointerId) {
-      this.moveStick(x, y);
+    if (pointerId === this.walk.pointerId) {
+      this.walk.dir = walkDirection(x);
       return;
     }
     if (!this.touchHeld.has(pointerId)) return;
@@ -147,25 +146,11 @@ export class Input {
   }
 
   pointerUp(pointerId) {
-    if (pointerId === this.stick.pointerId) this.releaseStick();
+    if (pointerId === this.walk.pointerId) this.releaseWalk();
     this.touchHeld.delete(pointerId);
   }
 
-  moveStick(x, y) {
-    let dx = x - JOYSTICK.cx;
-    let dy = y - JOYSTICK.cy;
-    this.stick.dirs = stickDirections(dx, dy);
-    // O pino fica limitado à base
-    const d = Math.hypot(dx, dy);
-    if (d > JOYSTICK.r) {
-      dx = (dx / d) * JOYSTICK.r;
-      dy = (dy / d) * JOYSTICK.r;
-    }
-    this.stick.dx = dx;
-    this.stick.dy = dy;
-  }
-
-  releaseStick() {
-    this.stick = { pointerId: null, dx: 0, dy: 0, dirs: [] };
+  releaseWalk() {
+    this.walk = { pointerId: null, dir: 0 };
   }
 }
