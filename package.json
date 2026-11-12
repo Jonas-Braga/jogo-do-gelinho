@@ -5,6 +5,12 @@
   "scripts": {
     "start": "python tools/serve.py 8137",
     "test": "node tests/run.js",
-    "test:baseline": "node tests/run.js --update-baseline"
+    "test:baseline": "node tests/run.js --update-baseline",
+    "test:regras": "firebase emulators:exec --only firestore --project demo-gelinho \"node --test tests/rules/regras.test.js\"",
+    "deploy:regras": "firebase deploy --only firestore:rules --project jogo-do-gelinho"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.3.0"
   }
 }

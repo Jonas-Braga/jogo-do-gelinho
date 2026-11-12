@@ -22,6 +22,7 @@ A imagem de referência é `frostbite1.jpeg` (arte da caixa original). Use-a só
 - Nunca apague, renomeie ou enfraqueça testes da baseline: a suíte falha se algum sumir. Se uma mudança de regra exigir, peça aprovação antes
 - Só rode `npm run test:baseline` (promove progressivos a regressivos) depois que o usuário aprovar a etapa
 - Antes de entregar uma etapa: `npm test` com 0 falhas e 0 testes sumidos
+- `npm run test:regras`: testa o `firestore.rules` de verdade no emulador do Firestore (`tests/rules/regras.test.js`, `node:test` + `@firebase/rules-unit-testing`, projeto `demo-gelinho`, porta 8181; precisa do Java 21+, Temurin instalado). Rodar sempre que as regras mudarem. Publicar as regras: `npm run deploy:regras` (Firebase CLI, precisa de `firebase login` uma vez), não mais colando no console
 - `localStorage` só via `src/storage.js` (prefixo `gelinho.`); `tests/env.js` troca o prefixo para `gelinho.test.` para a suíte no navegador não sobrescrever recorde/mudo do jogador
 - `new Game(canvas)` começa direto numa partida (testes); o jogo real usa `new Game(canvas, { title: true })` (tela inicial)
 

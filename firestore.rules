@@ -9,7 +9,8 @@ rules_version = '2';
 // - Só jogadores aprovados leem o ranking e gravam recorde, e o recorde nunca diminui.
 // - Troféus (níveis das fases especiais concluídas) ficam no documento do ranking:
 //   a lista só cresce e só aceita fases especiais que existem. Ao criar uma fase
-//   especial nova, inclua o nível em validTrophies e publique as regras de novo.
+//   especial nova, inclua o nível em validTrophies e publique as regras de novo
+//   (`npm run test:regras` e depois `npm run deploy:regras`).
 //   O "zerar" do admin apaga só a pontuação, não os troféus.
 service cloud.firestore {
   match /databases/{database}/documents {
