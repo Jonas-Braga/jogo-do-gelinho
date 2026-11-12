@@ -67,6 +67,14 @@ export const SOUNDS = {
     [96, 91, 88, 84].forEach((n, i) => s.tone({ type: 'sine', f0: NOTE(n), dur: 0.15, vol: 0.06, t: 0.1 + i * 0.15 }));
   },
   growl(s, o = {}) {
+    if (o.kind === 'werewolf') {
+      // Uivo de lobisomem: "auuuu" subindo, segurando e caindo, com rosnado embaixo
+      s.tone({ type: 'sawtooth', f0: 260, f1: 560, dur: 0.35, vol: 0.09, filter: 1400 });
+      s.tone({ type: 'sawtooth', f0: 560, f1: 380, dur: 0.9, vol: 0.08, t: 0.35, filter: 1300 });
+      s.tone({ type: 'sine', f0: 565, f1: 385, dur: 0.9, vol: 0.05, t: 0.35 });
+      s.noise({ dur: 0.4, vol: 0.1, filter: 'lowpass', f0: 380 });
+      return;
+    }
     if (o.kind === 'giantCrab') {
       // Caranguejo gigante: pinçadas enormes estalando e um ronco grave
       [0, 0.12, 0.24, 0.36].forEach((t) => s.noise({ dur: 0.04, vol: 0.3, filter: 'bandpass', f0: 1400, q: 6, t }));
@@ -123,6 +131,18 @@ export const SOUNDS = {
     } else if (o.kind === 'siri') {
       // Siri: pinças estalando
       [0, 0.06, 0.12].forEach((t) => s.noise({ dur: 0.025, vol: 0.2, filter: 'bandpass', f0: 3200, q: 8, t }));
+    } else if (o.kind === 'ghost') {
+      // Fantasminha: "buuu" tremido
+      [0, 0.09, 0.18, 0.27].forEach((t, i) =>
+        s.tone({ type: 'sine', f0: 330 - i * 18, f1: 300 - i * 20, dur: 0.12, vol: 0.08, t }));
+    } else if (o.kind === 'spider') {
+      // Aranha: patinhas arranhando rápido
+      [0, 0.03, 0.06, 0.09, 0.12, 0.15].forEach((t) =>
+        s.noise({ dur: 0.02, vol: 0.12, filter: 'bandpass', f0: 4200, q: 6, t }));
+    } else if (o.kind === 'eyeball') {
+      // Olho: "plóc" molhado
+      s.tone({ type: 'sine', f0: 180, f1: 620, dur: 0.1, vol: 0.12 });
+      s.noise({ dur: 0.08, vol: 0.08, filter: 'lowpass', f0: 700, t: 0.02 });
     } else if (o.kind === 'jellyfish') {
       // Água-viva: choquinho elétrico ondulando
       s.tone({ type: 'square', f0: 220, f1: 660, dur: 0.18, vol: 0.05, filter: 1800 });
@@ -461,6 +481,86 @@ function buildBeachTrack({ beat }) {
   return { beat, length: BEACH_BARS.length * 4, events };
 }
 
+// ---- Halloween: tema original em ré menor, "na ponta dos pés".
+// Caixinha de música na melodia, órgão sombrio nos acordes, baixo em pizzicato,
+// sino badalando e um "uuuu" de fantasma de vez em quando.
+
+// Caixinha de música: fundamental + harmônico agudo curtinho
+function musicBox(s, n, t, dur) {
+  s.tone({ type: 'sine', f0: NOTE(n), dur: Math.max(0.3, dur), vol: 0.045, t });
+  s.tone({ type: 'sine', f0: NOTE(n) * 4, dur: 0.07, vol: 0.008, t });
+}
+
+// Órgão: acorde grave segurado, com filtro escuro
+function organ(s, notes, t, dur) {
+  notes.forEach((n) => s.tone({ type: 'sawtooth', f0: NOTE(n - 12), dur, vol: 0.012, t, filter: 900 }));
+}
+
+function pizz(s, n, t) {
+  s.tone({ type: 'triangle', f0: NOTE(n), dur: 0.18, vol: 0.07, t, filter: 900 });
+}
+
+// Sino de igreja ao longe (parciais inarmônicos)
+function churchBell(s, t) {
+  s.tone({ type: 'sine', f0: NOTE(50), dur: 2.4, vol: 0.04, t });
+  s.tone({ type: 'sine', f0: NOTE(50) * 2.76, dur: 1.2, vol: 0.012, t });
+}
+
+// "Uuuu" de fantasma (glissando de teremim)
+function ghostly(s, t) {
+  s.tone({ type: 'sine', f0: NOTE(81), f1: NOTE(76), dur: 1.6, vol: 0.025, t });
+}
+
+const HALLOWEEN_CHORDS = {
+  Dm: { bass: 38, notes: [62, 65, 69] },
+  Bb: { bass: 46, notes: [62, 65, 70] },
+  Gm: { bass: 43, notes: [62, 67, 70] },
+  A: { bass: 45, notes: [61, 64, 69] },
+  F: { bass: 41, notes: [60, 65, 69] },
+};
+const HALLOWEEN_BARS = ['Dm', 'Dm', 'Bb', 'A', 'Dm', 'Gm', 'A', 'A', 'Dm', 'F', 'Gm', 'Dm', 'Bb', 'Gm', 'A', 'Dm'];
+// Melodia original da caixinha de música, um compasso por linha (nota 0 = pausa)
+const HALLOWEEN_TUNE = [
+  [74, 1], [77, 1], [81, 1], [80, 1],
+  [81, 2], [74, 2],
+  [77, 1], [74, 1], [70, 1], [74, 1],
+  [73, 3], [0, 1],
+  [74, 0.5], [74, 0.5], [77, 1], [81, 1], [86, 1],
+  [82, 2], [79, 2],
+  [81, 1], [79, 1], [77, 1], [76, 1],
+  [73, 2], [76, 1], [0, 1],
+  [86, 1], [84, 1], [81, 1], [77, 1],
+  [81, 2], [77, 2],
+  [79, 1], [82, 1], [86, 1.5], [84, 0.5],
+  [81, 3], [0, 1],
+  [82, 1], [81, 1], [79, 1], [77, 1],
+  [79, 1], [77, 1], [74, 1], [70, 1],
+  [73, 1], [76, 1], [79, 1], [81, 1],
+  [74, 3], [0, 1],
+];
+
+function buildHalloweenTrack({ beat }) {
+  const events = [];
+  const add = (b, play) => events.push({ beat: b, play });
+  HALLOWEEN_BARS.forEach((name, bar) => {
+    const c = HALLOWEEN_CHORDS[name];
+    const b0 = bar * 4;
+    add(b0, (s, t) => organ(s, c.notes, t, beat * 3.8));
+    // Baixo em pizzicato: tum... tum, na ponta dos pés
+    add(b0, (s, t) => pizz(s, c.bass, t));
+    add(b0 + 1, (s, t) => pizz(s, c.bass + 7, t));
+    add(b0 + 2, (s, t) => pizz(s, c.bass + 12, t));
+    add(b0 + 3, (s, t) => pizz(s, c.bass + 7, t));
+    if (bar % 4 === 0) add(b0, (s, t) => churchBell(s, t));
+    if (bar % 4 === 2) add(b0 + 2, (s, t) => ghostly(s, t));
+  });
+  for (const m of phrase(HALLOWEEN_TUNE)) {
+    if (m.note) add(m.beat, (s, t) => musicBox(s, m.note, t, Math.min(0.9, m.len * beat * 0.9)));
+  }
+  events.sort((a, b) => a.beat - b.beat);
+  return { beat, length: HALLOWEEN_BARS.length * 4, events };
+}
+
 // Trilhas disponíveis (as fases especiais escolhem a sua em specials.js)
 export const MUSIC = {
   // 64 batidas de melodia + 8 só de guizos, antes de recomeçar
@@ -471,6 +571,8 @@ export const MUSIC = {
   espaco: buildSpaceTrack({ beat: 0.4 }),
   // 16 compassos (64 batidas), cerca de 23 s por volta
   praia: buildBeachTrack({ beat: 0.36 }),
+  // 16 compassos (64 batidas), cerca de 27 s por volta
+  halloween: buildHalloweenTrack({ beat: 0.42 }),
 };
 const LOOKAHEAD = 0.12; // agenda as notas um pouco antes da hora
 

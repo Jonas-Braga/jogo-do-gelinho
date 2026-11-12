@@ -12,13 +12,15 @@
 //   scenery  cenário inteiro trocado: 'forest' = mata, rio, troncos e folhas caindo;
 //            'space' = lua, céu estrelado, rio de poeira estelar, asteroides e
 //            estrelinhas douradas no lugar dos peixes; 'beach' = praia, mar
-//            turquesa, pranchas de surfe e peixinhos tropicais
+//            turquesa, pranchas de surfe e peixinhos tropicais; 'halloween' =
+//            noite de lua cheia, cemitério, rio escuro, abóboras e balas
 //   house    o que se constrói na costa: 'igloo' (padrão), 'cabin' (cabana de madeira)
-//            'base' (base lunar) ou 'hut' (cabana de palha)
+//            'base' (base lunar), 'hut' (cabana de palha) ou 'haunted' (casa assombrada)
 //   enemies  inimigos sorteados a cada grupo (no lugar do ciclo ganso/caranguejo/molusco)
 //   aurora   false desliga a aurora boreal nesta fase
 //   breath   false desliga o vapor da respiração no frio
-//   weather  'none' = nada caindo do céu (sem neve, folhas ou poeira)
+//   weather  'none' = nada caindo do céu (sem neve, folhas ou poeira);
+//            'leaves' = folhas secas caindo no lugar da neve
 //   pace     ritmo próprio da fase (ex.: 0.8 = placas, bichos e urso a 80% da velocidade)
 //   trophy   troféu ganho ao concluir a fase pela primeira vez: { name, ribbon }
 //            (o emblema desenhado na taça fica em src/trophies.js, pelo `id`).
@@ -84,6 +86,22 @@ export const SPECIALS = {
     aurora: false,
     breath: false, // calor: sem vapor da respiração
     weather: 'none', // nada caindo do céu
+    pace: 0.8,
+  },
+  25: {
+    id: 'halloween',
+    trophy: { name: 'Troféu do Halloween', ribbon: '#F07A1A' },
+    title: 'FASE 25 · ESPECIAL DE HALLOWEEN',
+    intro: 'Pule nas abóboras do rio escuro e monte a casa assombrada!',
+    music: 'halloween',
+    outfits: { player: 'wizard', bear: 'werewolf' },
+    sleigh: false,
+    decor: 'halloween',
+    scenery: 'halloween',
+    house: 'haunted',
+    enemies: ['ghost', 'spider', 'eyeball'],
+    aurora: false,
+    weather: 'leaves', // folhas secas caindo
     pace: 0.8,
   },
 };

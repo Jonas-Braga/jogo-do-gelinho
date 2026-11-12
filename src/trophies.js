@@ -132,6 +132,40 @@ export const TROPHY_EMBLEMS = {
   },
 };
 
+// Abóbora de rosto aceso sob a lua cheia, no céu noturno
+TROPHY_EMBLEMS.halloween = (ctx) => {
+  ctx.fillStyle = '#24123E';
+  ctx.fillRect(-16, -16, 32, 32);
+  ctx.fillStyle = '#FFF3C4';
+  ctx.beginPath();
+  ctx.arc(6, -7, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#F28C28';
+  ctx.beginPath();
+  ctx.ellipse(-1, 4, 10, 7.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(110, 40, 8, 0.6)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(-1, 4, 4, 7.2, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#4E6B2A';
+  ctx.fillRect(-2, -5, 2.5, 3.5);
+  ctx.fillStyle = '#FFE27A';
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(-1 + s * 1.5, 3);
+    ctx.lineTo(-1 + s * 6, 3);
+    ctx.lineTo(-1 + s * 3.7, -0.5);
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.moveTo(-7, 6);
+  ctx.lineTo(5, 6);
+  ctx.quadraticCurveTo(-1, 12, -7, 6);
+  ctx.fill();
+};
+
 // ---------------------------------------------------------------- Taça
 // Contorno do bojo (unidades: a taça tem 100 de altura, base em y = 0)
 function bowlPath(ctx) {

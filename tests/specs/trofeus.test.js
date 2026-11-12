@@ -68,10 +68,18 @@ function textCtx() {
   return { ctx, texts };
 }
 
+// Primeira múltipla de 5 ainda sem tema (uma fase normal que um dia pode virar especial)
+const UNTHEMED = (() => {
+  let lv = 5;
+  while (SPECIALS[lv]) lv += 5;
+  return lv;
+})();
+
 suite('Troféus · fases especiais', () => {
   // ---- Registro
   test('toda fase especial tem um troféu com nome, cor da fita e emblema próprio', () => {
-    expect(TROPHY_LEVELS).toEqual([5, 10, 15, 20]);
+    expect(TROPHY_LEVELS).toEqual(Object.keys(SPECIALS).map(Number).sort((a, b) => a - b));
+    expect(TROPHY_LEVELS.slice(0, 4), 'as quatro primeiras').toEqual([5, 10, 15, 20]);
     const names = new Set();
     for (const [lv, sp] of Object.entries(SPECIALS)) {
       const tr = trophyFor(lv);
@@ -83,7 +91,7 @@ suite('Troféus · fases especiais', () => {
     }
     expect(names.size, 'nomes diferentes').toBe(TROPHY_LEVELS.length);
     expect(trophyFor(4)).toBe(null);
-    expect(trophyFor(25), 'fase 25 ainda sem tema').toBe(null);
+    expect(trophyFor(UNTHEMED), `fase ${UNTHEMED} ainda sem tema`).toBe(null);
   });
 
   test('lista de troféus é limpa: sem repetição, só fases especiais, em ordem', () => {
@@ -196,7 +204,7 @@ suite('Troféus · fases especiais', () => {
 
   test('fases normais não dão troféu', () => {
     removeItem('trophies');
-    for (const lv of [1, 4, 6, 25]) {
+    for (const lv of [1, 4, 6, UNTHEMED]) {
       const g = makeGame({ level: lv });
       finishLevel(g);
       expect(g.state, `fase ${lv}`).toBe('play');

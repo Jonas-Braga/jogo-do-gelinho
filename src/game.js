@@ -15,6 +15,7 @@ import { normTrophies } from './specials.js';
 import { Celebration } from './trophies.js';
 import { DUST } from './space.js';
 import { SEA } from './beach.js';
+import { HAUNT } from './halloween.js';
 
 // Cores das partículas de pouso por cenário: poeira na costa, lascas ao pousar
 // numa placa e brilhos da fileira que acende (padrão = neve e gelo)
@@ -22,6 +23,7 @@ const LAND_FX = {
   forest: { puff: '#C9B98A', chip: '#C08A50', spark: '#FFE6A8' },
   space: { puff: DUST.regolith, chip: DUST.rock, spark: DUST.spark },
   beach: { puff: SEA.sand, chip: SEA.spray, spark: SEA.spark },
+  halloween: { puff: HAUNT.mist, chip: HAUNT.chip, spark: HAUNT.spark },
 };
 
 // Estados: title (tela inicial), play (jogando, incluindo animações de morte),
@@ -226,7 +228,7 @@ export class Game {
     // estelar no lugar da neve
     const sp = this.params.special;
     this.igloo.style = sp?.house || 'igloo';
-    this.particles.leaves = sp?.scenery === 'forest';
+    this.particles.leaves = sp?.scenery === 'forest' || sp?.weather === 'leaves';
     this.particles.stardust = sp?.scenery === 'space';
     this.particles.calm = sp?.weather === 'none';
     this.player = new Player(this);

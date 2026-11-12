@@ -16,6 +16,10 @@ import {
   makeBeachBackground, drawBeachDecor, drawSkyGulls, boardSprite, drawGull, drawSiri, drawJellyfish,
   drawTropicalFish, drawHut, drawHutDoorFront, SEA,
 } from './beach.js';
+import {
+  makeHalloweenBackground, drawHalloweenSky, drawHalloweenDecor, pumpkinSprite, drawGhost, drawSpider,
+  drawEyeball, drawCandy, drawHaunted, drawHauntedDoorFront, HAUNT,
+} from './halloween.js';
 import { drawHud } from './hud.js';
 
 const CRITTER_DRAW = {
@@ -23,6 +27,7 @@ const CRITTER_DRAW = {
   snake: drawSnake, bat: drawBat, piranha: drawPiranha,
   ufo: drawUfo, crawler: drawCrawler, comet: drawComet,
   gull: drawGull, siri: drawSiri, jellyfish: drawJellyfish,
+  ghost: drawGhost, spider: drawSpider, eyeball: drawEyeball,
 };
 
 // Construções das fases especiais (o iglu se desenha sozinho)
@@ -30,16 +35,17 @@ const HOUSE_DRAW = {
   cabin: { body: drawCabin, front: drawCabinDoorFront },
   base: { body: drawBase, front: drawBaseDoorFront },
   hut: { body: drawHut, front: drawHutDoorFront },
+  haunted: { body: drawHaunted, front: drawHauntedDoorFront },
 };
 
 // Cores do "rio" de cada cenário (padrão = água gelada)
-const WATERS = { forest: RIVER, space: DUST, beach: SEA };
+const WATERS = { forest: RIVER, space: DUST, beach: SEA, halloween: HAUNT };
 const ICE_WATER = { water: ['#1C7E99', '#0E5670', '#052A40'], ripple: [190, 235, 250], bank: 'rgba(3, 30, 48, 0.35)' };
 // Placas de cada cenário: gelo, troncos, asteroides ou pranchas
-const FLOE_SPRITE = { forest: logSprite, space: asteroidSprite, beach: boardSprite };
-const FLOE_HALO = { forest: RIVER.halo, space: DUST.halo, beach: SEA.halo };
+const FLOE_SPRITE = { forest: logSprite, space: asteroidSprite, beach: boardSprite, halloween: pumpkinSprite };
+const FLOE_HALO = { forest: RIVER.halo, space: DUST.halo, beach: SEA.halo, halloween: HAUNT.halo };
 // Peixes de cada cenário (mesmos pontos): estrelinha no espaço, peixinho tropical na praia
-const FISH_DRAW = { space: drawStarBonus, beach: drawTropicalFish };
+const FISH_DRAW = { space: drawStarBonus, beach: drawTropicalFish, halloween: drawCandy };
 
 // Intensidade da aurora boreal (0 = nenhuma). Aparece nas fases avançadas,
 // cresce com a fase e fica mais forte quando o céu escurece.
@@ -116,7 +122,9 @@ export class Renderer {
     const scenery = sp?.scenery || null;
     const forest = scenery === 'forest';
     const space = scenery === 'space';
+    const halloween = scenery === 'halloween';
     if (space) drawSpaceSky(ctx, t, this.skyF);
+    else if (halloween) drawHalloweenSky(ctx, t, this.skyF);
     else this.drawSky(ctx, sky);
     this.aurora = sp?.aurora === false ? 0 : auroraStrength(game.level, this.skyF);
     if (this.aurora > 0) this.drawAurora(ctx, t, this.aurora);
@@ -125,6 +133,7 @@ export class Renderer {
     if (forest) bg = this.forestBg ||= makeForestBackground();
     else if (space) bg = this.spaceBg ||= makeSpaceBackground();
     else if (scenery === 'beach') bg = this.beachBg ||= makeBeachBackground();
+    else if (halloween) bg = this.halloweenBg ||= makeHalloweenBackground();
     ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h);
     if (scenery === 'beach') drawSkyGulls(ctx, t);
     if (sp?.sleigh) drawSleigh(ctx, game.sleigh, t);
@@ -132,9 +141,12 @@ export class Renderer {
     if (sp?.decor === 'floresta') drawForestDecor(ctx, t);
     if (sp?.decor === 'espaco') drawSpaceDecor(ctx, t);
     if (sp?.decor === 'praia') drawBeachDecor(ctx, t);
+    if (sp?.decor === 'halloween') drawHalloweenDecor(ctx, t);
     if (forest) drawFireflies(ctx, t, 1 - this.skyF);
     // No espaço o "reflexo do céu" na poeira é o roxo do horizonte
-    this.drawWater(ctx, t, space ? { hor: [120, 80, 220] } : sky, WATERS[scenery] || ICE_WATER);
+    // No espaço e no Halloween o "reflexo do céu" na água é a cor do horizonte noturno
+    const reflect = space ? { hor: [120, 80, 220] } : halloween ? { hor: HAUNT.sky } : sky;
+    this.drawWater(ctx, t, reflect, WATERS[scenery] || ICE_WATER);
     game.particles.drawRipples(ctx);
     this.drawEntities(ctx, game, t);
     game.particles.drawPuffs(ctx);

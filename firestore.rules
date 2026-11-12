@@ -29,7 +29,7 @@ service cloud.firestore {
     }
     function validTrophies(t) {
       return t is list && t.size() <= 50 && t.toSet().size() == t.size()
-        && t.hasOnly([5, 10, 15, 20]);
+        && t.hasOnly([5, 10, 15, 20, 25]);
     }
     function validScore(d) {
       return d.keys().hasOnly(['nickname', 'best', 'level', 'trophies', 'updatedAt'])

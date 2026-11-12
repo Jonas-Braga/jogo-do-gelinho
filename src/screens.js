@@ -10,6 +10,7 @@ const WORDS = {
   cabin: { floes: 'os troncos', floe: 'o tronco', house: 'na cabana pronta' },
   base: { floes: 'os asteroides', floe: 'o asteroide', house: 'na base lunar pronta' },
   hut: { floes: 'as pranchas', floe: 'a prancha', house: 'na cabana de palha pronta' },
+  haunted: { floes: 'as abóboras', floe: 'a abóbora', house: 'na casa assombrada pronta' },
 };
 
 export function controlsFor(style = 'igloo') {

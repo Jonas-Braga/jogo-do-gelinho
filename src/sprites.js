@@ -3,6 +3,7 @@
 import { W, SHORE_TOP, WATER_TOP, PALETTE as C, CROUCH_SCALE } from './config.js';
 import { drawAlien } from './space.js';
 import { drawGiantCrab } from './beach.js';
+import { drawWerewolf } from './halloween.js';
 
 const SS = 2;
 
@@ -284,6 +285,17 @@ OUTFITS.surfer = {
   boots: ['#E3AA80', '#C98B62'], bootTrim: ['#E3AA80', '#C98B62'], sole: '#2FB5E8',
   hands: ['#C98B62', '#E3AA80'], hair: '#F2C94C',
 };
+// Bruxinho (fase de Halloween): manto roxo com estrelas e luas, chapéu pontudo
+// com faixa laranja, meias listradas de laranja e preto e sapatos pretos
+OUTFITS.wizard = {
+  body: ['#8A5AC8', '#6A3FA0', '#432470'], armBack: '#4E2A80', armFront: ['#7A4CB8', '#4E2A80'],
+  seam: 'rgba(30, 10, 60, 0.5)', stars: true, witchHat: true,
+  pants: ['#2A2235', '#1C1626'], stripes: '#F28C28',
+  boots: ['#1E1A24', '#141018'], bootTrim: ['#3A2E4A', '#2A2236'],
+  hands: ['#C98B62', '#E3AA80'],
+};
+export const WIZARD_ROBE = '#6A3FA0';
+const WIZ_TRIM = '#F28C28';
 export const ASTRO_WHITE = '#E9EEF4';
 export const SURF_SHIRT = '#1FB5B0';
 const VISOR_RIM = '#D6DCE6';
@@ -297,7 +309,10 @@ const HAIR = '#6B4524';
 function cuff(ctx, O, x, y, w) {
   if (O.shortSleeve) return; // manga curta: braço de fora, sem punho
   if (O.sweater) knitCuff(ctx, x, y, w);
-  else if (O.suit) {
+  else if (O.stars) {
+    ctx.fillStyle = WIZ_TRIM;
+    ctx.fillRect(x, y, w, 3.5);
+  } else if (O.suit) {
     ctx.fillStyle = '#5B8BD9';
     ctx.fillRect(x, y, w, 3.5);
   } else if (O.plaid) {
@@ -456,6 +471,93 @@ function sunglasses(ctx, onForehead) {
   ctx.fillRect(2, y - 1.6, 1.4, 1.2);
   ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
   ctx.fillRect(4, y - 1.3, 1.6, 0.9);
+}
+
+// ---- Bruxinho
+// Estampa do manto: estrelinhas e luas douradas (já recortada pelo contorno)
+function starsPattern(ctx, back) {
+  const marks = [[-9, -42, 's'], [7, -38, 'm'], [-3, -30, 's'], [10, -24, 's'], [-12, -22, 'm'], [2, -19, 's']];
+  for (const [x, y, kind] of marks) {
+    const fx = back ? -x : x;
+    ctx.fillStyle = '#FFD86A';
+    if (kind === 'm') {
+      ctx.beginPath();
+      ctx.arc(fx, y, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = WIZARD_ROBE;
+      ctx.beginPath();
+      ctx.arc(fx + 1.6, y - 1, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const d = i % 2 ? 1.2 : 3;
+        ctx.lineTo(fx + Math.cos(a) * d, y + Math.sin(a) * d);
+      }
+      ctx.fill();
+    }
+  }
+  // Fecho do manto (só de frente)
+  if (!back) {
+    ctx.fillStyle = WIZ_TRIM;
+    ctx.beginPath();
+    ctx.arc(6, -45, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// Barra do manto: faixa laranja
+function robeHem(ctx) {
+  ctx.fillStyle = WIZ_TRIM;
+  ctx.beginPath();
+  ctx.roundRect(-18, -17, 36, 5, 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(120, 50, 0, 0.35)';
+  ctx.fillRect(-18, -13.5, 36, 1.2);
+}
+
+// Chapéu pontudo de bruxo com aba larga, faixa laranja e fivela. No susto, o
+// chapéu pula da cabeça.
+function wizardHat(ctx, back, scared, t) {
+  ctx.save();
+  if (scared) {
+    ctx.translate(0, -7 - Math.abs(Math.sin(t * 9)) * 3);
+    ctx.rotate(-0.15);
+  }
+  const cx = back ? 0 : 1;
+  // Aba
+  ctx.fillStyle = '#3A1E60';
+  ctx.beginPath();
+  ctx.ellipse(cx, -64, 20, 4.8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Cone dobrado na ponta
+  const g = ctx.createLinearGradient(-12, 0, 12, 0);
+  g.addColorStop(0, '#5A3290');
+  g.addColorStop(1, '#3A1E60');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(cx - 12, -65);
+  ctx.quadraticCurveTo(cx - 6, -84, cx - 2, -96);
+  ctx.quadraticCurveTo(cx - 10, -100, cx - 16, -94);
+  ctx.quadraticCurveTo(cx - 6, -96, cx + 4, -90);
+  ctx.quadraticCurveTo(cx + 9, -78, cx + 12, -65);
+  ctx.closePath();
+  ctx.fill();
+  // Faixa e fivela
+  ctx.fillStyle = WIZ_TRIM;
+  ctx.fillRect(cx - 12, -70, 24, 4.5);
+  if (!back) {
+    ctx.strokeStyle = '#FFD86A';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(cx + 1, -70.5, 5, 5.5);
+  }
+  // Estrelinha na ponta
+  ctx.fillStyle = '#FFD86A';
+  ctx.beginPath();
+  ctx.arc(cx - 15, -94, 1.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 // ---- Traje de astronauta
@@ -736,6 +838,11 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
       ctx.fillStyle = O.skin[back ? 1 : 0];
       ctx.fillRect(lx - 3.5, -14 - lift, 7, 6);
     }
+    if (O.stripes) {
+      // Meias listradas
+      ctx.fillStyle = O.stripes;
+      for (const sy of [-19, -15.5]) ctx.fillRect(lx - 4, sy - lift, 8, 2);
+    }
     ctx.fillStyle = O.boots ? O.boots[back ? 1 : 0] : back ? '#4A3220' : C.boots;
     ctx.beginPath();
     ctx.roundRect(lx - 5, -10 - lift, 12, 10, 3);
@@ -815,6 +922,12 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     floralPattern(ctx, false);
     ctx.restore();
     shortsHem(ctx, O, false);
+  } else if (O.stars) {
+    ctx.save();
+    ctx.clip();
+    starsPattern(ctx, false);
+    ctx.restore();
+    robeHem(ctx);
   } else if (O.plaid) {
     ctx.save();
     ctx.clip();
@@ -849,8 +962,8 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     helmetShell(ctx, false);
   } else if (O.hair) {
     surfHairBack(ctx, O, false);
-  } else if (O.beanie) {
-    // Cabelo na nuca e orelha (o gorro vem por cima, depois do rosto)
+  } else if (O.beanie || O.witchHat) {
+    // Cabelo na nuca e orelha (o gorro ou o chapéu vêm por cima, depois do rosto)
     ctx.fillStyle = HAIR;
     ctx.beginPath();
     ctx.arc(-2, -58, 11.5, 0, Math.PI * 2);
@@ -944,6 +1057,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   }
 
   if (O.beanie) beanieHat(ctx, false);
+  if (O.witchHat) wizardHat(ctx, false, panicking, t);
   if (O.hair) {
     surfHairTop(ctx, O, false);
     sunglasses(ctx, panicking);
@@ -1064,6 +1178,10 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
       ctx.fillStyle = O.skin[1];
       ctx.fillRect(lx - 3.5, -14 - lift, 7, 6);
     }
+    if (O.stripes) {
+      ctx.fillStyle = O.stripes;
+      for (const sy of [-19, -15.5]) ctx.fillRect(lx - 4, sy - lift, 8, 2);
+    }
     ctx.fillStyle = O.boots ? O.boots[0] : C.boots;
     ctx.beginPath();
     ctx.roundRect(lx - 5, -10 - lift, 10, 10, 3);
@@ -1126,6 +1244,12 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     floralPattern(ctx, true);
     ctx.restore();
     shortsHem(ctx, O, true);
+  } else if (O.stars) {
+    ctx.save();
+    ctx.clip();
+    starsPattern(ctx, true);
+    ctx.restore();
+    robeHem(ctx);
   } else if (O.plaid) {
     ctx.save();
     ctx.clip();
@@ -1159,6 +1283,21 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     // Nuca com o cabelo loiro bagunçado
     surfHairBack(ctx, O, true);
     surfHairTop(ctx, O, true);
+    return;
+  }
+  if (O.witchHat) {
+    // Nuca com cabelo, orelhas e o chapéu pontudo por cima
+    ctx.fillStyle = HAIR;
+    ctx.beginPath();
+    ctx.arc(0, -57, 12.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#D99A70';
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(s * 12, -56, 2.6, 3.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    wizardHat(ctx, true, false, t);
     return;
   }
   if (O.beanie) {
@@ -1750,6 +1889,10 @@ export function drawBear(ctx, b, t, outfit = null) {
   }
   if (outfit === 'giantCrab') {
     drawGiantCrab(ctx, b, t);
+    return;
+  }
+  if (outfit === 'werewolf') {
+    drawWerewolf(ctx, b, t);
     return;
   }
   const F = BEAR_FUR.polar;
