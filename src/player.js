@@ -147,7 +147,9 @@ export class Player {
       case 'jump': {
         this.t += dt / P.jumpTime;
         this.moving = h !== 0;
-        this.x = clamp(this.x + h * P.walkSpeed * P.airControl * dt, P.edge, W - P.edge);
+        // No ar dá para ir para os lados; o alcance cresce com a velocidade da fase
+        const air = this.game.params?.airSpeed ?? P.walkSpeed * P.airControl;
+        this.x = clamp(this.x + h * air * dt, P.edge, W - P.edge);
         const k = Math.min(this.t, 1);
         const arc = this.to < this.from ? P.arcUp : P.arcDown;
         this.y = this.y0 + (this.y1 - this.y0) * k - arc * 4 * k * (1 - k);

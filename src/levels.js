@@ -9,6 +9,7 @@ import { specialFor } from './specials.js';
 // - na fase 1 os grupos têm 1 bicho e surgem com folga; depois apertam aos poucos;
 // - peixes aparecem um pouco mais no começo, para recompensar quem explora.
 const ENEMY_CYCLE = ['goose', 'crab', 'clam'];
+const BASE_SPEED = 62;     // velocidade das placas na fase 1 (px/s)
 const ESCAPE_MARGIN = 0.8; // inimigos/urso no máximo a 80% da velocidade de caminhada
 
 export function levelParams(level) {
@@ -17,9 +18,14 @@ export function levelParams(level) {
   // Ritmo próprio de uma fase especial (ex.: espaço a 80%): multiplica a velocidade
   // das placas, dos bichos e do urso. Sem `pace`, ritmo normal.
   const pace = specialFor(level)?.pace ?? 1;
+  const speed = Math.min(BASE_SPEED + L * 9, 170) * pace;
   return {
     // Placas
-    speed: Math.min(62 + L * 9, 170) * pace,
+    speed,
+    // Velocidade para os lados durante o pulo: cresce na mesma proporção das
+    // placas (como no jogo original), para o pulo alcançar o mesmo "tanto de placa"
+    // em qualquer fase. Nunca menor que na fase 1.
+    airSpeed: PLAYER.walkSpeed * PLAYER.airControl * Math.max(1, speed / BASE_SPEED),
     fragmented: level % 2 === 0,          // fases pares: placas em pedaços que abrem e fecham
     breathSpeed: Math.min(1.1 + L * 0.06, 1.9),
 

@@ -84,6 +84,12 @@ export class Game {
       if (this.state === 'gameOver' || this.state === 'title') this.newGame();
       else if (this.state === 'trophy') this.endCelebration();
     });
+    // Start do joystick: começa/continua nas telas e pausa durante a partida
+    this.input.on('menu', () => {
+      this.sfx.unlock?.();
+      if (['gameOver', 'title', 'trophy'].includes(this.state)) this.input.emit('start');
+      else this.input.emit('pause');
+    });
 
     if (title || this.locked) this.showTitle();
     else this.newGame();
@@ -266,6 +272,7 @@ export class Game {
     this.last = now;
     const dt = Math.min(raw, 0.25); // evita "saltos" após a aba ficar inativa
     if (raw > 0) this.fps += (1 / raw - this.fps) * 0.05;
+    this.input.pollGamepads(); // também na pausa: o Start do joystick continua o jogo
 
     if (!this.paused) {
       this.acc += dt;

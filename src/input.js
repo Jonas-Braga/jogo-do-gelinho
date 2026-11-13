@@ -37,6 +37,43 @@ export const TOUCH_BUTTONS = [
   { id: 'pause', label: 'II', hold: false, x: W - 62, y: H - 100, w: 46, h: 40 },
 ];
 
+// Joystick (Gamepad API), no celular ou no PC. Alavanca esquerda ou direcional
+// digital: andar e pular. Botões da frente (A/B/X/Y): inverter (e começar).
+// Start: pausar/continuar (e começar). Select: som.
+export const GAMEPAD = {
+  walk: 0.4,   // quanto a alavanca precisa inclinar para andar
+  jump: 0.6,   // para pular precisa inclinar mais: não pula só de a alavanca entortar
+  action: [0, 1, 2, 3],
+  menu: 9,
+  mute: 8,
+  up: 12, down: 13, left: 14, right: 15,
+};
+
+const pressed = (pad, i) => !!pad.buttons?.[i] && (pad.buttons[i].pressed || pad.buttons[i].value > 0.5);
+
+// Lê um joystick: direções seguradas e botões apertados
+export function readGamepad(pad) {
+  const G = GAMEPAD;
+  const ax = pad.axes || [];
+  let x = ax[0] || 0;
+  let y = ax[1] || 0;
+  // Fora do mapeamento padrão, o direcional digital costuma vir nos eixos 6 e 7
+  if (pad.mapping !== 'standard' && ax.length >= 8) {
+    if (Math.abs(ax[6]) > 0.5 && Math.abs(ax[6]) <= 1) x = ax[6];
+    if (Math.abs(ax[7]) > 0.5 && Math.abs(ax[7]) <= 1) y = ax[7];
+  }
+  const held = new Set();
+  if (x < -G.walk || pressed(pad, G.left)) held.add('left');
+  if (x > G.walk || pressed(pad, G.right)) held.add('right');
+  if (y < -G.jump || pressed(pad, G.up)) held.add('up');
+  if (y > G.jump || pressed(pad, G.down)) held.add('down');
+  const buttons = new Set();
+  if (G.action.some((i) => pressed(pad, i))) buttons.add('action');
+  if (pressed(pad, G.menu)) buttons.add('menu');
+  if (pressed(pad, G.mute)) buttons.add('mute');
+  return { held, buttons };
+}
+
 // Campos de texto e botões de formulário recebem as próprias teclas
 export function typingIn(target) {
   const tag = target?.tagName;
@@ -52,12 +89,18 @@ export class Input {
     this.touchMode = false;      // vira true no primeiro toque: mostra os botões
     // Botões de andar: dedo que os controla e o lado apertado (-1, 0, +1)
     this.walk = { pointerId: null, dir: 0 };
+    // Joystick: direções seguradas, botões que já estavam apertados e se ele está
+    // em uso (o último controle usado manda: tocar na tela traz os botões de volta)
+    this.padHeld = new Set();
+    this.padButtons = new Set();
+    this.padActive = false;
     this.listeners = {};
     window.addEventListener('keydown', (e) => this.keyDown(e));
     window.addEventListener('keyup', (e) => this.keyUp(e));
     window.addEventListener('blur', () => {
       this.held.clear();
       this.touchHeld.clear();
+      this.padHeld.clear();
       this.releaseWalk();
       this.emit('blur');
     });
@@ -86,8 +129,46 @@ export class Input {
     for (const fn of this.listeners[action] || []) fn();
   }
 
+  // Lido a cada quadro (game.js). `pads` = lista do navegador (ou falsa, nos testes).
+  // Segurar vale enquanto segura; botões disparam uma vez por aperto.
+  pollGamepads(pads) {
+    if (pads === undefined) {
+      try {
+        pads = globalThis.navigator?.getGamepads?.() || [];
+      } catch {
+        pads = [];
+      }
+    }
+    const held = new Set();
+    const buttons = new Set();
+    let connected = false;
+    for (const pad of pads) {
+      if (!pad || pad.connected === false) continue;
+      connected = true;
+      const r = readGamepad(pad);
+      for (const a of r.held) held.add(a);
+      for (const b of r.buttons) buttons.add(b);
+    }
+    if (held.size || buttons.size) this.padActive = true;
+    if (!connected) this.padActive = false;
+    const fresh = [...buttons].filter((b) => !this.padButtons.has(b));
+    this.padHeld = held;
+    this.padButtons = buttons;
+    for (const b of fresh) this.emit(b);
+  }
+
+  // Botões de toque aparecem? Só depois de um toque e sem joystick em uso
+  get showTouch() {
+    return this.touchMode && !this.padActive;
+  }
+
+  // Qual controle as telas devem ensinar: 'pad', 'touch' ou 'keys'
+  get style() {
+    return this.padActive ? 'pad' : this.touchMode ? 'touch' : 'keys';
+  }
+
   isDown(a) {
-    if (this.held.has(a)) return true;
+    if (this.held.has(a) || this.padHeld.has(a)) return true;
     if (a === 'left' && this.walk.dir < 0) return true;
     if (a === 'right' && this.walk.dir > 0) return true;
     for (const id of this.touchHeld.values()) if (id === a) return true;
@@ -116,6 +197,7 @@ export class Input {
 
   pointerDown(pointerId, x, y) {
     this.touchMode = true;
+    this.padActive = false; // tocou na tela: os botões voltam, até o joystick ser usado de novo
     if (this.walk.pointerId === null && this.inWalkPad(x, y)) {
       this.walk.pointerId = pointerId;
       this.walk.dir = walkDirection(x);

@@ -130,12 +130,14 @@ export function drawHud(ctx, game) {
   ctx.textAlign = 'left';
 
   // Controles: dica de teclado ou botões de toque
-  if (game.input.touchMode) {
+  if (game.input.showTouch) {
     drawTouchButtons(ctx, game);
   } else {
     ctx.font = `500 13px ${FONT}`;
     const floe = { cabin: 'tronco', base: 'asteroide', hut: 'prancha', haunted: 'abóbora' }[game.igloo.style] || 'placa';
-    const hint = `←/→ andar   ↑/↓ pular   Espaço inverter ${floe} (−1 bloco)   ↑ na porta: entrar   P pausa   M som`;
+    const hint = game.input.padActive
+      ? `Direcional: andar e pular   A inverter ${floe} (−1 bloco)   ↑ na porta: entrar   Start pausa   Select som`
+      : `←/→ andar   ↑/↓ pular   Espaço inverter ${floe} (−1 bloco)   ↑ na porta: entrar   P pausa   M som`;
     const hw = ctx.measureText(hint).width;
     panel(ctx, 16, H - 38, hw + 24, 26, 8);
     ctx.fillStyle = 'rgba(255,255,255,0.8)';

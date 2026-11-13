@@ -16,7 +16,10 @@ const WORDS = {
 // touch = true: mostra os botões da tela no lugar das teclas
 export function controlsFor(style = 'igloo', touch = false) {
   const w = WORDS[style] || WORDS.igloo;
-  const k = touch
+  // touch = 'pad': joystick (direcional ou alavanca, botão A, Start e Select)
+  const k = touch === 'pad'
+    ? { walk: '← →', jump: '↑ ↓', flip: 'Botão A', enter: '↑ na porta', misc: 'Start / Select', miscWhat: 'pausar / som' }
+    : touch
     ? { walk: '◀ ▶', jump: '▲ ▼', flip: '⇄', enter: '▲ na porta', misc: 'II', miscWhat: 'pausar' }
     : { walk: '← →', jump: '↑ ↓', flip: 'Espaço', enter: '↑ na porta', misc: 'P / M', miscWhat: 'pausar / som' };
   return [
@@ -133,7 +136,8 @@ export function drawTitle(ctx, game) {
   ctx.globalAlpha = blink(t);
   ctx.font = `800 24px ${FONT}`;
   ctx.fillStyle = '#FFFFFF';
-  const start = game.input.touchMode ? 'Toque para começar' : 'Pressione Enter ou Espaço para começar';
+  const start = { pad: 'Aperte A ou Start para começar', touch: 'Toque para começar' }[game.input.style]
+    || 'Pressione Enter ou Espaço para começar';
   ctx.fillText(start, W / 2, 638);
   ctx.restore();
 }
@@ -148,7 +152,8 @@ export function drawPause(ctx, game) {
   ctx.font = `900 52px ${FONT}`;
   ctx.fillText('PAUSA', W / 2, H / 2 - 62);
   ctx.textAlign = 'left';
-  controlsFor(game.igloo.style, game.input.touchMode).forEach(([key, what], i) => {
+  const how = game.input.style;
+  controlsFor(game.igloo.style, how === 'pad' ? 'pad' : how === 'touch').forEach(([key, what], i) => {
     const y = H / 2 - 18 + i * 24;
     ctx.font = `800 14px ${FONT}`;
     ctx.fillStyle = '#BDEBFA';
@@ -162,7 +167,8 @@ export function drawPause(ctx, game) {
   ctx.globalAlpha = blink(performance.now() / 1000);
   ctx.font = `700 16px ${FONT}`;
   ctx.fillStyle = '#FFD36B';
-  ctx.fillText(game.input.touchMode ? 'Toque em II para continuar' : 'Pressione P para continuar', W / 2, H / 2 + 108);
+  ctx.fillText({ pad: 'Aperte Start para continuar', touch: 'Toque em II para continuar' }[how]
+    || 'Pressione P para continuar', W / 2, H / 2 + 108);
   ctx.restore();
 }
 
@@ -230,8 +236,8 @@ export function drawGameOver(ctx, game) {
   ctx.globalAlpha = blink(t);
   ctx.font = `600 16px ${FONT}`;
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(game.input.touchMode ? 'Toque para jogar de novo' : 'Enter ou Espaço para jogar de novo',
-    cx, H / 2 + 126);
+  ctx.fillText({ pad: 'Aperte A ou Start para jogar de novo', touch: 'Toque para jogar de novo' }[game.input.style]
+    || 'Enter ou Espaço para jogar de novo', cx, H / 2 + 126);
   ctx.restore();
   if (game.ranking) drawRanking(ctx, game, W / 2 + 10, RANKING_W);
 }

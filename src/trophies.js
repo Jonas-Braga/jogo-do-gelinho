@@ -560,7 +560,8 @@ export function drawCelebration(ctx, game) {
     ctx.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(t * 2.2));
     ctx.font = `800 20px ${FONT}`;
     ctx.fillStyle = '#FFFFFF';
-    const msg = game.input?.touchMode ? 'Toque para continuar' : 'Enter ou Espaço para continuar';
+    const msg = { pad: 'Aperte A ou Start para continuar', touch: 'Toque para continuar' }[game.input?.style]
+      || 'Enter ou Espaço para continuar';
     ctx.fillText(msg, cx, H - 56);
   }
   ctx.globalAlpha = 1;
