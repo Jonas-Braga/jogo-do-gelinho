@@ -17,6 +17,7 @@ import { DUST } from './space.js';
 import { SEA } from './beach.js';
 import { HAUNT } from './halloween.js';
 import { BONUS } from './bonus.js';
+import { POWERS, POWER_NAMES } from './powers.js';
 
 // Cores das partículas de pouso por cenário: poeira na costa, lascas ao pousar
 // numa placa e brilhos da fileira que acende (padrão = neve e gelo)
@@ -486,6 +487,33 @@ export class Game {
       this.particles.puff(c.x, y - 12, 16, '#FFE08A');
       this.sfx.play('coins');
     }
+  }
+
+  // Pegou a boia de patinho ou a chuteira dourada: poder por alguns segundos
+  onPower(c) {
+    const y = this.rows[c.row].y;
+    this.player.givePower(c.kind);
+    this.particles.text(c.x, y - 70, `${POWER_NAMES[c.kind]}! ${POWERS.duration} s`, '#FFE066');
+    this.particles.puff(c.x, y - 12, 16, '#FFE98A');
+    this.sfx.play('power');
+  }
+
+  // Bicho chutado (chuteira dourada): voa longe e vale pontos
+  onKick(c) {
+    const pts = POWERS.kickPoints * this.level;
+    this.addScore(pts);
+    const y = this.rows[c.row].y;
+    this.particles.text(c.x, y - 60, `+${pts}`, '#FFE066');
+    this.particles.puff(c.x, y - 14, 10, '#FFE98A');
+    this.sfx.play('kick');
+    this.shake = Math.max(this.shake, 0.15);
+  }
+
+  // Urso chutado: é jogado para longe e fica tonto (não vale pontos)
+  onBearKick() {
+    this.particles.puff(this.bear.x, this.bear.y - 30, 12, '#FFE98A');
+    this.sfx.play('kick');
+    this.shake = Math.max(this.shake, 0.2);
   }
 
   onHit() {

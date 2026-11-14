@@ -1,4 +1,5 @@
 import { W, SHORE_Y } from './config.js';
+import { POWERS } from './powers.js';
 
 const EDGE = 70;
 const HIT = 44;
@@ -24,6 +25,8 @@ export class Bear {
     this.walk = 0;
     this.chasing = false;
     this.chaseT = 0;
+    this.stun = 0;
+    this.kvx = 0;
   }
 
   get offscreen() {
@@ -33,6 +36,7 @@ export class Bear {
   // Ao renascer, o urso volta para o lado oposto ao jogador.
   avoid(px) {
     this.chasing = false;
+    this.stun = 0;
     this.x = px < W / 2 ? W - 90 : 90;
     this.dir = px < W / 2 ? -1 : 1;
   }
@@ -50,6 +54,14 @@ export class Bear {
       return;
     }
 
+    if (this.stun > 0) {
+      // Levou um chute: escorrega para longe e fica tonto, sem perseguir ninguém
+      this.stun -= dt;
+      this.x = Math.max(EDGE, Math.min(W - EDGE, this.x + this.kvx * dt));
+      this.kvx *= Math.max(0, 1 - dt * 3);
+      return;
+    }
+
     let speed = this.speed;
     if (pl.alive && pl.row === -1 && Math.abs(pl.x - this.x) < CHASE_RANGE) {
       // Persegue o jogador na costa
@@ -63,6 +75,14 @@ export class Bear {
 
     if (pl.onShore && pl.invuln <= 0 && Math.abs(pl.x - this.x) < HIT) {
       const dir = Math.sign(pl.x - this.x) || this.dir; // jogador foge para longe do urso
+      if (pl.power === 'boot') {
+        // Com a chuteira o jogador é imune: o urso é jogado para longe e fica tonto
+        this.stun = POWERS.bearStun;
+        this.kvx = -dir * POWERS.bearKnock;
+        pl.kick(-dir);
+        this.game.onBearKick();
+        return;
+      }
       this.dir = dir;
       this.chasing = true;
       this.chaseT = 0;

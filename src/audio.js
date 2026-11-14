@@ -162,6 +162,28 @@ export const SOUNDS = {
       s.tone({ type: 'square', f0: NOTE(n), dur: 0.07, vol: 0.05, t: i * 0.05, filter: 5000 }));
     s.noise({ dur: 0.25, vol: 0.04, filter: 'highpass', f0: 7000, t: 0.05 });
   },
+  power(s) {
+    // Pegou um poder: arpejo brilhante subindo com um "uip" no final
+    [72, 76, 79, 84, 88, 91].forEach((n, i) =>
+      s.tone({ type: 'triangle', f0: NOTE(n), dur: 0.1, vol: 0.11, t: i * 0.045 }));
+    s.tone({ type: 'sine', f0: 900, f1: 1800, dur: 0.2, vol: 0.08, t: 0.28 });
+  },
+  quack(s) {
+    // Caiu na água com a boia de patinho: "plof" e dois "quá" de borracha
+    s.noise({ dur: 0.25, vol: 0.22, filter: 'lowpass', f0: 2200, f1: 400 });
+    s.tone({ type: 'square', f0: 620, f1: 480, dur: 0.09, vol: 0.08, t: 0.08, filter: 2200 });
+    s.tone({ type: 'square', f0: 660, f1: 500, dur: 0.11, vol: 0.08, t: 0.2, filter: 2200 });
+  },
+  kick(s) {
+    // Chute: pancada seca e o bicho assobiando para longe
+    s.noise({ dur: 0.07, vol: 0.3, filter: 'bandpass', f0: 900, q: 3 });
+    s.tone({ type: 'sine', f0: 190, f1: 70, dur: 0.1, vol: 0.25 });
+    s.tone({ type: 'sine', f0: 500, f1: 1700, dur: 0.35, vol: 0.07, t: 0.05 });
+  },
+  warn(s) {
+    // O poder está acabando: bipe curto
+    s.tone({ type: 'square', f0: 880, dur: 0.05, vol: 0.06, filter: 3000 });
+  },
   tick(s) {
     s.tone({ type: 'square', f0: 1100, dur: 0.03, vol: 0.05, filter: 4000 });
   },

@@ -1,5 +1,6 @@
 // Arte procedural. Tudo que é estático é pré-renderizado em canvases offscreen
 // com 2x de resolução para ficar nítido quando a tela é escalada.
+import { POWERS } from './powers.js';
 import { W, SHORE_TOP, WATER_TOP, PALETTE as C, CROUCH_SCALE } from './config.js';
 import { drawAlien } from './space.js';
 import { drawGiantCrab } from './beach.js';
@@ -774,6 +775,13 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     ctx.rect(0, 0, W, p.sinkLine);
     ctx.clip();
   }
+  // Boiando com a boia: da cintura para baixo fica dentro d'água
+  if (p.state === 'swim') {
+    ctx.beginPath();
+    ctx.rect(0, 0, W, p.y + 6);
+    ctx.clip();
+    ride = POWERS.swimDepth + Math.sin(t * 4) * 2;
+  }
   ctx.globalAlpha = p.alpha;
 
   let x = p.x;
@@ -860,7 +868,17 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
       ctx.fillRect(lx + 1, -7 - lift, 2, 5);
     }
   };
-  if (air) {
+  if (p.kickT > 0 && p.state === 'stand') {
+    // Chute: a perna da frente sobe esticada
+    const k = Math.sin((1 - p.kickT / POWERS.kickTime) * Math.PI);
+    leg(-4, 0, true);
+    ctx.save();
+    ctx.translate(4, -20);
+    ctx.rotate(-1.25 * k);
+    ctx.translate(-4, 20);
+    leg(4, 0, false);
+    ctx.restore();
+  } else if (air) {
     leg(-5, 6, true);
     leg(5, 3, false);
   } else {

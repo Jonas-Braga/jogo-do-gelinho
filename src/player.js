@@ -1,5 +1,6 @@
 import { W, SHORE_Y, ROW_Y, PLAYER as P, PLAYER_HEIGHT } from './config.js';
 import { SCARE_TIME } from './bear.js';
+import { POWERS } from './powers.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -31,7 +32,8 @@ const FLEE_SPEED = 330;
 const FLEE_MAX_TIME = 8; // segurança: nunca fica preso fugindo
 
 // row = -1 significa "na costa"; 0..3 são as fileiras de gelo.
-// Estados: stand, jump, flee, drown, freeze, enter, gone.
+// Estados: stand, jump, swim (boiando com a boia de patinho), flee, drown, freeze,
+// enter, gone.
 export class Player {
   constructor(game) {
     this.game = game;
@@ -57,6 +59,27 @@ export class Player {
     this.back = false;
     this.phase = null;
     this.submerged = false;
+    // Poder em uso ('duck' = boia, 'boot' = chuteira) e quanto tempo ainda dura
+    this.power = null;
+    this.powerT = 0;
+    this.kickT = 0;
+  }
+
+  // Pegou um item de poder: vale por POWERS.duration segundos (troca o anterior)
+  givePower(kind) {
+    this.power = kind;
+    this.powerT = POWERS.duration;
+    this.warnT = 0;
+  }
+
+  // Poder nos últimos instantes (pisca e apita)
+  get powerEnding() {
+    return !!this.power && this.powerT <= POWERS.warn;
+  }
+
+  endPower() {
+    this.power = null;
+    this.powerT = 0;
   }
 
   // Parte mais alta do corpo (incluindo mãos erguidas ao afundar) já está abaixo d'água?
@@ -65,7 +88,7 @@ export class Player {
   }
 
   get alive() {
-    return this.state === 'stand' || this.state === 'jump';
+    return this.state === 'stand' || this.state === 'jump' || this.state === 'swim';
   }
 
   get onShore() {
@@ -79,8 +102,9 @@ export class Player {
   // Animação atual (usada pelo desenho e pelos testes)
   get anim() {
     switch (this.state) {
-      case 'stand': return this.moving ? 'run' : 'idle';
+      case 'stand': return this.kickT > 0 ? 'kick' : this.moving ? 'run' : 'idle';
       case 'jump': return 'jump';
+      case 'swim': return 'swim';
       case 'drown': return 'drown';
       case 'freeze': return 'freeze';
       case 'enter': return 'enter';
@@ -110,6 +134,24 @@ export class Player {
     if (h) this.facing = h;
     this.squash = Math.max(0, this.squash - dt * 6);
     this.invuln = Math.max(0, this.invuln - dt);
+    this.kickT = Math.max(0, this.kickT - dt);
+    if (this.power && this.alive) {
+      this.powerT -= dt;
+      if (this.powerT <= 0) {
+        this.endPower();
+        // O tempo da boia acabou com ele ainda na água: afunda
+        if (this.state === 'swim') {
+          this.sink();
+          return;
+        }
+      } else if (this.powerEnding) {
+        this.warnT -= dt;
+        if (this.warnT <= 0) {
+          this.warnT = 0.5;
+          this.game.sfx.play('warn');
+        }
+      }
+    }
 
     switch (this.state) {
       case 'stand': {
@@ -154,6 +196,27 @@ export class Player {
         const arc = this.to < this.from ? P.arcUp : P.arcDown;
         this.y = this.y0 + (this.y1 - this.y0) * k - arc * 4 * k * (1 - k);
         if (this.t >= 1) this.land();
+        break;
+      }
+      case 'swim': {
+        // Boiando com a boia de patinho: não é levado pela correnteza, nada devagar
+        // e pula (↑/↓) de volta para o gelo ou para a costa
+        this.moving = h !== 0;
+        this.x = clamp(this.x + h * POWERS.swimSpeed * dt, P.edge, W - P.edge);
+        // Uma placa passou por ele: sobe nela (conta como pouso)
+        const r = rows[this.row].pieceAt(this.x);
+        if (r) {
+          this.to = this.row;
+          this.y1 = this.y;
+          this.land();
+          break;
+        }
+        this.cooldown -= dt;
+        const v = input.axisY();
+        if (this.cooldown <= 0) {
+          if (v < 0) this.jump(this.row - 1);
+          else if (v > 0 && this.row < ROW_Y.length - 1) this.jump(this.row + 1);
+        }
         break;
       }
       case 'flee': {
@@ -294,7 +357,30 @@ export class Player {
     this.game.onHit();
   }
 
+  // Chute (com a chuteira dourada): vira para o alvo e estica a perna
+  kick(dir) {
+    this.facing = dir;
+    this.kickT = POWERS.kickTime;
+  }
+
+  // Ficou sem placa embaixo: com a boia de patinho ele boia; sem ela, afunda
   fall() {
+    if (this.power === 'duck') this.swim();
+    else this.sink();
+  }
+
+  swim() {
+    this.state = 'swim';
+    this.t = 0;
+    this.support = null;
+    this.y = rowY(this.row);
+    this.cooldown = P.landDelay;
+    this.squash = 0;
+    this.game.particles.splash(this.x, this.y + 6);
+    this.game.sfx.play('quack');
+  }
+
+  sink() {
     this.state = 'drown';
     this.t = 0;
     this.support = null;
@@ -309,6 +395,11 @@ export class Player {
 
   freeze() {
     if (!this.alive) return;
+    if (this.state === 'swim') {
+      // Congelou boiando: afunda
+      this.sink();
+      return;
+    }
     if (this.state === 'jump') {
       // Congela no meio do pulo: termina onde estava indo.
       this.row = this.to;
@@ -316,7 +407,7 @@ export class Player {
       if (this.row >= 0) {
         const r = this.game.rows[this.row].pieceAt(this.x);
         if (!r) {
-          this.fall();
+          this.sink();
           return;
         }
         this.setSupport(r);
@@ -330,6 +421,7 @@ export class Player {
   }
 
   enter(doorX) {
+    this.endPower(); // o poder acaba ao entrar no iglu
     this.state = 'enter';
     this.phase = 'turn';
     this.targetX = doorX;

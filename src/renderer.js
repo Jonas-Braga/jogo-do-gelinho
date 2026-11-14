@@ -22,6 +22,7 @@ import {
 } from './halloween.js';
 import { drawHud } from './hud.js';
 import { drawMoneyBag, drawHeart } from './bonus.js';
+import { drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront, drawDizzy } from './powers.js';
 
 const CRITTER_DRAW = {
   goose: drawGoose, crab: drawCrab, clam: drawClam, fish: drawFish,
@@ -30,6 +31,7 @@ const CRITTER_DRAW = {
   gull: drawGull, siri: drawSiri, jellyfish: drawJellyfish,
   ghost: drawGhost, spider: drawSpider, eyeball: drawEyeball,
   bag: drawMoneyBag, heart: drawHeart,
+  duck: drawDuckFloat, boot: drawGoldenBoot,
 };
 
 // Construções das fases especiais (o iglu se desenha sozinho)
@@ -299,17 +301,25 @@ export class Renderer {
     const ride = (p.state === 'stand' || p.state === 'freeze') && p.row >= 0 && p.support
       ? floeOffset(p.support, t) : 0;
     const outfits = game.special?.outfits || {};
-    const drawP = () => drawPlayer(ctx, p, t, cold, ride, outfits.player);
+    // Com um poder: boia de patinho na cintura ou brilho e chuteira dourada
+    const drawP = () => {
+      drawPowerBack(ctx, p, t);
+      drawPlayer(ctx, p, t, cold, ride, outfits.player);
+      drawPowerFront(ctx, p, t);
+    };
     // O jogador é desenhado depois da última fileira que está "atrás" dele.
     let bucket = -1;
     game.rows.forEach((r, i) => { if (r.y <= p.y + 16) bucket = i; });
-    if ((p.state === 'drown' || p.state === 'freeze') && p.row >= 0) bucket = Math.max(bucket, p.row);
+    if ((p.state === 'drown' || p.state === 'freeze' || p.state === 'swim') && p.row >= 0) bucket = Math.max(bucket, p.row);
 
     const house = HOUSE_DRAW[game.igloo.style];
     if (house) house.body(ctx, game.igloo, t);
     else game.igloo.draw(ctx, t);
     if (game.special?.decor === 'natal' && game.igloo.complete) drawIglooLights(ctx, t);
-    if (game.bear.active) drawBear(ctx, game.bear, t, outfits.bear);
+    if (game.bear.active) {
+      drawBear(ctx, game.bear, t, outfits.bear);
+      if (game.bear.stun > 0) drawDizzy(ctx, game.bear.x, game.bear.y - 92, t);
+    }
     if (p.state !== 'gone' && bucket === -1) {
       drawP();
       // Passando pela porta: moldura do arco, sombra do interior e cortina por cima dele
@@ -324,7 +334,17 @@ export class Renderer {
     game.rows.forEach((row, i) => {
       this.drawRow(ctx, row, t, scenery);
       for (const c of game.critters.inRow(i)) {
-        if (c.x > -60 && c.x < W + 60) (c.kind === 'fish' ? fishDraw : CRITTER_DRAW[c.kind])(ctx, c, row.y, t);
+        if (c.x <= -60 || c.x >= W + 60) continue;
+        const draw = c.kind === 'fish' ? fishDraw : CRITTER_DRAW[c.kind];
+        if (c.kicked) {
+          // Chutado: voa girando por cima da fileira
+          ctx.save();
+          ctx.translate(c.x, row.y - 18 + c.fly);
+          ctx.rotate(c.spin);
+          ctx.translate(-c.x, -(row.y - 18));
+          draw(ctx, c, row.y, t);
+          ctx.restore();
+        } else draw(ctx, c, row.y, t);
       }
       if (p.state !== 'gone' && bucket === i) drawP();
     });

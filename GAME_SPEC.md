@@ -72,6 +72,20 @@ o visual deve ser totalmente novo.
 
 &#x20; custa uma vida.
 
+\- \*\*Poderes (acréscimo ao original):\*\* só nas fases normais, a partir da fase 6;
+
+&#x20; fases especiais não têm. Cada item passa uma única vez por fase e é pego como
+
+&#x20; os peixes. \*\*Boia de patinho\*\* (fase 6 em diante): por 5 s, cair na água não
+
+&#x20; custa a vida; ele boia, nada devagar e pula de volta para o gelo ou para a
+
+&#x20; costa; se o tempo acabar com ele na água, afunda. \*\*Chuteira dourada\*\* (fase
+
+&#x20; 11 em diante, além da boia): por 5 s fica imune; o bicho que encosta leva um
+
+&#x20; chute, voa longe e vale 50 × fase; o urso é jogado para longe e fica tonto 2 s.
+
 \- \*\*Progressão:\*\* a velocidade aumenta a cada fase. Em fases alternadas, as
 
 &#x20; placas são fragmentadas (vários pedaços pequenos em vez de blocos inteiros)

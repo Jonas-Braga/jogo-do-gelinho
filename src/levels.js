@@ -1,5 +1,6 @@
 import { RULES, PLAYER } from './config.js';
 import { specialFor } from './specials.js';
+import { POWERS, powersFor } from './powers.js';
 
 // Parâmetros por fase: velocidade, tipo de placa, inimigos, urso e pontuação.
 //
@@ -49,6 +50,9 @@ export function levelParams(level) {
 
     // Fase especial (a cada 5 fases, quando já há um tema criado), ou null
     special: specialFor(level),
+
+    // Poderes que passam uma vez na fase (boia de patinho, chuteira dourada)
+    powers: powersFor(level, specialFor(level)),
   };
 }
 
@@ -61,6 +65,8 @@ export function levelIntro(level) {
   if (level === 1) sub = 'Pule nas placas brancas para construir o iglu';
   else if (level === 4) sub = 'Cuidado: um urso apareceu na costa!';
   else if (level === RULES.auroraFrom) sub = 'Uma aurora boreal ilumina o céu';
+  else if (level === POWERS.from) sub = 'Novidade: pegue a boia de patinho e pule na água por 5 s!';
+  else if (level === POWERS.bootFrom) sub = 'Novidade: a chuteira dourada chuta os bichos para longe!';
   else if (level === 2) sub = 'Placas fragmentadas: cuidado com os vãos!';
   else if (levelParams(level).fragmented) sub = 'Placas fragmentadas e mais rápidas';
   else sub = 'As placas estão mais rápidas';

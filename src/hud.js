@@ -5,6 +5,7 @@ import {
   drawTitle, drawPause, drawLevelEnd, drawGameOver, drawBanner, drawTouchButtons,
 } from './screens.js';
 import { drawCelebration } from './trophies.js';
+import { POWERS, POWER_NAMES, drawPowerIcon } from './powers.js';
 
 // Botão de mudo (área clicável em coordenadas lógicas; usado em main.js)
 export const MUTE_BUTTON = { x: W - 62, y: H - 48, w: 46, h: 36 };
@@ -88,6 +89,26 @@ export function drawHud(ctx, game) {
   const house = { cabin: 'cabana', base: 'base', hut: 'cabana', haunted: 'casa' }[game.igloo.style] || 'iglu';
   ctx.fillText(`${house} ${game.igloo.count}/${RULES.iglooPieces}`, W / 2 + 34, 60);
   ctx.textAlign = 'left';
+
+  // Poder em uso: ícone, nome e barra do tempo que resta
+  const pw = game.player.power;
+  if (pw && (game.state === 'play' || game.state === 'entering')) {
+    const k = Math.max(0, game.player.powerT / POWERS.duration);
+    const ending = game.player.powerEnding;
+    panel(ctx, W / 2 - 110, 82, 220, 30, 10);
+    drawPowerIcon(ctx, pw, W / 2 - 92, 99);
+    ctx.fillStyle = '#FFE066';
+    ctx.font = `700 12px ${FONT}`;
+    ctx.fillText(POWER_NAMES[pw], W / 2 - 74, 101);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath();
+    ctx.roundRect(W / 2, 92, 98, 10, 5);
+    ctx.fill();
+    ctx.fillStyle = ending && Math.sin(game.time * 28) > 0 ? '#FF8A7A' : '#FFD21F';
+    ctx.beginPath();
+    ctx.roundRect(W / 2, 92, Math.max(4, 98 * k), 10, 5);
+    ctx.fill();
+  }
 
   // Termômetro
   const tx = W - 266;

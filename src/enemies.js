@@ -1,5 +1,6 @@
 import { W, ROW_Y } from './config.js';
 import { BONUS, BONUS_KINDS } from './bonus.js';
+import { POWERS, POWER_KINDS } from './powers.js';
 
 // Largura de colisão de cada tipo. Os bichos das fases especiais têm o tamanho dos
 // que substituem (morcego, disco voador e gaivota = ganso; cobra, bichinho lunar e
@@ -12,6 +13,7 @@ export const SIZE = {
   gull: 44, siri: 40, jellyfish: 34,
   ghost: 44, spider: 40, eyeball: 34,
   bag: BONUS.size, heart: BONUS.size,
+  duck: POWERS.size, boot: POWERS.size,
 };
 const SPACING = 52;
 const PLAYER_HALF = 12;
@@ -45,6 +47,10 @@ export class Critters {
       ...Array(BONUS.bags).fill('bag'), ...Array(BONUS.hearts).fill('heart'),
     ]) : [];
     this.bonusTimer = BONUS.first;
+    // Poderes (fases normais a partir da 6): cada item passa uma única vez na
+    // fase, em hora sorteada; com dois, em ordem sorteada e nunca juntos
+    this.powerQueue = shuffle([...(params.powers || [])]);
+    this.powerTimer = rand(POWERS.firstMin, POWERS.firstMax);
   }
 
   // A entrada da fileira está livre? (nenhum bicho perto da borda por onde o prêmio
@@ -57,13 +63,22 @@ export class Critters {
 
   // Solta o próximo prêmio numa fileira com a entrada livre, contra o fluxo das placas
   spawnBonus() {
+    return this.spawnItem(this.bonusQueue, { bonus: true });
+  }
+
+  // Solta o próximo item de poder (boia ou chuteira), do mesmo jeito dos prêmios
+  spawnPower() {
+    return this.spawnItem(this.powerQueue, { power: true });
+  }
+
+  spawnItem(queue, flags) {
     const free = ROW_Y.map((_, i) => i).filter((r) => this.entryClear(r));
     if (!free.length) return false;
     const row = free[Math.floor(Math.random() * free.length)];
-    const kind = this.bonusQueue.shift();
+    const kind = queue.shift();
     const dir = -this.game.rows[row].dir;
     const speed = this.params.enemySpeed * BONUS.speed;
-    this.list.push({ kind, row, dir, vx: dir * speed, x: dir > 0 ? -40 : W + 40, w: SIZE[kind], ph: Math.random() * 6, bonus: true });
+    this.list.push({ kind, row, dir, vx: dir * speed, x: dir > 0 ? -40 : W + 40, w: SIZE[kind], ph: Math.random() * 6, ...flags });
     return true;
   }
 
@@ -107,7 +122,26 @@ export class Critters {
         this.bonusTimer = this.spawnBonus() ? rand(BONUS.gapMin, BONUS.gapMax) : 0.5;
       }
     }
+    if (this.powerQueue?.length) {
+      this.powerTimer -= dt;
+      if (this.powerTimer <= 0) {
+        this.powerTimer = this.spawnPower() ? rand(POWERS.gapMin, POWERS.gapMax) : 0.5;
+      }
+    }
     for (const c of this.list) {
+      if (c.kicked) {
+        // Chutado: voa girando para longe e cai na água lá adiante
+        c.x += c.vx * dt;
+        c.fly += c.vy * dt;
+        c.vy += POWERS.kickGravity * dt;
+        c.spin += dt * 16 * Math.sign(c.vx);
+        c.ph += dt;
+        if (c.fly >= 0) {
+          c.dead = true;
+          if (c.x > 0 && c.x < W) game.particles.splash(c.x, game.rows[c.row].y + 6);
+        }
+        continue;
+      }
       // Se a fileira foi invertida, os bichos dela também viram.
       const want = -game.rows[c.row].dir;
       if (c.dir !== want) {
@@ -124,7 +158,7 @@ export class Critters {
     const pl = game.player;
     if (pl.state !== 'stand' || pl.row < 0) return;
     for (const c of this.list) {
-      if (c.row !== pl.row || c.dead) continue;
+      if (c.row !== pl.row || c.dead || c.kicked) continue;
       const half = c.w / 2 + PLAYER_HALF;
       const dx = pl.x - c.x;
       if (Math.abs(dx) >= half) continue;
@@ -134,6 +168,19 @@ export class Critters {
       } else if (BONUS_KINDS.includes(c.kind)) {
         c.dead = true;
         game.onBonus(c);
+      } else if (POWER_KINDS.includes(c.kind)) {
+        c.dead = true;
+        game.onPower(c);
+      } else if (pl.power === 'boot') {
+        // Com a chuteira: imune, e quem encosta leva um chute e voa longe
+        const away = Math.sign(-dx) || pl.facing;
+        c.kicked = true;
+        c.vx = away * POWERS.kickVx;
+        c.vy = POWERS.kickVy;
+        c.fly = -0.01;
+        c.spin = 0;
+        pl.kick(away);
+        game.onKick(c);
       } else if (Math.sign(dx || c.dir) === c.dir) {
         // Jogador está à frente do bicho: é empurrado junto com ele.
         pl.push(c.x + c.dir * half);
