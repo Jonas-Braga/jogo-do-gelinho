@@ -20,6 +20,10 @@ import {
   makeHalloweenBackground, drawHalloweenSky, drawHalloweenDecor, pumpkinSprite, drawGhost, drawSpider,
   drawEyeball, drawCandy, drawHaunted, drawHauntedDoorFront, HAUNT,
 } from './halloween.js';
+import {
+  makeDinoBackground, drawDinoSky, drawDinoDecor, drawLavaBubbles, drawEmbers, rockSprite, drawPtero,
+  drawRaptor, drawAmmonite, drawDinoEgg, drawCave, drawCaveDoorFront, LAVA,
+} from './dino.js';
 import { drawHud } from './hud.js';
 import { drawMoneyBag, drawHeart } from './bonus.js';
 import { drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront, drawDizzy } from './powers.js';
@@ -30,6 +34,7 @@ const CRITTER_DRAW = {
   ufo: drawUfo, crawler: drawCrawler, comet: drawComet,
   gull: drawGull, siri: drawSiri, jellyfish: drawJellyfish,
   ghost: drawGhost, spider: drawSpider, eyeball: drawEyeball,
+  ptero: drawPtero, raptor: drawRaptor, ammonite: drawAmmonite,
   bag: drawMoneyBag, heart: drawHeart,
   duck: drawDuckFloat, boot: drawGoldenBoot,
 };
@@ -40,16 +45,19 @@ const HOUSE_DRAW = {
   base: { body: drawBase, front: drawBaseDoorFront },
   hut: { body: drawHut, front: drawHutDoorFront },
   haunted: { body: drawHaunted, front: drawHauntedDoorFront },
+  cave: { body: drawCave, front: drawCaveDoorFront },
 };
 
 // Cores do "rio" de cada cenário (padrão = água gelada)
-const WATERS = { forest: RIVER, space: DUST, beach: SEA, halloween: HAUNT };
+const WATERS = { forest: RIVER, space: DUST, beach: SEA, halloween: HAUNT, dino: LAVA };
 const ICE_WATER = { water: ['#1C7E99', '#0E5670', '#052A40'], ripple: [190, 235, 250], bank: 'rgba(3, 30, 48, 0.35)' };
 // Placas de cada cenário: gelo, troncos, asteroides ou pranchas
-const FLOE_SPRITE = { forest: logSprite, space: asteroidSprite, beach: boardSprite, halloween: pumpkinSprite };
-const FLOE_HALO = { forest: RIVER.halo, space: DUST.halo, beach: SEA.halo, halloween: HAUNT.halo };
+const FLOE_SPRITE = {
+  forest: logSprite, space: asteroidSprite, beach: boardSprite, halloween: pumpkinSprite, dino: rockSprite,
+};
+const FLOE_HALO = { forest: RIVER.halo, space: DUST.halo, beach: SEA.halo, halloween: HAUNT.halo, dino: LAVA.halo };
 // Peixes de cada cenário (mesmos pontos): estrelinha no espaço, peixinho tropical na praia
-const FISH_DRAW = { space: drawStarBonus, beach: drawTropicalFish, halloween: drawCandy };
+const FISH_DRAW = { space: drawStarBonus, beach: drawTropicalFish, halloween: drawCandy, dino: drawDinoEgg };
 
 // Intensidade da aurora boreal (0 = nenhuma). Aparece nas fases avançadas,
 // cresce com a fase e fica mais forte quando o céu escurece.
@@ -127,8 +135,10 @@ export class Renderer {
     const forest = scenery === 'forest';
     const space = scenery === 'space';
     const halloween = scenery === 'halloween';
+    const dino = scenery === 'dino';
     if (space) drawSpaceSky(ctx, t, this.skyF);
     else if (halloween) drawHalloweenSky(ctx, t, this.skyF);
+    else if (dino) drawDinoSky(ctx, t, this.skyF);
     else this.drawSky(ctx, sky);
     this.aurora = sp?.aurora === false ? 0 : auroraStrength(game.level, this.skyF);
     if (this.aurora > 0) this.drawAurora(ctx, t, this.aurora);
@@ -138,6 +148,7 @@ export class Renderer {
     else if (space) bg = this.spaceBg ||= makeSpaceBackground();
     else if (scenery === 'beach') bg = this.beachBg ||= makeBeachBackground();
     else if (halloween) bg = this.halloweenBg ||= makeHalloweenBackground();
+    else if (dino) bg = this.dinoBg ||= makeDinoBackground();
     ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h);
     if (scenery === 'beach') drawSkyGulls(ctx, t);
     if (sp?.sleigh) drawSleigh(ctx, game.sleigh, t);
@@ -146,11 +157,13 @@ export class Renderer {
     if (sp?.decor === 'espaco') drawSpaceDecor(ctx, t);
     if (sp?.decor === 'praia') drawBeachDecor(ctx, t);
     if (sp?.decor === 'halloween') drawHalloweenDecor(ctx, t);
+    if (sp?.decor === 'dino') drawDinoDecor(ctx, t);
     if (forest) drawFireflies(ctx, t, 1 - this.skyF);
     // No espaço o "reflexo do céu" na poeira é o roxo do horizonte
     // No espaço e no Halloween o "reflexo do céu" na água é a cor do horizonte noturno
-    const reflect = space ? { hor: [120, 80, 220] } : halloween ? { hor: HAUNT.sky } : sky;
+    const reflect = space ? { hor: [120, 80, 220] } : halloween ? { hor: HAUNT.sky } : dino ? { hor: LAVA.sky } : sky;
     this.drawWater(ctx, t, reflect, WATERS[scenery] || ICE_WATER);
+    if (dino) drawLavaBubbles(ctx, t);
     game.particles.drawRipples(ctx);
     this.drawEntities(ctx, game, t);
     game.particles.drawPuffs(ctx);
@@ -166,6 +179,7 @@ export class Renderer {
     game.particles.drawTexts(ctx);
     if (game.particles.leaves) drawLeaves(ctx, game.particles.snow, t);
     else if (game.particles.stardust) drawStardust(ctx, game.particles.snow, t);
+    else if (game.particles.embers) drawEmbers(ctx, game.particles.snow, t);
     else if (!game.particles.calm) game.particles.drawSnow(ctx);
     ctx.restore();
 

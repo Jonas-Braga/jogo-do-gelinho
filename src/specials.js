@@ -13,14 +13,17 @@
 //            'space' = lua, céu estrelado, rio de poeira estelar, asteroides e
 //            estrelinhas douradas no lugar dos peixes; 'beach' = praia, mar
 //            turquesa, pranchas de surfe e peixinhos tropicais; 'halloween' =
-//            noite de lua cheia, cemitério, rio escuro, abóboras e balas
+//            noite de lua cheia, cemitério, rio escuro, abóboras e balas;
+//            'dino' = vulcões, rio de lava, pedras de basalto e ovos de dinossauro
 //   house    o que se constrói na costa: 'igloo' (padrão), 'cabin' (cabana de madeira)
-//            'base' (base lunar), 'hut' (cabana de palha) ou 'haunted' (casa assombrada)
+//            'base' (base lunar), 'hut' (cabana de palha), 'haunted' (casa assombrada)
+//            ou 'cave' (caverna de pedra)
 //   enemies  inimigos sorteados a cada grupo (no lugar do ciclo ganso/caranguejo/molusco)
 //   aurora   false desliga a aurora boreal nesta fase
 //   breath   false desliga o vapor da respiração no frio
 //   weather  'none' = nada caindo do céu (sem neve, folhas ou poeira);
-//            'leaves' = folhas secas caindo no lugar da neve
+//            'leaves' = folhas secas caindo no lugar da neve;
+//            'embers' = brasas subindo do rio de lava no lugar da neve
 //   pace     ritmo próprio da fase (ex.: 0.8 = placas, bichos e urso a 80% da velocidade)
 //   trophy   troféu ganho ao concluir a fase pela primeira vez: { name, ribbon }
 //            (o emblema desenhado na taça fica em src/trophies.js, pelo `id`).
@@ -102,6 +105,23 @@ export const SPECIALS = {
     enemies: ['ghost', 'spider', 'eyeball'],
     aurora: false,
     weather: 'leaves', // folhas secas caindo
+    pace: 0.8,
+  },
+  30: {
+    id: 'dinossauros',
+    trophy: { name: 'Troféu dos Dinossauros', ribbon: '#6B8E23' },
+    title: 'FASE 30 · ESPECIAL DOS DINOSSAUROS',
+    intro: 'Pule nas pedras do rio de lava e monte a caverna!',
+    music: 'dino',
+    outfits: { player: 'caveman', bear: 'trex' },
+    sleigh: false,
+    decor: 'dino',
+    scenery: 'dino',
+    house: 'cave',
+    enemies: ['ptero', 'raptor', 'ammonite'],
+    aurora: false,
+    breath: false, // calor do vulcão: sem vapor da respiração
+    weather: 'embers', // brasas subindo da lava
     pace: 0.8,
   },
 };

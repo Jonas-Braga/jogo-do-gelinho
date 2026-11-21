@@ -10,6 +10,9 @@ export class Particles {
     this.leaves = false;   // fase da floresta: folhas caindo no lugar da neve
     this.stardust = false; // fase do espaço: poeira estelar no lugar da neve
     this.calm = false;     // fase sem nada caindo do céu (praia)
+    this.embers = false;   // fase dos dinossauros: brasas subindo no lugar da neve
+    // Cores do líquido (respingo, anel e bolhas); null = água clarinha
+    this.liquid = null;
     // Neve ambiente
     this.snow = Array.from({ length: 140 }, () => ({
       x: Math.random() * W,
@@ -170,7 +173,7 @@ export class Particles {
         }
         case 'bubble':
           ctx.globalAlpha = 0.8;
-          ctx.strokeStyle = 'rgba(220, 245, 255, 0.9)';
+          ctx.strokeStyle = this.liquid?.bubble || 'rgba(220, 245, 255, 0.9)';
           ctx.lineWidth = 1.2;
           ctx.beginPath();
           ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
@@ -236,7 +239,7 @@ export class Particles {
     for (const r of this.ripples) {
       if (r.t < 0) continue;
       const k = r.t;
-      ctx.strokeStyle = `rgba(207, 239, 250, ${0.7 * (1 - k)})`;
+      ctx.strokeStyle = `rgba(${(this.liquid?.ripple || [207, 239, 250]).join(', ')}, ${0.7 * (1 - k)})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.ellipse(r.x, r.y, 10 + k * 60, 3 + k * 12, 0, 0, Math.PI * 2);
@@ -247,7 +250,7 @@ export class Particles {
 
   drawDrops(ctx) {
     ctx.save();
-    ctx.fillStyle = PALETTE.splash;
+    ctx.fillStyle = this.liquid?.splash || PALETTE.splash;
     for (const d of this.drops) {
       ctx.globalAlpha = 1 - d.t / d.life;
       ctx.beginPath();

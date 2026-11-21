@@ -67,6 +67,14 @@ export const SOUNDS = {
     [96, 91, 88, 84].forEach((n, i) => s.tone({ type: 'sine', f0: NOTE(n), dur: 0.15, vol: 0.06, t: 0.1 + i * 0.15 }));
   },
   growl(s, o = {}) {
+    if (o.kind === 'trex') {
+      // Rugido de T-rex: berro grave e rasgado que sobe e despenca, com tremor no chão
+      s.tone({ type: 'sawtooth', f0: 70, f1: 150, dur: 0.3, vol: 0.16, filter: 700 });
+      s.tone({ type: 'sawtooth', f0: 150, f1: 55, dur: 0.9, vol: 0.15, t: 0.3, filter: 650 });
+      s.tone({ type: 'square', f0: 74, f1: 52, dur: 0.9, vol: 0.06, t: 0.3, filter: 300 });
+      s.noise({ dur: 1.1, vol: 0.16, filter: 'lowpass', f0: 600, f1: 150 });
+      return;
+    }
     if (o.kind === 'werewolf') {
       // Uivo de lobisomem: "auuuu" subindo, segurando e caindo, com rosnado embaixo
       s.tone({ type: 'sawtooth', f0: 260, f1: 560, dur: 0.35, vol: 0.09, filter: 1400 });
@@ -143,6 +151,18 @@ export const SOUNDS = {
       // Olho: "plóc" molhado
       s.tone({ type: 'sine', f0: 180, f1: 620, dur: 0.1, vol: 0.12 });
       s.noise({ dur: 0.08, vol: 0.08, filter: 'lowpass', f0: 700, t: 0.02 });
+    } else if (o.kind === 'ptero') {
+      // Pterossauro: guincho rouco que desce
+      s.tone({ type: 'sawtooth', f0: 1800, f1: 900, dur: 0.22, vol: 0.06, filter: 3200 });
+      s.noise({ dur: 0.15, vol: 0.05, filter: 'bandpass', f0: 2500, q: 3 });
+    } else if (o.kind === 'raptor') {
+      // Raptorzinho: "kric-kric" estalado
+      [0, 0.08, 0.16].forEach((t, i) =>
+        s.tone({ type: 'square', f0: 900 + i * 150, f1: 600, dur: 0.05, vol: 0.06, t, filter: 2600 }));
+    } else if (o.kind === 'ammonite') {
+      // Amonite: "blóp" borbulhante
+      s.tone({ type: 'sine', f0: 140, f1: 420, dur: 0.12, vol: 0.13 });
+      s.tone({ type: 'sine', f0: 200, f1: 520, dur: 0.08, vol: 0.08, t: 0.1 });
     } else if (o.kind === 'jellyfish') {
       // Água-viva: choquinho elétrico ondulando
       s.tone({ type: 'square', f0: 220, f1: 660, dur: 0.18, vol: 0.05, filter: 1800 });
@@ -589,6 +609,100 @@ function buildHalloweenTrack({ beat }) {
   return { beat, length: HALLOWEEN_BARS.length * 4, events };
 }
 
+// ---- Dinossauros: tema tribal original em mi menor.
+// Tambores de pele no chão, marimba de madeira nos acordes, flauta de osso na
+// melodia, um zumbido grave de tronco oco por baixo, chocalho de sementes e, de
+// vez em quando, um rugido distante de dinossauro.
+
+// Tambor: tom grave que despenca rápido + estalo da pele
+function tribalDrum(s, t, low, vol = 0.09) {
+  const f = low ? 70 : 130;
+  s.tone({ type: 'sine', f0: f * 1.8, f1: f, dur: low ? 0.3 : 0.16, vol, t });
+  s.noise({ dur: 0.03, vol: vol * 0.5, filter: 'bandpass', f0: low ? 500 : 1100, q: 2, t });
+}
+
+// Marimba: madeira (triângulo curtinho + parcial agudo)
+function marimba(s, n, t) {
+  s.tone({ type: 'triangle', f0: NOTE(n), dur: 0.28, vol: 0.03, t });
+  s.tone({ type: 'sine', f0: NOTE(n) * 3.9, dur: 0.05, vol: 0.008, t });
+}
+
+// Flauta de osso: seno com sopro (ruído filtrado) no ataque
+function boneFlute(s, n, t, dur) {
+  s.tone({ type: 'sine', f0: NOTE(n) * 0.985, f1: NOTE(n), dur, vol: 0.045, t });
+  s.tone({ type: 'triangle', f0: NOTE(n + 12), dur: dur * 0.6, vol: 0.006, t });
+  s.noise({ dur: 0.08, vol: 0.012, filter: 'bandpass', f0: NOTE(n) * 2, q: 4, t });
+}
+
+// Zumbido de tronco oco (bem grave e abafado)
+function drone(s, n, t, dur) {
+  s.tone({ type: 'sawtooth', f0: NOTE(n), dur, vol: 0.02, t, filter: 260 });
+}
+
+function rattle(s, t, vol) {
+  s.noise({ dur: 0.05, vol, filter: 'highpass', f0: 5000, t });
+}
+
+// Rugido distante, lá longe nos vulcões
+function farRoar(s, t) {
+  s.tone({ type: 'sawtooth', f0: 90, f1: 60, dur: 1.2, vol: 0.02, t, filter: 380 });
+  s.noise({ dur: 1.2, vol: 0.025, filter: 'lowpass', f0: 350, f1: 120, t });
+}
+
+const DINO_CHORDS = {
+  Em: { bass: 40, notes: [64, 67, 71] },
+  D: { bass: 38, notes: [62, 66, 69] },
+  C: { bass: 36, notes: [60, 64, 67] },
+  Am: { bass: 45, notes: [64, 69, 72] },
+  B: { bass: 35, notes: [63, 66, 71] },
+};
+const DINO_BARS = ['Em', 'Em', 'D', 'Em', 'C', 'D', 'Em', 'Em', 'Am', 'C', 'D', 'Em', 'C', 'D', 'B', 'Em'];
+// Melodia original da flauta de osso, um compasso por linha (nota 0 = pausa)
+const DINO_TUNE = [
+  [76, 1], [79, 1], [76, 1], [74, 1],
+  [71, 2], [67, 1], [69, 1],
+  [74, 1], [76, 0.5], [74, 0.5], [69, 1], [66, 1],
+  [64, 3], [0, 1],
+  [67, 1], [71, 1], [72, 1], [71, 1],
+  [69, 1.5], [66, 0.5], [69, 1], [74, 1],
+  [76, 1], [74, 1], [71, 1], [67, 1],
+  [71, 3], [0, 1],
+  [81, 1], [79, 1], [76, 1], [72, 1],
+  [79, 2], [76, 1], [72, 1],
+  [74, 1], [78, 1], [81, 1], [78, 1],
+  [79, 3], [0, 1],
+  [76, 1], [79, 1], [84, 1.5], [83, 0.5],
+  [81, 1], [78, 1], [74, 2],
+  [75, 1], [78, 1], [83, 1], [78, 1],
+  [76, 3], [0, 1],
+];
+
+function buildDinoTrack({ beat }) {
+  const events = [];
+  const add = (b, play) => events.push({ beat: b, play });
+  DINO_BARS.forEach((name, bar) => {
+    const c = DINO_CHORDS[name];
+    const b0 = bar * 4;
+    add(b0, (s, t) => drone(s, c.bass, t, beat * 3.9));
+    // Tambores: TUM . tá tá TUM . tá .
+    add(b0, (s, t) => tribalDrum(s, t, true));
+    add(b0 + 1, (s, t) => tribalDrum(s, t, false, 0.06));
+    add(b0 + 1.5, (s, t) => tribalDrum(s, t, false, 0.05));
+    add(b0 + 2, (s, t) => tribalDrum(s, t, true));
+    add(b0 + 3, (s, t) => tribalDrum(s, t, false, 0.06));
+    // Marimba nos contratempos, subindo pelo acorde
+    [0, 1, 2, 1].forEach((k, i) => add(b0 + 0.5 + i, (s, t) => marimba(s, c.notes[k], t)));
+    // Chocalho de sementes em colcheias
+    for (let i = 0; i < 8; i++) add(b0 + i * 0.5, (s, t) => rattle(s, t, i % 2 ? 0.025 : 0.012));
+    if (bar % 8 === 6) add(b0 + 1, (s, t) => farRoar(s, t));
+  });
+  for (const m of phrase(DINO_TUNE)) {
+    if (m.note) add(m.beat, (s, t) => boneFlute(s, m.note, t, Math.min(1.1, m.len * beat * 0.92)));
+  }
+  events.sort((a, b) => a.beat - b.beat);
+  return { beat, length: DINO_BARS.length * 4, events };
+}
+
 // Trilhas disponíveis (as fases especiais escolhem a sua em specials.js)
 export const MUSIC = {
   // 64 batidas de melodia + 8 só de guizos, antes de recomeçar
@@ -601,6 +715,8 @@ export const MUSIC = {
   praia: buildBeachTrack({ beat: 0.36 }),
   // 16 compassos (64 batidas), cerca de 27 s por volta
   halloween: buildHalloweenTrack({ beat: 0.42 }),
+  // 16 compassos (64 batidas), cerca de 26 s por volta
+  dino: buildDinoTrack({ beat: 0.4 }),
 };
 const LOOKAHEAD = 0.12; // agenda as notas um pouco antes da hora
 

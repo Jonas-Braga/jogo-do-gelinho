@@ -240,6 +240,59 @@ suite('Fases especiais · prêmios (sacos de dinheiro e corações)', () => {
     }
   });
 
+  test('fases especiais: acender uma fileira não dá pontos (nas normais continua dando)', () => {
+    for (const lv of LEVELS) {
+      const g = makeGame({ level: lv });
+      g.onLand(1);
+      expect(g.rows[1].active, `fase ${lv}`).toBe(true);
+      expect(g.igloo.count, `fase ${lv}: a peça entra igual`).toBe(1);
+      expect(g.score, `fase ${lv}`).toBe(0);
+      expect(g.particles.texts.some((x) => x.str.startsWith('+')), `fase ${lv}: sem "+pontos"`).toBe(false);
+    }
+    for (const lv of [4, 6, 29]) {
+      const g = makeGame({ level: lv });
+      g.onLand(1);
+      expect(g.score, `fase normal ${lv}`).toBe(10 * lv);
+    }
+  });
+
+  test('fases especiais: sem bônus de temperatura no fim da fase (a tela avisa)', () => {
+    for (const lv of LEVELS) {
+      const g = makeGame({ level: lv });
+      g.temp = 30;
+      g.onEntered();
+      step(g, 1);
+      const rec = recordingCtx();
+      g.renderer.ctx = rec.ctx;
+      g.renderer.draw(g);
+      const texts = rec.texts;
+      step(g, 4);
+      expect(g.score, `fase ${lv}`).toBe(0);
+      expect(g.bonusTotal, `fase ${lv}`).toBe(0);
+      expect(g.bonusDone || g.level === lv + 1 || g.state === 'trophy', `fase ${lv}: segue em frente`).toBe(true);
+      expect(texts, `fase ${lv}`).toContain('Fase especial · sem bônus de temperatura');
+    }
+    const n = makeGame({ level: 29 });
+    n.temp = 30;
+    n.onEntered();
+    step(n, 4);
+    expect(n.score, 'fase normal: bônus de 10 × fase por grau').toBe(30 * 10 * 29);
+  });
+
+  test('fases especiais: peixes e sacos de dinheiro continuam dando pontos', () => {
+    for (const lv of LEVELS) {
+      const g = bonusGame(lv);
+      g.player.state = 'stand';
+      g.player.row = 2;
+      g.player.x = 600;
+      g.critters.list = [{ kind: 'fish', row: 2, dir: 1, vx: 0, x: 600, w: SIZE.fish, ph: 0 }];
+      g.critters.update(1 / 120);
+      expect(g.score, `fase ${lv}: peixe`).toBe(g.params.fishPoints);
+      g.onBonus({ kind: 'bag', row: 2, x: 600 });
+      expect(g.score, `fase ${lv}: saco`).toBe(g.params.fishPoints + BONUS.bagPoints);
+    }
+  });
+
   test('há um som de moedas', () => {
     const g = makeGame();
     g.sfx.play('coins');

@@ -19,5 +19,6 @@ export const SPEC_FILES = [
   'app.test.js',
   'joystick.test.js',
   'poderes.test.js',
+  'dinossauros.test.js',
   'futuras.test.js',
 ];

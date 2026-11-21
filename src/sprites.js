@@ -5,6 +5,7 @@ import { W, SHORE_TOP, WATER_TOP, PALETTE as C, CROUCH_SCALE } from './config.js
 import { drawAlien } from './space.js';
 import { drawGiantCrab } from './beach.js';
 import { drawWerewolf } from './halloween.js';
+import { drawTrex } from './dino.js';
 
 const SS = 2;
 
@@ -295,6 +296,21 @@ OUTFITS.wizard = {
   boots: ['#1E1A24', '#141018'], bootTrim: ['#3A2E4A', '#2A2236'],
   hands: ['#C98B62', '#E3AA80'],
 };
+// Homem das cavernas (fase dos dinossauros): túnica de pele de onça presa num
+// ombro, braços e canelas de fora, pés enrolados em pele e cabeleira
+// desgrenhada com um ossinho espetado
+OUTFITS.caveman = {
+  body: ['#F0A848', '#D9892B', '#9A5A18'], armBack: '#C98B62', armFront: ['#E3AA80', '#C98B62'],
+  seam: 'rgba(90, 40, 10, 0.5)', spots: true, caveHair: true,
+  shortSleeve: true, sleeve: ['#C98B62', '#B07A52'],
+  pants: ['#D9892B', '#9A5A18'], shorts: true, skin: ['#E3AA80', '#C98B62'],
+  boots: ['#8A5A2E', '#6A4220'], bootTrim: ['#B07A44', '#8A5A2E'],
+  hands: ['#C98B62', '#E3AA80'],
+};
+export const CAVE_FUR = '#D9892B';
+export const CAVE_HAIR = '#3A2414';
+const CAVE_SPOT = '#5A3410';
+const CAVE_BONE = '#F2E8D0';
 export const WIZARD_ROBE = '#6A3FA0';
 const WIZ_TRIM = '#F28C28';
 export const ASTRO_WHITE = '#E9EEF4';
@@ -472,6 +488,109 @@ function sunglasses(ctx, onForehead) {
   ctx.fillRect(2, y - 1.6, 1.4, 1.2);
   ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
   ctx.fillRect(4, y - 1.3, 1.6, 0.9);
+}
+
+// ---- Homem das cavernas
+// Manchas de onça na túnica (já recortada pelo contorno) e a alça no ombro
+function spotsPattern(ctx, back) {
+  const spots = [[-10, -40], [4, -44], [-3, -33], [10, -30], [-12, -24], [3, -22], [12, -40], [-6, -16]];
+  for (const [i, [x, y]] of spots.entries()) {
+    const fx = back ? -x : x;
+    ctx.fillStyle = CAVE_SPOT;
+    ctx.beginPath();
+    ctx.ellipse(fx, y, 2.6, 2, i * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#F7C070';
+    ctx.beginPath();
+    ctx.arc(fx + 0.4, y, 1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Túnica de um ombro só: o outro ombro fica de fora (pele)
+  ctx.fillStyle = '#E3AA80';
+  ctx.beginPath();
+  if (back) {
+    ctx.moveTo(-12, -50);
+    ctx.lineTo(-2, -50);
+    ctx.quadraticCurveTo(-8, -46, -13, -40);
+  } else {
+    ctx.moveTo(12, -50);
+    ctx.lineTo(1, -50);
+    ctx.quadraticCurveTo(7, -45, 14, -38);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Barra da túnica em pontas de pele, com um cinto de cipó
+function furHem(ctx) {
+  ctx.fillStyle = '#9A5A18';
+  ctx.beginPath();
+  ctx.moveTo(-18, -16);
+  for (let i = 0; i <= 8; i++) ctx.lineTo(-18 + i * 4.5, i % 2 ? -9 : -14);
+  ctx.lineTo(18, -16);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#5A7A2A';
+  ctx.fillRect(-15, -27, 30, 2.4);
+}
+
+// Cabeleira desgrenhada: atrás da cabeça (antes do rosto) e o topo com o osso
+function caveHairBack(ctx, back) {
+  ctx.fillStyle = CAVE_HAIR;
+  ctx.beginPath();
+  ctx.arc(back ? 0 : -3, back ? -57 : -57, back ? 13.5 : 12.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Mechas caindo na nuca
+  ctx.beginPath();
+  const x0 = back ? -12 : -14;
+  ctx.moveTo(x0, -56);
+  for (let i = 0; i < 5; i++) ctx.lineTo(x0 + i * (back ? 6 : 3) + 1.5, -44 - (i % 2) * 4);
+  ctx.lineTo(back ? 12 : 0, -56);
+  ctx.fill();
+  if (!back) {
+    ctx.fillStyle = '#D99A70';
+    ctx.beginPath();
+    ctx.ellipse(-3, -56, 3, 3.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function caveHairTop(ctx, back, scared, t) {
+  ctx.fillStyle = CAVE_HAIR;
+  ctx.beginPath();
+  ctx.moveTo(back ? -14 : -13, -58);
+  const lift = scared ? 3 + Math.abs(Math.sin(t * 9)) * 2 : 0; // cabelo em pé no susto
+  const tufts = back
+    ? [[-12, -71], [-6, -67], [-2, -75], [3, -68], [8, -74], [13, -66]]
+    : [[-10, -72], [-4, -68], [0, -76], [5, -69], [10, -72], [14, -63]];
+  for (const [x, y] of tufts) ctx.lineTo(x, y - lift);
+  ctx.lineTo(back ? 14 : 13, -58);
+  ctx.quadraticCurveTo(0, back ? -63 : -65, back ? -14 : -13, -58);
+  ctx.fill();
+  if (!back) {
+    // Franja grossa na testa e sobrancelha cerrada
+    ctx.beginPath();
+    ctx.moveTo(0, -65);
+    ctx.quadraticCurveTo(8, -67, 13, -61);
+    ctx.lineTo(9, -62);
+    ctx.lineTo(6, -60);
+    ctx.lineTo(3, -62);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Ossinho espetado no cabelo
+  ctx.save();
+  ctx.translate(back ? 2 : -2, -70 - lift * 0.4);
+  ctx.rotate(-0.5);
+  ctx.fillStyle = CAVE_BONE;
+  ctx.fillRect(-7, -1.5, 14, 3);
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.arc(s * 7, -1.4, 2.2, 0, Math.PI * 2);
+    ctx.arc(s * 7, 1.4, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 // ---- Bruxinho
@@ -946,6 +1065,12 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     starsPattern(ctx, false);
     ctx.restore();
     robeHem(ctx);
+  } else if (O.spots) {
+    ctx.save();
+    ctx.clip();
+    spotsPattern(ctx, false);
+    ctx.restore();
+    furHem(ctx);
   } else if (O.plaid) {
     ctx.save();
     ctx.clip();
@@ -980,6 +1105,8 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     helmetShell(ctx, false);
   } else if (O.hair) {
     surfHairBack(ctx, O, false);
+  } else if (O.caveHair) {
+    caveHairBack(ctx, false);
   } else if (O.beanie || O.witchHat) {
     // Cabelo na nuca e orelha (o gorro ou o chapéu vêm por cima, depois do rosto)
     ctx.fillStyle = HAIR;
@@ -1076,6 +1203,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
 
   if (O.beanie) beanieHat(ctx, false);
   if (O.witchHat) wizardHat(ctx, false, panicking, t);
+  if (O.caveHair) caveHairTop(ctx, false, panicking, t);
   if (O.hair) {
     surfHairTop(ctx, O, false);
     sunglasses(ctx, panicking);
@@ -1268,6 +1396,12 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     starsPattern(ctx, true);
     ctx.restore();
     robeHem(ctx);
+  } else if (O.spots) {
+    ctx.save();
+    ctx.clip();
+    spotsPattern(ctx, true);
+    ctx.restore();
+    furHem(ctx);
   } else if (O.plaid) {
     ctx.save();
     ctx.clip();
@@ -1301,6 +1435,12 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     // Nuca com o cabelo loiro bagunçado
     surfHairBack(ctx, O, true);
     surfHairTop(ctx, O, true);
+    return;
+  }
+  if (O.caveHair) {
+    // Cabeleira desgrenhada por trás, com o ossinho
+    caveHairBack(ctx, true);
+    caveHairTop(ctx, true, false, t);
     return;
   }
   if (O.witchHat) {
@@ -1911,6 +2051,10 @@ export function drawBear(ctx, b, t, outfit = null) {
   }
   if (outfit === 'werewolf') {
     drawWerewolf(ctx, b, t);
+    return;
+  }
+  if (outfit === 'trex') {
+    drawTrex(ctx, b, t);
     return;
   }
   const F = BEAR_FUR.polar;

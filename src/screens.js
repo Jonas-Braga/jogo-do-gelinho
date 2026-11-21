@@ -11,6 +11,7 @@ const WORDS = {
   base: { floes: 'os asteroides', floe: 'o asteroide', house: 'na base lunar pronta' },
   hut: { floes: 'as pranchas', floe: 'a prancha', house: 'na cabana de palha pronta' },
   haunted: { floes: 'as abóboras', floe: 'a abóbora', house: 'na casa assombrada pronta' },
+  cave: { floes: 'as pedras', floe: 'a pedra', house: 'na caverna pronta' },
 };
 
 // touch = true: mostra os botões da tela no lugar das teclas
@@ -181,10 +182,13 @@ export function drawLevelEnd(ctx, game) {
   ctx.fillText(`FASE ${game.level} CONCLUÍDA`, W / 2, H / 2 - 52);
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
   ctx.font = `600 16px ${FONT}`;
-  ctx.fillText(`Bônus de temperatura · ${game.params.degreePoints} pts por grau`, W / 2, H / 2 - 14);
+  // Fase especial: sem bônus de temperatura (só peixes e sacos de dinheiro dão pontos)
+  ctx.fillText(game.scoresRows === false
+    ? 'Fase especial · sem bônus de temperatura'
+    : `Bônus de temperatura · ${game.params.degreePoints} pts por grau`, W / 2, H / 2 - 14);
   ctx.fillStyle = '#FFFFFF';
   ctx.font = `800 40px ${FONT}`;
-  ctx.fillText(`${game.temp}°   +${game.bonusTotal}`, W / 2, H / 2 + 38);
+  ctx.fillText(game.scoresRows === false ? `${game.temp}°` : `${game.temp}°   +${game.bonusTotal}`, W / 2, H / 2 + 38);
   if (game.bonusDone) {
     ctx.font = `600 15px ${FONT}`;
     ctx.fillStyle = 'rgba(255,255,255,0.7)';

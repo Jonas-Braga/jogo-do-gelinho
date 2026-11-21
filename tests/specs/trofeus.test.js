@@ -130,13 +130,15 @@ suite('Troféus · fases especiais', () => {
     removeItem('trophies');
   });
 
-  test('a comemoração vem depois da contagem do bônus (pontos do bônus já somados)', () => {
+  // Renomeado com aprovação do usuário: fase especial não tem mais bônus de temperatura
+  test('a comemoração vem depois do fim da fase (fase especial não tem bônus de temperatura)', () => {
     removeItem('trophies');
     const g = makeGame({ level: 5 });
     const before = g.score;
     finishLevel(g);
-    expect(g.temp).toBe(0);
-    expect(g.score).toBeGreaterThan(before);
+    expect(g.state).toBe('trophy');
+    expect(g.temp, 'a temperatura não vira pontos').toBeGreaterThan(0);
+    expect(g.score).toBe(before);
     expect(g.bonusDone).toBe(true);
     removeItem('trophies');
   });
@@ -302,6 +304,8 @@ suite('Troféus · fases especiais', () => {
     g.level = 5;
     g.startLevel();
     quiet(g);
+    // Fase especial só dá pontos com peixes e sacos: pega um peixe para entrar no ranking
+    g.onFish({ row: 0, x: 600 });
     finishLevel(g);
     expect(g.state).toBe('trophy');
     await g.pendingSave;

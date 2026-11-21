@@ -166,6 +166,44 @@ TROPHY_EMBLEMS.halloween = (ctx) => {
   ctx.fill();
 };
 
+// Pegada de dinossauro de três dedos diante de um vulcão soltando lava
+TROPHY_EMBLEMS.dinossauros = (ctx) => {
+  ctx.fillStyle = '#E8724A';
+  ctx.fillRect(-16, -16, 32, 32);
+  ctx.fillStyle = '#4A2A32';
+  ctx.beginPath();
+  ctx.moveTo(-16, 4);
+  ctx.lineTo(-4, -10);
+  ctx.lineTo(4, -10);
+  ctx.lineTo(16, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#FF9A2A';
+  ctx.beginPath();
+  ctx.arc(0, -12, 3, 0, Math.PI * 2);
+  ctx.arc(-4, -15, 2, 0, Math.PI * 2);
+  ctx.arc(4, -15, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#6E5A3A';
+  ctx.fillRect(-16, 4, 32, 12);
+  ctx.fillStyle = '#5FA83A';
+  ctx.beginPath();
+  ctx.ellipse(0, 10, 4.5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  for (const [dx, dy, a] of [[-5, 4, -0.5], [0, 2.5, 0], [5, 4, 0.5]]) {
+    ctx.save();
+    ctx.translate(dx, dy);
+    ctx.rotate(a);
+    ctx.beginPath();
+    ctx.moveTo(-1.6, 2);
+    ctx.lineTo(0, -5);
+    ctx.lineTo(1.6, 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+};
+
 // ---------------------------------------------------------------- Taça
 // Contorno do bojo (unidades: a taça tem 100 de altura, base em y = 0)
 function bowlPath(ctx) {

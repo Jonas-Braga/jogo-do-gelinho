@@ -16,6 +16,7 @@ import { Celebration } from './trophies.js';
 import { DUST } from './space.js';
 import { SEA } from './beach.js';
 import { HAUNT } from './halloween.js';
+import { LAVA } from './dino.js';
 import { BONUS } from './bonus.js';
 import { POWERS, POWER_NAMES } from './powers.js';
 
@@ -26,6 +27,8 @@ const LAND_FX = {
   space: { puff: DUST.regolith, chip: DUST.rock, spark: DUST.spark },
   beach: { puff: SEA.sand, chip: SEA.spray, spark: SEA.spark },
   halloween: { puff: HAUNT.mist, chip: HAUNT.chip, spark: HAUNT.spark },
+  // Na lava: cinza na costa, lascas de basalto, e respingos/bolhas cor de lava
+  dino: { puff: LAVA.ash, chip: LAVA.chip, spark: LAVA.spark, liquid: LAVA.liquid },
 };
 
 // Estados: title (tela inicial), play (jogando, incluindo animações de morte),
@@ -110,6 +113,8 @@ export class Game {
     this.particles.leaves = false;
     this.particles.stardust = false;
     this.particles.calm = false;
+    this.particles.embers = false;
+    this.particles.liquid = null;
     while (!this.igloo.complete) this.igloo.add();
     this.igloo.anim.fill(1);
     this.igloo.landed.fill(true);
@@ -239,6 +244,8 @@ export class Game {
     this.particles.leaves = sp?.scenery === 'forest' || sp?.weather === 'leaves';
     this.particles.stardust = sp?.scenery === 'space';
     this.particles.calm = sp?.weather === 'none';
+    this.particles.embers = sp?.weather === 'embers';
+    this.particles.liquid = LAND_FX[sp?.scenery]?.liquid || null;
     this.player = new Player(this);
     this.critters.reset(this.params);
     this.bear.reset(this.params);
@@ -370,7 +377,8 @@ export class Game {
       }
       this.bonusTimer -= dt;
       if (this.bonusTimer <= 0) {
-        if (this.temp > 0) {
+        // Fase especial não tem bônus de temperatura (os prêmios já dão pontos e vidas)
+        if (this.temp > 0 && this.scoresRows) {
           this.temp--;
           this.bonusTotal += this.params.degreePoints;
           this.addScore(this.params.degreePoints);
@@ -402,6 +410,13 @@ export class Game {
   // Fase com o cenário do espaço (asteroides, base lunar, poeira estelar)
   get space() {
     return this.special?.scenery === 'space';
+  }
+
+  // Fileiras acesas e bônus de temperatura dão pontos? Nas fases especiais, não:
+  // lá só peixes (ou o que os substitui) e sacos de dinheiro valem pontos, porque
+  // os prêmios já dão muitos pontos e vidas (pedido do usuário).
+  get scoresRows() {
+    return !this.special;
   }
 
   get landFx() {
@@ -449,8 +464,10 @@ export class Game {
     for (const q of r.rects()) {
       if (q.x > -q.w && q.x < W) this.particles.sparkle(q.x + q.w / 2, r.y - 4, 2, this.landFx.spark);
     }
-    this.addScore(this.params.floePoints);
-    this.particles.text(this.player.x, this.player.y - 80, `+${this.params.floePoints}`);
+    if (this.scoresRows) {
+      this.addScore(this.params.floePoints);
+      this.particles.text(this.player.x, this.player.y - 80, `+${this.params.floePoints}`);
+    }
     this.igloo.add();
     if (this.rows.every((x) => x.active)) this.rowsResetTimer = 0.35;
   }

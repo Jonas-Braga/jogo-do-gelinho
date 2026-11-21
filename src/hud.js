@@ -86,7 +86,7 @@ export function drawHud(ctx, game) {
   ctx.fillText(String(game.level), W / 2 - 34, 64);
   ctx.font = `600 13px ${FONT}`;
   ctx.fillStyle = game.igloo.complete ? '#FFD36B' : 'rgba(255,255,255,0.85)';
-  const house = { cabin: 'cabana', base: 'base', hut: 'cabana', haunted: 'casa' }[game.igloo.style] || 'iglu';
+  const house = { cabin: 'cabana', base: 'base', hut: 'cabana', haunted: 'casa', cave: 'caverna' }[game.igloo.style] || 'iglu';
   ctx.fillText(`${house} ${game.igloo.count}/${RULES.iglooPieces}`, W / 2 + 34, 60);
   ctx.textAlign = 'left';
 
@@ -155,7 +155,7 @@ export function drawHud(ctx, game) {
     drawTouchButtons(ctx, game);
   } else {
     ctx.font = `500 13px ${FONT}`;
-    const floe = { cabin: 'tronco', base: 'asteroide', hut: 'prancha', haunted: 'abóbora' }[game.igloo.style] || 'placa';
+    const floe = { cabin: 'tronco', base: 'asteroide', hut: 'prancha', haunted: 'abóbora', cave: 'pedra' }[game.igloo.style] || 'placa';
     const hint = game.input.padActive
       ? `Direcional: andar e pular   A inverter ${floe} (−1 bloco)   ↑ na porta: entrar   Start pausa   Select som`
       : `←/→ andar   ↑/↓ pular   Espaço inverter ${floe} (−1 bloco)   ↑ na porta: entrar   P pausa   M som`;
