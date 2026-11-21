@@ -7,6 +7,7 @@ import { makeGame, step } from '../helpers.js';
 import { W, SHORE_Y, ROW_Y, DEPTH } from '../../src/config.js';
 import {
   depthScale, projectX, visibleRange, floeTilt, withVolume, volume, contactShadow, atDepth,
+  camera, followCamera, swayAt, maxSway, sceneLight, foregroundKind,
 } from '../../src/depth.js';
 import { SPECIALS } from '../../src/specials.js';
 
@@ -186,6 +187,155 @@ suite('Profundidade: luz, volume e sombras', () => {
       expect(lit[3]).toBe(255);
       expect(fora[3]).toBe(0); // luz e sombra só onde há tinta
       expect(lit[0] + lit[1] + lit[2]).toBeGreaterThan(dark[0] + dark[1] + dark[2] + 60);
+    });
+  }
+});
+
+suite('Profundidade: relevo, parallax e primeiro plano', () => {
+  test('a câmera segue o jogador: a frente anda tudo, a costa menos e o céu menos ainda', () => {
+    const was = camera.x;
+    try {
+      camera.x = 0;
+      for (let i = 0; i < 200; i++) followCamera(W, 0.05);
+      expect(camera.x).toBeCloseTo((W / 2) * DEPTH.sway.amount, 0.01);
+      const front = Math.abs(swayAt(ROW_Y[3]));
+      const shore = Math.abs(swayAt(SHORE_Y));
+      expect(front).toBeCloseTo(camera.x, 1e-9);
+      expect(shore).toBeLessThan(front);
+      expect(shore).toBeGreaterThan(0);
+      expect(DEPTH.sway.far).toBeLessThan(DEPTH.sway.shore);
+      expect(DEPTH.sway.fore).toBeGreaterThan(1);
+      // Jogador do outro lado: a câmera vai para o outro lado
+      for (let i = 0; i < 200; i++) followCamera(0, 0.05);
+      expect(camera.x).toBeLessThan(0);
+      // O deslocamento nunca passa do máximo
+      expect(Math.abs(camera.x)).toBeLessThan(maxSway() + 1e-9);
+    } finally {
+      camera.x = was;
+    }
+  });
+
+  test('com a câmera deslocada, projeção, desenho e descarte continuam combinando', () => {
+    const was = camera.x;
+    try {
+      camera.x = 12;
+      const y = ROW_Y[1];
+      const { ctx, calls } = recordingCtx();
+      atDepth(ctx, y, () => {});
+      const tr = calls.find((c) => c[0] === 'translate');
+      expect(tr[1]).toBeCloseTo(DEPTH.vanishX + swayAt(y), 1e-9);
+      expect(projectX(DEPTH.vanishX, y)).toBeCloseTo(DEPTH.vanishX + swayAt(y), 1e-9);
+      const [a, b] = visibleRange(y, 0);
+      expect(projectX(a, y)).toBeCloseTo(0, 1e-6);
+      expect(projectX(b, y)).toBeCloseTo(W, 1e-6);
+      // Na frente também há deslocamento (atDepth não pode pular a transformação)
+      const r = recordingCtx();
+      atDepth(r.ctx, ROW_Y[3], () => {});
+      expect(r.calls.find((c) => c[0] === 'translate')[1]).toBeCloseTo(DEPTH.vanishX - 12, 1e-9);
+    } finally {
+      camera.x = was;
+    }
+  });
+
+  test('desenhar com contexto falso (testes) não move a câmera', () => {
+    const was = camera.x;
+    try {
+      camera.x = 0;
+      const g = makeGame({ level: 4 });
+      g.player.x = 1200;
+      const { ctx } = recordingCtx();
+      g.renderer.ctx = ctx;
+      for (let i = 0; i < 5; i++) {
+        g.time += 0.05;
+        g.renderer.draw(g);
+      }
+      expect(camera.x).toBe(0);
+    } finally {
+      camera.x = was;
+    }
+  });
+
+  test('a luz do relevo acompanha o cenário (sol quente de dia, luar frio no Halloween)', () => {
+    const { ctx } = recordingCtx();
+    const g = makeGame({ level: 25 });
+    g.renderer.ctx = ctx;
+    g.renderer.draw(g);
+    const moon = [...sceneLight.key];
+    expect(moon[2]).toBeGreaterThan(moon[0]); // azulado
+    const n = makeGame({ level: 1 });
+    n.renderer.ctx = ctx;
+    n.renderer.draw(n);
+    expect(sceneLight.key[0]).toBeGreaterThanOrEqual(sceneLight.key[2]); // quente
+    expect(DEPTH.relief.light).toBeGreaterThan(0);
+    expect(DEPTH.relief.shade).toBeGreaterThan(0);
+  });
+
+  test('com fps um pouco baixo, só o relevo desliga (o resto do volume continua)', () => {
+    const g = makeGame();
+    const was = [volume.enabled, volume.relief];
+    try {
+      volume.enabled = true;
+      volume.relief = true;
+      g.time = 10;
+      g.fps = DEPTH.relief.minFps - 5;
+      expect(g.fps).toBeGreaterThan(DEPTH.minFps);
+      for (let i = 0; i < 15; i++) g.renderer.watchFps(g, 0.1);
+      expect(volume.relief).toBe(true);
+      for (let i = 0; i < 10; i++) g.renderer.watchFps(g, 0.1);
+      expect(volume.relief).toBe(false);
+      for (let i = 0; i < 100; i++) g.renderer.watchFps(g, 0.1);
+      expect(volume.enabled).toBe(true);
+    } finally {
+      [volume.enabled, volume.relief] = was;
+    }
+  });
+
+  test('os mapas de luz ficam guardados por personagem (não são refeitos todo quadro)', () => {
+    expect(DEPTH.relief.every).toBeGreaterThan(1);
+    expect(DEPTH.relief.res).toBeLessThan(1);
+    expect(DEPTH.relief.res).toBeGreaterThan(0);
+  });
+
+  test('cada cenário tem o seu primeiro plano (os desconhecidos usam o de gelo)', () => {
+    for (const sp of Object.values(SPECIALS)) expect(typeof foregroundKind(sp.scenery || null)).toBe('string');
+    expect(foregroundKind(null)).toBe('ice');
+    expect(foregroundKind('forest')).toBe('forest');
+    expect(foregroundKind('nada')).toBe('ice');
+    expect(DEPTH.foreground).toBe(true);
+  });
+
+  if (!isNode) {
+    test('no canvas de verdade: o relevo acende o lado da luz e escurece o oposto de uma forma redonda', () => {
+      const paint = (relief) => {
+        const c = document.createElement('canvas');
+        c.width = 200;
+        c.height = 200;
+        const ctx = c.getContext('2d');
+        const was = [volume.enabled, DEPTH.relief, volume.relief];
+        volume.enabled = true;
+        volume.relief = true;
+        DEPTH.relief = relief;
+        try {
+          withVolume(ctx, [0, 0, 200, 200], (g) => {
+            g.fillStyle = 'rgb(120, 120, 120)';
+            g.beginPath();
+            g.arc(100, 100, 60, 0, Math.PI * 2);
+            g.fill();
+          });
+        } finally {
+          [volume.enabled, DEPTH.relief, volume.relief] = was;
+        }
+        const px = (x, y) => {
+          const d = ctx.getImageData(x, y, 1, 1).data;
+          return d[0] + d[1] + d[2];
+        };
+        return { lit: px(70, 70), dark: px(132, 132), out: ctx.getImageData(10, 10, 1, 1).data[3] };
+      };
+      const on = paint(DEPTH.relief);
+      const off = paint(null);
+      expect(on.out).toBe(0);
+      expect(on.lit).toBeGreaterThan(off.lit);
+      expect(on.dark).toBeLessThan(off.dark);
     });
   }
 });

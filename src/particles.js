@@ -1,12 +1,13 @@
 import { W, H, PALETTE, DEPTH } from './config.js';
-import { depthScale, projectX } from './depth.js';
+import { depthScale, projectX, swayAt } from './depth.js';
 
 // Cada partícula é desenhada na perspectiva da linha onde está (como placas e bichos)
 function enterDepth(ctx, y) {
   ctx.save();
   const s = depthScale(y);
-  if (s === 1) return;
-  ctx.translate(DEPTH.vanishX, y);
+  const o = swayAt(y);
+  if (s === 1 && !o) return;
+  ctx.translate(DEPTH.vanishX + o, y);
   ctx.scale(s, s);
   ctx.translate(-DEPTH.vanishX, -y);
 }

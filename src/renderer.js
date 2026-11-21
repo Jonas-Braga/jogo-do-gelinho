@@ -1,6 +1,6 @@
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
 import {
-  atDepth, floeTilt, visibleRange, withVolume, volume, contactShadow, drawHaze, drawWaterDepth, drawSunPath,
+  atDepth, floeTilt, visibleRange, withVolume, volume, sceneLight, camera, followCamera, swayLayer, Foreground, foregroundKind, contactShadow, drawHaze, drawWaterDepth, drawSunPath,
   drawLighting, drawVignette, Bokeh,
 } from './depth.js';
 import {
@@ -68,11 +68,12 @@ const FISH_DRAW = { space: drawStarBonus, beach: drawTropicalFish, halloween: dr
 // Bichos que voam ou flutuam: a sombra fica mais fraca e menor (estão longe do chão)
 const FLYING = new Set(['goose', 'bat', 'ufo', 'comet', 'gull', 'ghost', 'ptero', 'jellyfish', 'eyeball']);
 // Luz de cada cenário (sol, lua cheia, Terra): cor do banho de luz e do caminho na água
+// key/shade/relief: cor da luz e da sombra no relevo dos personagens e força do relevo
 const LIGHT = {
-  space: { warm: [150, 190, 255], path: [150, 200, 255], strength: 0.6, haze: 0.5 },
+  space: { warm: [150, 190, 255], path: [150, 200, 255], strength: 0.6, haze: 0.5, key: [215, 230, 255], shade: [40, 40, 110], relief: 1 },
   // Noite: luar frio e fraco, sem névoa (a fase já tem a neblina rasteira própria)
-  halloween: { warm: [190, 180, 255], path: [255, 240, 200], strength: 0.3, haze: 0, glow: 0 },
-  dino: { warm: [255, 170, 80], path: [255, 190, 110], strength: 1, haze: 1.1 },
+  halloween: { warm: [190, 180, 255], path: [255, 240, 200], strength: 0.3, haze: 0, glow: 0, key: [205, 200, 255], shade: [40, 20, 80], relief: 0.85 },
+  dino: { warm: [255, 170, 80], path: [255, 190, 110], strength: 1, haze: 1.1, key: [255, 200, 140], shade: [90, 40, 40], relief: 1 },
 };
 
 // Intensidade da aurora boreal (0 = nenhuma). Aparece nas fases avançadas,
@@ -129,6 +130,7 @@ export class Renderer {
       sp: 1.5 + Math.random() * 2.5,
     }));
     this.bokeh = new Bokeh();
+    this.foreground = new Foreground();
     this.lastT = 0;
     this.slow = 0;
   }
@@ -136,6 +138,14 @@ export class Renderer {
   // Volume desligado sozinho se o aparelho não aguentar (fps baixo por alguns segundos)
   watchFps(game, dt) {
     if (!volume.enabled || !(game.fps > 0) || game.time < 4) return;
+    // Primeiro degrau: sem o relevo (o mais caro)
+    if (volume.relief && DEPTH.relief) {
+      this.slowRelief = game.fps < DEPTH.relief.minFps ? (this.slowRelief || 0) + dt : 0;
+      if (this.slowRelief > 2) {
+        volume.relief = false;
+        console.info('[gelinho] fps baixo: relevo dos personagens desligado');
+      }
+    }
     this.slow = game.fps < DEPTH.minFps ? this.slow + dt : 0;
     if (this.slow > 3) {
       volume.enabled = false;
@@ -153,6 +163,11 @@ export class Renderer {
     const dt = Math.max(0, Math.min(0.1, t - this.lastT));
     this.lastT = t;
     this.watchFps(game, dt);
+    // Câmera acompanhando o jogador (só no canvas de verdade: os testes no Node não mudam)
+    const tr = ctx.getTransform ? ctx.getTransform() : null;
+    // A câmera só vale durante este desenho (fora dele camera.x = 0: projeções puras)
+    camera.x = this.camX || 0;
+    if (DEPTH.sway && tr && typeof tr.a === 'number') followCamera(game.player.x, dt);
 
     ctx.save();
     if (game.shake > 0) {
@@ -168,12 +183,16 @@ export class Renderer {
     const space = scenery === 'space';
     const halloween = scenery === 'halloween';
     const dino = scenery === 'dino';
-    if (space) drawSpaceSky(ctx, t, this.skyF);
-    else if (halloween) drawHalloweenSky(ctx, t, this.skyF);
-    else if (dino) drawDinoSky(ctx, t, this.skyF);
-    else this.drawSky(ctx, sky);
+    const far = DEPTH.sway.far;
+    const shore = DEPTH.sway.shore;
     this.aurora = sp?.aurora === false ? 0 : auroraStrength(game.level, this.skyF);
-    if (this.aurora > 0) this.drawAurora(ctx, t, this.aurora);
+    swayLayer(ctx, far, () => {
+      if (space) drawSpaceSky(ctx, t, this.skyF);
+      else if (halloween) drawHalloweenSky(ctx, t, this.skyF);
+      else if (dino) drawDinoSky(ctx, t, this.skyF);
+      else this.drawSky(ctx, sky);
+      if (this.aurora > 0) this.drawAurora(ctx, t, this.aurora);
+    });
     // Os fundos das fases especiais só são criados quando a fase aparece pela primeira vez
     let bg = this.bg;
     if (forest) bg = this.forestBg ||= makeForestBackground();
@@ -181,13 +200,20 @@ export class Renderer {
     else if (scenery === 'beach') bg = this.beachBg ||= makeBeachBackground();
     else if (halloween) bg = this.halloweenBg ||= makeHalloweenBackground();
     else if (dino) bg = this.dinoBg ||= makeDinoBackground();
-    ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h);
+    swayLayer(ctx, shore, () => ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h));
     const lt = LIGHT[scenery] || { warm: sky.sun, path: sky.sun, strength: 1, haze: 1 };
+    // Luz do relevo dos personagens: a cor do sol misturada ao branco
+    sceneLight.key = lt.key || sky.sun.map((v) => Math.round(255 - (255 - v) * 0.35));
+    sceneLight.shade = lt.shade || [60, 80, 130];
+    sceneLight.strength = lt.relief ?? 1;
     const horizon = space ? [120, 80, 220] : halloween ? HAUNT.sky : dino ? LAVA.sky : sky.hor;
     // Perspectiva atmosférica: o cenário distante se perde na cor do horizonte
     drawHaze(ctx, horizon, lt.haze);
+    ctx.save();
+    ctx.translate(-camera.x * far, 0);
     if (scenery === 'beach') drawSkyGulls(ctx, t);
     if (sp?.sleigh) drawSleigh(ctx, game.sleigh, t);
+    ctx.translate(-camera.x * (shore - far), 0);
     if (sp?.decor === 'natal') drawChristmasTrees(ctx, t);
     if (sp?.decor === 'floresta') drawForestDecor(ctx, t);
     if (sp?.decor === 'espaco') drawSpaceDecor(ctx, t);
@@ -195,13 +221,17 @@ export class Renderer {
     if (sp?.decor === 'halloween') drawHalloweenDecor(ctx, t);
     if (sp?.decor === 'dino') drawDinoDecor(ctx, t);
     if (forest) drawFireflies(ctx, t, 1 - this.skyF);
+    ctx.restore();
     // No espaço o "reflexo do céu" na poeira é o roxo do horizonte
     // No espaço e no Halloween o "reflexo do céu" na água é a cor do horizonte noturno
     const reflect = space ? { hor: [120, 80, 220] } : halloween ? { hor: HAUNT.sky } : dino ? { hor: LAVA.sky } : sky;
-    this.drawWater(ctx, t, reflect, WATERS[scenery] || ICE_WATER);
-    if (dino) drawLavaBubbles(ctx, t);
+    swayLayer(ctx, (shore + 1) / 2, () => {
+      this.drawWater(ctx, t, reflect, WATERS[scenery] || ICE_WATER);
+      if (dino) drawLavaBubbles(ctx, t);
+    });
     drawWaterDepth(ctx, horizon, lt.glow ?? 1);
-    drawSunPath(ctx, t, 300, lt.path, lt.strength * (0.45 + 0.55 * clamp01(this.skyF + (sp ? 0.4 : 0))));
+    // O caminho de luz acompanha o sol (camada do céu)
+    swayLayer(ctx, far, () => drawSunPath(ctx, t, 300, lt.path, lt.strength * (0.45 + 0.55 * clamp01(this.skyF + (sp ? 0.4 : 0)))));
     game.particles.drawRipples(ctx);
     this.drawEntities(ctx, game, t);
     game.particles.drawPuffs(ctx);
@@ -227,8 +257,12 @@ export class Renderer {
       this.bokeh.update(dt, parts.embers);
       this.bokeh.draw(ctx, parts.embers ? [255, 150, 60] : [255, 255, 255], parts.embers ? 0.3 : 0.2);
     }
+    // Primeiro plano desfocado (passa na frente de tudo, anda mais que a fileira da frente)
+    if (DEPTH.foreground) this.foreground.draw(ctx, foregroundKind(scenery), 0.95);
     drawVignette(ctx);
     ctx.restore();
+    this.camX = camera.x;
+    camera.x = 0;
 
     drawHud(ctx, game);
   }
@@ -371,7 +405,7 @@ export class Renderer {
     const drawP = () => atDepth(ctx, pGround, () => {
       if (p.state === 'jump') contactShadow(ctx, p.x, pGround + 3, 22, pGround - p.y);
       drawPowerBack(ctx, p, t);
-      withVolume(ctx, [p.x - 64, p.y - 150, p.x + 64, p.y + 26], (g) => drawPlayer(g, p, t, cold, ride, outfits.player));
+      withVolume(ctx, [p.x - 64, p.y - 150, p.x + 64, p.y + 26], (g) => drawPlayer(g, p, t, cold, ride, outfits.player), undefined, { key: p });
       drawPowerFront(ctx, p, t);
     });
     // O jogador é desenhado depois da última fileira que está "atrás" dele.
@@ -385,13 +419,13 @@ export class Renderer {
       withVolume(ctx, [IGLOO.x - 200, IGLOO.baseY - 300, IGLOO.x + 200, IGLOO.baseY + 30], (g) => {
         if (house) house.body(g, game.igloo, t);
         else game.igloo.draw(g, t);
-      });
+      }, undefined, { key: game.igloo });
       if (game.special?.decor === 'natal' && game.igloo.complete) drawIglooLights(ctx, t);
     });
     if (game.bear.active) {
       const b = game.bear;
       atDepth(ctx, b.y, () => {
-        withVolume(ctx, [b.x - 150, b.y - 190, b.x + 150, b.y + 24], (g) => drawBear(g, b, t, outfits.bear));
+        withVolume(ctx, [b.x - 150, b.y - 190, b.x + 150, b.y + 24], (g) => drawBear(g, b, t, outfits.bear), undefined, { key: b });
         if (b.stun > 0) drawDizzy(ctx, b.x, b.y - 92, t);
       });
     }
@@ -432,7 +466,7 @@ export class Renderer {
           } else {
             const fly = FLYING.has(c.kind);
             contactShadow(ctx, c.x, row.y + 4, fly ? 18 : 24, fly ? 40 : 0, fly ? 0.18 : 0.26);
-            withVolume(ctx, [c.x - 80, row.y - 120, c.x + 80, row.y + 50], (g) => draw(g, c, row.y, t));
+            withVolume(ctx, [c.x - 80, row.y - 120, c.x + 80, row.y + 50], (g) => draw(g, c, row.y, t), undefined, { key: c });
           }
         }
       });

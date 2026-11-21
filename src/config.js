@@ -65,6 +65,22 @@ export const DEPTH = {
     rim: 'rgba(255, 246, 226, 1)',
     core: 'rgba(6, 16, 40, 1)',
   },
+  // Relevo "renderizado": a silhueta desfocada vira um mapa de altura e cada pixel
+  // é aceso (difusa + brilho especular) ou sombreado pela inclinação em relação à luz
+  relief: {
+    blur: [4, 12, 28], // raios do arredondamento: detalhes e corpo (unidades do mundo)
+    shift: 5,          // distância usada para medir a inclinação (unidades do mundo)
+    gain: 3,           // contraste do relevo
+    light: 0.55,       // força da luz difusa no lado virado para a luz
+    spec: 0.45,        // força do brilho especular
+    shade: 0.6,        // força da sombra no lado oposto
+    res: 1 / 3,        // resolução dos mapas de luz (são suaves: 1/3 basta)
+    every: 3,          // refaz os mapas de cada personagem a cada N quadros
+    minFps: 50,        // abaixo disso por 2 s, só o relevo é desligado (aparelho fraco)
+  },
+  // Câmera que acompanha o jogador de leve: o fundo anda menos que a frente (parallax)
+  sway: { amount: 0.03, far: 0.25, shore: 0.45, fore: 1.6, ease: 3 },
+  foreground: true,    // faixa desfocada de primeiro plano na beira de baixo
   minFps: 40,          // abaixo disso (por alguns segundos) o volume é desligado sozinho
 };
 

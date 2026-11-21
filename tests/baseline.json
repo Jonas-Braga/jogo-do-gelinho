@@ -480,5 +480,12 @@
   "Profundidade: luz, volume e sombras › sombra de contato encolhe quando quem a projeta sobe (pulo)",
   "Profundidade: luz, volume e sombras › sem canvas de verdade, o volume desenha direto no contexto (cores continuam visíveis)",
   "Profundidade: luz, volume e sombras › volume desliga sozinho quando o fps fica baixo por alguns segundos",
-  "Profundidade: luz, volume e sombras › toda fase (normal e especial) desenha com a profundidade sem erro, com bichos e pulo"
+  "Profundidade: luz, volume e sombras › toda fase (normal e especial) desenha com a profundidade sem erro, com bichos e pulo",
+  "Profundidade: relevo, parallax e primeiro plano › a câmera segue o jogador: a frente anda tudo, a costa menos e o céu menos ainda",
+  "Profundidade: relevo, parallax e primeiro plano › com a câmera deslocada, projeção, desenho e descarte continuam combinando",
+  "Profundidade: relevo, parallax e primeiro plano › desenhar com contexto falso (testes) não move a câmera",
+  "Profundidade: relevo, parallax e primeiro plano › a luz do relevo acompanha o cenário (sol quente de dia, luar frio no Halloween)",
+  "Profundidade: relevo, parallax e primeiro plano › com fps um pouco baixo, só o relevo desliga (o resto do volume continua)",
+  "Profundidade: relevo, parallax e primeiro plano › os mapas de luz ficam guardados por personagem (não são refeitos todo quadro)",
+  "Profundidade: relevo, parallax e primeiro plano › cada cenário tem o seu primeiro plano (os desconhecidos usam o de gelo)"
 ]
