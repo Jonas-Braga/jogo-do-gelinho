@@ -12,6 +12,11 @@ import {
 import { SPECIALS } from '../../src/specials.js';
 import { playerPose, poseList, loadModel, model, SUBJECTS, CRITTERS_3D, floeSprite3D } from '../../src/model3d.js';
 import { floeSubject } from '../../src/m3d/floes.js';
+import * as bear3d from '../../src/m3d/bear.js';
+import { BLOCKS as IGLOO_BLOCKS } from '../../src/m3d/igloo.js';
+import { drawIgloo3D, drawIglooFrame3D } from '../../src/model3d.js';
+import { powerArt, drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront } from '../../src/powers.js';
+import { RULES } from '../../src/config.js';
 
 // Contexto 2D falso que registra as chamadas
 function recordingCtx() {
@@ -512,6 +517,112 @@ suite('Modelos 3D da fase normal (etapa 1 do 3D)', () => {
       expect(n).toBeGreaterThan(5);
     } finally {
       Object.assign(model, was);
+    }
+  });
+});
+
+suite('Modelos 3D da fase normal: articulações, iglu e poderes', () => {
+  // Fotos falsas: toda chave existe; registra quais foram pedidas
+  const fakeSprites = () => {
+    const asked = [];
+    const img = { fake3d: true };
+    return { asked, img, proxy: new Proxy({}, { get: (_, k) => (asked.push(String(k)), img) }) };
+  };
+  const withFake = (fn) => {
+    const was = { ...model };
+    const f = fakeSprites();
+    try {
+      model.state = 'ready';
+      model.sprites = f.proxy;
+      fn(f);
+    } finally {
+      Object.assign(model, was);
+    }
+  };
+
+  test('urso: as quatro patas se alternam e a pata de apoio não patina', () => {
+    const phases = bear3d.LEGS.map((l) => l[2]).sort();
+    expect(phases).toEqual([0, 0.25, 0.5, 0.75]);
+    expect(bear3d.LEGS.filter((l) => l[1]).length).toBe(2);
+    for (const [, front] of bear3d.LEGS) {
+      const leg = { front, hip: { z: front ? 22 : -25 } };
+      // No apoio a pata fica no chão e desliza para trás em linha reta
+      const a = bear3d.footAt(leg, 0.05);
+      const b = bear3d.footAt(leg, 0.35);
+      expect(a.y).toBe(b.y);
+      expect(b.z).toBeLessThan(a.z);
+      // Velocidade da pata no chão = velocidade do urso (35 px por ciclo, ~91% de perfil)
+      const perCycle = ((a.z - b.z) / 0.3) * Math.sin(Math.PI / 2 - 0.42);
+      expect(Math.abs(perCycle - (Math.PI * 2) / 3 / 0.06)).toBeLessThan(0.01);
+      // Na passada ela sobe
+      expect(bear3d.footAt(leg, 0.8).y).toBeGreaterThan(a.y + 5);
+    }
+  });
+
+  test('personagem: braços com cotovelo (dobram ao correr, no pulo, boiando e abraçados de frio)', () => {
+    const list = SUBJECTS.player.poses();
+    const get = (k) => list.find((p) => p.key === k);
+    expect(get('jumpR').elbows.length).toBe(2);
+    expect(get('swim0R').elbows.length).toBe(2);
+    expect(get('coldR').hug).toBe(true);
+  });
+
+  test('iglu: uma foto para cada quantidade de blocos e uma para cada bloco caindo', () => {
+    expect(IGLOO_BLOCKS).toBe(RULES.iglooPieces - 1);
+    const keys = new Set(SUBJECTS.igloo.poses().map((p) => p.key));
+    for (let n = 1; n <= IGLOO_BLOCKS; n++) expect(keys.has(`n${n}`)).toBe(true);
+    for (let i = 0; i < IGLOO_BLOCKS; i++) expect(keys.has(`b${i}`)).toBe(true);
+  });
+
+  test('iglu 3D: blocos assentados numa foto só e o que está caindo por cima, com o mesmo quique', () => {
+    withFake((f) => {
+      const g = makeGame({ level: 1 });
+      for (let i = 0; i < 6; i++) g.igloo.add();
+      g.igloo.update(5); // os 6 assentam
+      g.igloo.add(); // o 7º começa a cair
+      const { ctx, calls } = recordingCtx();
+      expect(drawIgloo3D(ctx, g.igloo, 0)).toBe(true);
+      expect(f.asked.includes('igloo:n6')).toBe(true);
+      expect(f.asked.includes('igloo:b6')).toBe(true);
+      expect(calls.filter((c) => c[0] === 'drawImage').length).toBe(2);
+    });
+  });
+
+  test('iglu 3D: a moldura da porta vira foto (também por cima de quem está entrando)', () => {
+    withFake((f) => {
+      const g = makeGame({ level: 1 });
+      for (let i = 0; i < 16; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.igloo.frameHook = drawIglooFrame3D;
+      const { ctx, calls } = recordingCtx();
+      g.igloo.drawDoorFront(ctx, 0);
+      expect(f.asked.includes('porch:frame')).toBe(true);
+      expect(calls.some((c) => c[0] === 'drawImage' && c[1] === f.img)).toBe(true);
+    });
+  });
+
+  test('boia e chuteira 3D: item na fileira e efeito no jogador usam as fotos; desligado, o 2D', () => {
+    const got = [];
+    const was = { ...powerArt };
+    try {
+      powerArt.on = true;
+      powerArt.draw = (ctx, name, part, dir, scale) => (got.push([name, part, dir, scale]), true);
+      const { ctx } = recordingCtx();
+      drawDuckFloat(ctx, { x: 100, dir: -1, ph: 0 }, 300, 0);
+      drawGoldenBoot(ctx, { x: 100, dir: 1, ph: 0 }, 300, 0);
+      const p = { x: 200, y: 300, facing: -1, state: 'stand', power: 'duck', powerEnding: false, kickT: 0 };
+      drawPowerBack(ctx, p, 0);
+      drawPowerFront(ctx, p, 0);
+      drawPowerFront(ctx, { ...p, power: 'boot', facing: 1 }, 0);
+      expect(got).toEqual([
+        ['duck', 'item', -1, 1], ['boot', '', 1, 1], ['duck', 'back', -1, 22 / 17], ['duck', 'front', -1, 22 / 17], ['boot', '', 1, 1],
+      ]);
+      got.length = 0;
+      powerArt.on = false;
+      drawDuckFloat(ctx, { x: 100, dir: 1, ph: 0 }, 300, 0);
+      expect(got.length).toBe(0);
+    } finally {
+      Object.assign(powerArt, was);
     }
   });
 });

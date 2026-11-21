@@ -98,6 +98,14 @@ function duckHead(ctx, x, y, s = 1) {
   ctx.restore();
 }
 
+// Gancho do visual 3D (src/model3d.js): com `on` ligado e a foto pronta, `draw` desenha
+// a boia/chuteira 3D no lugar do desenho 2D, no mesmo ponto de apoio
+export const powerArt = { on: false, draw: null };
+// dir: o lado para onde o desenho está virado (a foto já vem virada; desfaz o espelho)
+function art(ctx, name, part, dir, scale = 1) {
+  return !!(powerArt.on && powerArt.draw?.(ctx, name, part, dir, scale));
+}
+
 // Metade da boia (anel amarelo visto de cima, achatado). half: 'back' = a parte
 // de trás (desenhada antes do corpo), 'front' = a da frente, por cima do corpo.
 function ringHalf(ctx, rx, ry, thick, half) {
@@ -131,6 +139,11 @@ export function drawDuckFloat(ctx, c, y, t) {
   ctx.translate(c.x, by);
   ctx.rotate(Math.sin(t * 2 + c.ph) * 0.07);
   ctx.scale(c.dir < 0 ? -1 : 1, 1);
+  if (art(ctx, 'duck', 'item', c.dir)) {
+    ctx.restore();
+    duckRipples(ctx, c, y, by, t);
+    return;
+  }
   ringHalf(ctx, 17, 7, 9, 'back');
   // Furo do meio (água aparecendo)
   ctx.fillStyle = 'rgba(8, 60, 84, 0.55)';
@@ -148,6 +161,11 @@ export function drawDuckFloat(ctx, c, y, t) {
   ctx.fill();
   duckHead(ctx, 15, -2);
   ctx.restore();
+  duckRipples(ctx, c, y, by, t);
+}
+
+// Brilhos e anel d'água em volta da boia boiando
+function duckRipples(ctx, c, y, by, t) {
   twinkles(ctx, c.x, by - 8, t, '#FFF7C0', 28, 16);
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
   ctx.lineWidth = 1.4;
@@ -165,7 +183,7 @@ export function drawGoldenBoot(ctx, c, y, t) {
   ctx.translate(c.x, by);
   ctx.rotate(-0.18 + Math.sin(t * 2 + c.ph) * 0.1);
   ctx.scale(c.dir < 0 ? -1.25 : 1.25, 1.25);
-  bootShape(ctx);
+  if (!art(ctx, 'boot', '', c.dir)) bootShape(ctx);
   ctx.restore();
   twinkles(ctx, c.x, by - 8, t, '#FFF4C0', 28, 16);
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
@@ -243,7 +261,7 @@ export function drawPowerBack(ctx, p, t) {
   if (p.power === 'duck') {
     ctx.translate(p.x, floatY(p));
     ctx.scale(p.facing, 1);
-    ringHalf(ctx, 22, 7.5, 10, 'back');
+    if (!art(ctx, 'duck', 'back', p.facing, 22 / 17)) ringHalf(ctx, 22, 7.5, 10, 'back');
   } else {
     glow(ctx, p.x, p.y - 34, 62, '255, 205, 80', 0.5 + Math.sin(t * 9) * 0.12);
   }
@@ -259,8 +277,10 @@ export function drawPowerFront(ctx, p, t) {
   if (p.power === 'duck') {
     ctx.translate(p.x, floatY(p));
     ctx.scale(p.facing, 1);
-    ringHalf(ctx, 22, 7.5, 10, 'front');
-    duckHead(ctx, 23, -1, 0.85);
+    if (!art(ctx, 'duck', 'front', p.facing, 22 / 17)) {
+      ringHalf(ctx, 22, 7.5, 10, 'front');
+      duckHead(ctx, 23, -1, 0.85);
+    }
   } else {
     const a = ctx.globalAlpha;
     twinkles(ctx, p.x, p.y - 36, t * 1.6, '#FFE9A0', 30, 34, 5);
@@ -270,7 +290,7 @@ export function drawPowerFront(ctx, p, t) {
     ctx.translate(p.x + p.facing * (5 + k * 20), p.y - k * 16);
     ctx.scale(p.facing * 0.55, 0.55);
     ctx.rotate(-k * 0.9);
-    bootShape(ctx);
+    if (!art(ctx, 'boot', '', p.facing)) bootShape(ctx);
   }
   ctx.restore();
 }

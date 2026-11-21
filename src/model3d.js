@@ -4,19 +4,22 @@
 // Cada modelo é fotografado só quando aparece pela primeira vez, aos poucos (algumas
 // poses por quadro) para não travar o jogo. Enquanto a foto não fica pronta, ou sem
 // internet/WebGL, vale o desenho 2D de sempre.
-import { DEPTH, W } from './config.js';
+import { DEPTH, W, IGLOO } from './config.js';
 import { Studio } from './m3d/kit.js';
 import * as player from './m3d/player.js';
 import * as bear from './m3d/bear.js';
 import { goose, crab, clam, fish } from './m3d/critters.js';
 import { floeSubject, variantOf, PAD as FLOE_PAD, TOP as FLOE_TOP, H as FLOE_H } from './m3d/floes.js';
+import { dome as iglooDome, porch as iglooPorch, BLOCKS as IGLOO_BLOCKS } from './m3d/igloo.js';
+import { duck as duckItem, boot as bootItem } from './m3d/powers.js';
+import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
 
 const M = DEPTH.model3d;
 const TAU = Math.PI * 2;
 
-export const SUBJECTS = { player, bear, goose, crab, clam, fish };
+export const SUBJECTS = { player, bear, goose, crab, clam, fish, igloo: iglooDome, porch: iglooPorch, duck: duckItem, boot: bootItem };
 export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish']);
 export const BOX = player.box;
 export const playerPose = player.playerPose;
@@ -247,4 +250,83 @@ export function floeSprite3D(piece, active) {
   const s = { canvas: img, ox: FLOE_PAD, oy: FLOE_TOP, w: piece.w + FLOE_PAD * 2, h: FLOE_H };
   piece.sprites[cacheKey] = s;
   return s;
+}
+
+// ---------------------------------------------------------------- Iglu
+// Mesmo comportamento do Igloo.draw 2D: sombra, contornos-guia do que falta, blocos
+// caindo com o quique (easeOutBack) e o pórtico (o interior, a luz e a cortina vêm
+// do 2D; só a moldura é a foto 3D, via igloo.frameHook)
+export function drawIgloo3D(ctx, igloo, t) {
+  want('igloo');
+  want('porch');
+  const blocks = Math.min(igloo.count, IGLOO_BLOCKS);
+  // Blocos já assentados (os primeiros com a animação no fim)
+  let settled = 0;
+  while (settled < blocks && igloo.anim[settled] >= 1) settled++;
+  if (blocks > 0 && !sprite('igloo', `b${blocks - 1}`)) return false;
+  if (settled > 0 && !sprite('igloo', `n${settled}`)) return false;
+  const { rx } = IGLOO;
+  ctx.save();
+  ctx.translate(IGLOO.x, IGLOO.baseY);
+  ctx.fillStyle = 'rgba(70, 105, 125, 0.22)';
+  ctx.beginPath();
+  ctx.ellipse(6, 3, rx + 12, 9, 0, 0, TAU);
+  ctx.fill();
+  if (!igloo.complete) {
+    ctx.save();
+    ctx.setLineDash([5, 6]);
+    ctx.strokeStyle = 'rgba(120, 160, 180, 0.45)';
+    ctx.lineWidth = 1.5;
+    igloo.dome(ctx);
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (settled > 0) blit(ctx, sprite('igloo', `n${settled}`), iglooDome.box);
+  for (let i = settled; i < blocks; i++) {
+    const a = igloo.anim[i];
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 3);
+    ctx.translate(0, -(1 - easeOutBack(a)) * 46);
+    blit(ctx, sprite('igloo', `b${i}`), iglooDome.box);
+    ctx.restore();
+  }
+  ctx.restore();
+  if (!igloo.complete) {
+    ctx.save();
+    ctx.setLineDash([5, 6]);
+    ctx.strokeStyle = 'rgba(120, 160, 180, 0.45)';
+    ctx.lineWidth = 1.5;
+    igloo.archPath(ctx, DOOR.porchRx, DOOR.porchRy);
+    ctx.stroke();
+    ctx.restore();
+  }
+  igloo.drawPorch(ctx, t);
+  return true;
+}
+
+// Moldura do pórtico em 3D (chamada pelo Igloo.drawFrame); false = desenho 2D
+export function drawIglooFrame3D(ctx) {
+  want('porch');
+  const img = sprite('porch', 'frame');
+  if (!img) return false;
+  ctx.save();
+  ctx.translate(DOOR.x, DOOR.bottom);
+  blit(ctx, img, iglooPorch.box);
+  ctx.restore();
+  return true;
+}
+
+// ---------------------------------------------------------------- Itens de poder
+// Gancho de src/powers.js (powerArt.draw): desenha a boia ou a chuteira 3D no ponto de
+// apoio atual. dir < 0: o desenho 2D está espelhado; a foto já vem virada, então desfaz.
+export function drawPower3D(ctx, name, part, dir, scale = 1) {
+  want(name);
+  const img = sprite(name, `${part}${dir < 0 ? 'L' : 'R'}`);
+  if (!img) return false;
+  ctx.save();
+  if (dir < 0) ctx.scale(-1, 1);
+  ctx.scale(scale, scale);
+  blit(ctx, img, SUBJECTS[name].box);
+  ctx.restore();
+  return true;
 }

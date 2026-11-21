@@ -15,7 +15,10 @@ export const goose = {
   poses() {
     const out = [];
     for (const f of ['R', 'L']) {
-      for (let i = 0; i < GOOSE_FRAMES; i++) out.push({ key: `${i}${f}`, f, flap: Math.sin(((i + 0.5) / GOOSE_FRAMES) * TAU - Math.PI / 2) });
+      for (let i = 0; i < GOOSE_FRAMES; i++) {
+        const ph = ((i + 0.5) / GOOSE_FRAMES) * TAU - Math.PI / 2;
+        out.push({ key: `${i}${f}`, f, flap: Math.sin(ph), lag: Math.sin(ph - 0.9) });
+      }
     }
     return out;
   },
@@ -33,32 +36,49 @@ export const goose = {
     const tail = sphere(5, grey, 0, 2, -18, 12);
     tail.scale.set(1, 0.6, 1.4);
     root.add(tail);
-    root.add(bone(3.2, [0, 3, 13], [0, 10, 19], white));
-    root.add(bone(3, [0, 10, 19], [0, 14, 21], white));
-    const head = sphere(5, white, 0, 15, 22, 16);
-    root.add(head);
-    const beak = mesh(new THREE.ConeGeometry(2.2, 8, 10), orange, 0, 14, 29);
+    // Pescoço em duas partes (base e meio) e cabeça: balançam com o bater das asas
+    const neck = group(0, 3, 13);
+    root.add(neck);
+    neck.add(bone(3.2, [0, 0, 0], [0, 7, 6], white));
+    const neck2 = group(0, 7, 6);
+    neck.add(neck2);
+    neck2.add(bone(3, [0, 0, 0], [0, 4, 2], white));
+    neck2.add(sphere(5, white, 0, 5, 3, 16));
+    const beak = mesh(new THREE.ConeGeometry(2.2, 8, 10), orange, 0, 4, 10);
     beak.rotation.x = Math.PI / 2;
-    root.add(beak);
-    for (const s of [-1, 1]) root.add(sphere(1, ink, s * 3.6, 16.5, 24.5, 8));
+    neck2.add(beak);
+    for (const s of [-1, 1]) neck2.add(sphere(1, ink, s * 3.6, 6.5, 5.5, 8));
+    // Asa em duas partes: braço (do ombro ao cotovelo) e mão com as penas pretas da ponta
     const wings = [];
     for (const s of [-1, 1]) {
       const hinge = group(s * 5, 7, 2);
-      const w = sphere(9, s < 0 ? white : grey, s * 11, 0, -2, 18);
-      w.scale.set(1.3, 0.22, 0.75);
+      const w = sphere(6, s < 0 ? white : grey, s * 6.5, 0, -1, 16);
+      w.scale.set(1.25, 0.24, 1.05);
       hinge.add(w);
-      const tip = sphere(4.2, black, s * 22, 0, -6, 10);
+      const elbow = group(s * 13, 0, -1);
+      hinge.add(elbow);
+      const hand = sphere(6.5, s < 0 ? white : grey, s * 6.5, 0, -2, 16);
+      hand.scale.set(1.3, 0.2, 0.85);
+      elbow.add(hand);
+      const tip = sphere(4.2, black, s * 13, 0, -4, 10);
       tip.scale.set(1.2, 0.25, 0.6);
-      hinge.add(tip);
+      elbow.add(tip);
       root.add(hinge);
-      wings.push({ hinge, s });
+      wings.push({ hinge, elbow, s });
     }
-    return { root, wings };
+    return { root, wings, neck, neck2 };
   },
   apply(rig, p) {
     rig.root.rotation.y = side(p.f) * (Math.PI / 2 - 0.4);
-    // Asas batendo mais para cima que para baixo (não atravessam o corpo)
-    for (const w of rig.wings) w.hinge.rotation.z = w.s * (0.2 + p.flap * 0.75);
+    // Asas batendo mais para cima que para baixo (não atravessam o corpo); a ponta
+    // vem atrasada: dobra para baixo na subida e se estica na descida
+    for (const w of rig.wings) {
+      w.hinge.rotation.z = w.s * (0.2 + p.flap * 0.75);
+      w.elbow.rotation.z = w.s * (0.15 - p.lag * 0.45);
+    }
+    // O pescoço compensa o sobe e desce do corpo (cabeça mais estável)
+    rig.neck.rotation.x = p.flap * 0.12;
+    rig.neck2.rotation.x = -p.flap * 0.18;
   },
 };
 
@@ -89,11 +109,15 @@ export const crab = {
     const legs = [];
     for (const s of [-1, 1]) {
       for (let i = 0; i < 3; i++) {
+        // Pata: coxa, joelho e canela apontando para o chão
         const g = group(s * (9 + i * 3), -1, -4 + i * 3);
         g.add(bone(1.6, [0, 0, 0], [s * 8, 4, 0], dark));
-        g.add(bone(1.4, [s * 8, 4, 0], [s * 12, -7, 1], dark));
+        const knee = group(s * 8, 4, 0);
+        knee.add(sphere(1.7, dark, 0, 0, 0, 8));
+        knee.add(bone(1.4, [0, 0, 0], [s * 4, -11, 1], dark));
+        g.add(knee);
         root.add(g);
-        legs.push({ g, s, i });
+        legs.push({ g, knee, s, i });
       }
       // Braço e garra (duas pinças)
       root.add(bone(2.2, [s * 10, -2, 6], [s * 16, 9, 8], dark));
@@ -119,7 +143,13 @@ export const crab = {
     rig.root.rotation.y = 0;
     for (const l of rig.legs) {
       if (l.pinch) l.pinch.rotation.z = -l.s * p.open * 1.4;
-      else l.g.rotation.x = (l.i % 2 ? p.sc : -p.sc) * 0.35;
+      else {
+        // Patas alternadas: a que vai para a frente sobe dobrando o joelho
+        const k = l.i % 2 ? p.sc : -p.sc;
+        l.g.rotation.x = k * 0.35;
+        l.g.rotation.z = l.s * Math.max(0, k) * 0.25;
+        l.knee.rotation.z = -l.s * Math.max(0, k) * 0.45;
+      }
     }
   },
 };
@@ -198,10 +228,16 @@ export const fish = {
       for (const [x, y] of pts.slice(1)) s.lineTo(x, y);
       return new THREE.ShapeGeometry(s);
     };
-    const tail = group(0, 0, -13);
+    // Cauda em duas partes: o pedúnculo (fim do corpo) e a nadadeira, que balança mais
+    const tail = group(0, 0, -8);
+    const ped = sphere(4.2, orange, 0, 0, -3, 14);
+    ped.scale.set(0.6, 0.9, 1.3);
+    tail.add(ped);
+    const finJoint = group(0, 0, -7);
     const tf = mesh(finShape([[0, 0], [-9, 8], [-6, 0], [-9, -8]]), fin);
     tf.rotation.y = -Math.PI / 2;
-    tail.add(tf);
+    finJoint.add(tf);
+    tail.add(finJoint);
     root.add(tail);
     const dorsal = mesh(finShape([[-6, 0], [4, 0], [-3, 6]]), fin, 0, 7, 0);
     dorsal.rotation.y = -Math.PI / 2;
@@ -210,10 +246,11 @@ export const fish = {
       root.add(sphere(2.4, white, s * 4.4, 2, 9, 12));
       root.add(sphere(1.2, ink, s * 5.4, 2, 10, 8));
     }
-    return { root, tail };
+    return { root, tail, finJoint };
   },
   apply(rig, p) {
     rig.root.rotation.y = side(p.f) * (Math.PI / 2 - 0.35);
-    rig.tail.rotation.y = p.wig;
+    rig.tail.rotation.y = p.wig * 0.6;
+    rig.finJoint.rotation.y = p.wig * 0.9;
   },
 };

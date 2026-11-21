@@ -46,7 +46,7 @@ function buildLayout() {
   return blocks;
 }
 
-const easeOutBack = (k) => {
+export const easeOutBack = (k) => {
   const c1 = 1.9;
   const c3 = c1 + 1;
   return 1 + c3 * (k - 1) ** 3 + c1 * (k - 1) ** 2;
@@ -286,6 +286,8 @@ export class Igloo {
   // Moldura do pórtico (arco externo menos a abertura), em blocos de neve.
   // Também é desenhada por cima do personagem enquanto ele entra.
   drawFrame(ctx, top = DOOR.bottom - DOOR.porchRy) {
+    // Moldura 3D (src/model3d.js), quando ligada e com a foto pronta
+    if (this.frameHook?.(ctx)) return;
     const ring = () => {
       ctx.beginPath();
       ctx.ellipse(DOOR.x, DOOR.bottom, DOOR.porchRx, DOOR.porchRy, 0, Math.PI, 0);

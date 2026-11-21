@@ -16,6 +16,7 @@
        ?urso=X   urso/lobisomem/T-rex parado na costa em X (?correr=1 perseguindo)
        ?parado=1 congela a simulação (só o desenho continua)
  ?modelo=0 / ?relevo=0 / ?frente=0 desligam o personagem 3D / o relevo / o primeiro plano (comparar e medir)
+       ?poder=duck|boot  jogador com o poder (e o item na fileira)
        ?x=N      põe o jogador em X na costa (a câmera já chega lá: parallax) -->
   <canvas id="game"></canvas>
   <script type="module">
@@ -54,6 +55,12 @@
     game.renderer.use3d = q.get('modelo') !== '0';
     if (q.get('relevo') === '0') DEPTH.relief = null;
     if (q.get('frente') === '0') DEPTH.foreground = false;
+    // ?poder=duck|boot: o jogador já com o poder (e o item boiando na primeira fileira)
+    if (q.get('poder')) {
+      game.player.givePower(q.get('poder'));
+      game.player.powerT = 999;
+      game.critters.list.push({ kind: q.get('poder'), row: 1, dir: 1, vx: 0, x: 520, w: 40, ph: 0, power: true });
+    }
     if (q.get('parado')) game.update = () => {};
     game.start();
     window.__game = game;

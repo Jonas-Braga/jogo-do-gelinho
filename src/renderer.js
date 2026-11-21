@@ -1,4 +1,4 @@
-import { drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, CRITTERS_3D } from './model3d.js';
+import { drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, CRITTERS_3D } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
 import {
   atDepth, floeTilt, visibleRange, withVolume, volume, sceneLight, camera, followCamera, swayLayer, Foreground, foregroundKind, contactShadow, drawHaze, drawWaterDepth, drawSunPath,
@@ -31,7 +31,7 @@ import {
 } from './dino.js';
 import { drawHud } from './hud.js';
 import { drawMoneyBag, drawHeart } from './bonus.js';
-import { drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront, drawDizzy } from './powers.js';
+import { drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront, drawDizzy, powerArt } from './powers.js';
 
 const CRITTER_DRAW = {
   goose: drawGoose, crab: drawCrab, clam: drawClam, fish: drawFish,
@@ -170,6 +170,8 @@ export class Renderer {
     camera.x = this.camX || 0;
     // Modelos 3D só nas fases normais (as especiais seguem em 2D até ganharem os seus)
     this.normal3d = !!(this.use3d && !game.special && DEPTH.model3d?.enabled);
+    powerArt.on = this.normal3d;
+    powerArt.draw = drawPower3D;
     if (DEPTH.sway && tr && typeof tr.a === 'number') followCamera(game.player.x, dt);
 
     ctx.save();
@@ -423,7 +425,9 @@ export class Renderer {
     const house = HOUSE_DRAW[game.igloo.style];
     // Costa: a casa, o urso e o jogador na costa ficam na escala do fundo
     atDepth(ctx, SHORE_Y, () => {
-      withVolume(ctx, [IGLOO.x - 200, IGLOO.baseY - 300, IGLOO.x + 200, IGLOO.baseY + 30], (g) => {
+      // Fase normal: iglu 3D (a moldura da porta também, inclusive por cima de quem entra)
+      game.igloo.frameHook = this.normal3d && !house ? drawIglooFrame3D : null;
+      if (!(this.normal3d && !house && drawIgloo3D(ctx, game.igloo, t))) withVolume(ctx, [IGLOO.x - 200, IGLOO.baseY - 300, IGLOO.x + 200, IGLOO.baseY + 30], (g) => {
         if (house) house.body(g, game.igloo, t);
         else game.igloo.draw(g, t);
       }, undefined, { key: game.igloo });

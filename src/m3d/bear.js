@@ -70,7 +70,7 @@ export function build(kit) {
   // Fase de cada pata no ciclo: traseira de perto, dianteira de perto, traseira de longe,
   // dianteira de longe (de perto da câmera = lado −x)
   const legs = [];
-  for (const [x, front, phase] of [[-11, false, 0], [-11, true, 0.25], [11, false, 0.5], [11, true, 0.75]]) {
+  for (const [x, front, phase] of LEGS) {
     const m = x < 0 ? fur : furShade;
     const L1 = front ? 17 : 18;
     const L2 = front ? 15 : 14;
@@ -133,8 +133,11 @@ function place(THREE, o, a, b) {
 
 // Onde fica a pata no momento u (0 a 1) do ciclo dela: apoio no chão deslizando
 // para trás, depois sobe em arco e avança
-const STANCE = 0.6;
-function footAt(leg, u) {
+export const STANCE = 0.6;
+// [x, dianteira?, fase no ciclo]: traseira de perto, dianteira de perto, traseira de
+// longe, dianteira de longe (de perto da câmera = lado −x)
+export const LEGS = [[-11, false, 0], [-11, true, 0.25], [11, false, 0.5], [11, true, 0.75]];
+export function footAt(leg, u) {
   // Passada casada com a velocidade: o urso anda ~35 px por ciclo (walk += v·dt·0,06 e o
   // ciclo é walk·3), a pata de apoio desliza para trás na mesma velocidade (sem patinar);
   // 0,91 é o quanto o perfil aparece na tela, virado 24° para a câmera

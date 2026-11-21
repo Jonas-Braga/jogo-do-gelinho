@@ -56,7 +56,7 @@ export function poses() {
   for (const f of ['R', 'L']) {
     out.push({ key: `idle${f}`, facing: f, arms: [0.2, 0.15], face: 'calm' });
     out.push({ key: `cold${f}`, facing: f, arms: [-0.45, -0.3], hug: true, face: 'cold' });
-    out.push({ key: `jump${f}`, facing: f, legs: [0.5, 0.9], knees: [0.8, 1.3], arms: [-2.0, -2.3], face: 'calm' });
+    out.push({ key: `jump${f}`, facing: f, legs: [0.5, 0.9], knees: [0.8, 1.3], arms: [-2.0, -2.3], elbows: [0.45, 0.35], face: 'calm' });
     for (let i = 0; i < n; i++) {
       out.push({ key: `run${i}${f}`, ...walk(i, f) });
       const w = walk(i, f);
@@ -75,7 +75,7 @@ export function poses() {
     // Boiando: braços remando à frente (4 quadros)
     for (let i = 0; i < 4; i++) {
       const s = Math.sin(((i + 0.5) / 4) * TAU);
-      out.push({ key: `swim${i}${f}`, facing: f, legs: [0.4, -0.2], arms: [-1.4 - s * 0.5, -1.4 + s * 0.5], face: 'calm' });
+      out.push({ key: `swim${i}${f}`, facing: f, legs: [0.4, -0.2], arms: [-1.4 - s * 0.5, -1.4 + s * 0.5], elbows: [0.5 + s * 0.4, 0.5 - s * 0.4], face: 'calm' });
     }
   }
   // De costas (entrando no iglu)
@@ -139,17 +139,25 @@ export function build(kit) {
   hem.position.y = 13.5;
   body.add(hem);
 
-  // Braços (ombro em y = 42): manga, punho de pelo e luva
+  // Braços (ombro em y = 42): manga do braço, cotovelo, antebraço, punho de pelo e luva
   const arm = (side) => {
+    const m = side < 0 ? parka : parkaDark;
     const sh = group(side * 11, 42, 0);
-    const sleeve = capsule(4.4, 11, side < 0 ? parka : parkaDark);
-    sleeve.position.y = -8;
-    sh.add(sleeve);
+    const upper = capsule(4.5, 4.5, m);
+    upper.position.y = -4.6;
+    sh.add(upper);
+    const elbow = group(0, -9.2, 0);
+    sh.add(elbow);
+    elbow.add(sphere(4.3, m, 0, 0, 0, 12));
+    const fore = capsule(4.2, 4, m);
+    fore.position.y = -4.4;
+    elbow.add(fore);
     const cuff = furRing(4.6, 1.8, 9, fur, furShade);
-    cuff.position.y = -15.5;
-    sh.add(cuff);
-    sh.add(sphere(4.8, mitten, 0, -19.5, 0, 16));
+    cuff.position.y = -7;
+    elbow.add(cuff);
+    elbow.add(sphere(4.8, mitten, 0, -10.8, 0, 16));
     body.add(sh);
+    sh.userData.elbow = elbow;
     return sh;
   };
   const arms = [arm(-1), arm(1)];
@@ -222,14 +230,20 @@ export function apply(rig, p) {
   });
   rig.arms.forEach((a, i) => {
     const side = i ? 1 : -1;
+    const elbow = a.userData.elbow;
     if (p.up) {
       // Erguidos em "V" acima da cabeça, sacudindo (esticados, como no desenho 2D)
       a.rotation.set(-0.35, 0, side * (Math.PI - 0.32 + val(p.up, i) * 0.6));
       a.scale.set(1, 1.4, 1);
+      elbow.rotation.set(-0.25 - Math.abs(val(p.up, i)) * 0.4, 0, 0);
     } else {
-      // Com frio, os braços se fecham na frente do corpo
-      a.rotation.set(val(p.arms, i), p.hug ? -side * 0.5 : 0, side * (p.hug ? -0.25 : 0.12));
+      // Com frio, os braços se fecham na frente do corpo (cotovelos bem dobrados)
+      const ang = val(p.arms, i);
+      a.rotation.set(ang, p.hug ? -side * 0.5 : 0, side * (p.hug ? -0.25 : 0.12));
       a.scale.set(1, 1, 1);
+      // O antebraço dobra mais quando o braço vai para a frente (como ao correr)
+      const bend = p.hug ? 1.7 : p.elbows ? val(p.elbows, i) : 0.3 + Math.max(0, -ang) * 0.75;
+      elbow.rotation.set(-Math.min(2.2, bend), 0, 0);
     }
   });
   for (const [k, g] of Object.entries(rig.faces)) g.visible = p.face === k;

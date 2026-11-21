@@ -497,5 +497,11 @@
   "Modelos 3D da fase normal (etapa 1 do 3D) › urso: toda foto pedida (andando, perseguindo de boca aberta, para os dois lados) existe",
   "Modelos 3D da fase normal (etapa 1 do 3D) › ganso, caranguejo, molusco e peixe: toda foto pedida existe",
   "Modelos 3D da fase normal (etapa 1 do 3D) › a foto da placa de gelo tem as mesmas medidas do sprite 2D",
-  "Modelos 3D da fase normal (etapa 1 do 3D) › com as fotos prontas, urso, bichos e placas da fase normal também viram 3D"
+  "Modelos 3D da fase normal (etapa 1 do 3D) › com as fotos prontas, urso, bichos e placas da fase normal também viram 3D",
+  "Modelos 3D da fase normal: articulações, iglu e poderes › urso: as quatro patas se alternam e a pata de apoio não patina",
+  "Modelos 3D da fase normal: articulações, iglu e poderes › personagem: braços com cotovelo (dobram ao correr, no pulo, boiando e abraçados de frio)",
+  "Modelos 3D da fase normal: articulações, iglu e poderes › iglu: uma foto para cada quantidade de blocos e uma para cada bloco caindo",
+  "Modelos 3D da fase normal: articulações, iglu e poderes › iglu 3D: blocos assentados numa foto só e o que está caindo por cima, com o mesmo quique",
+  "Modelos 3D da fase normal: articulações, iglu e poderes › iglu 3D: a moldura da porta vira foto (também por cima de quem está entrando)",
+  "Modelos 3D da fase normal: articulações, iglu e poderes › boia e chuteira 3D: item na fileira e efeito no jogador usam as fotos; desligado, o 2D"
 ]
