@@ -81,6 +81,16 @@ export const DEPTH = {
   // Câmera que acompanha o jogador de leve: o fundo anda menos que a frente (parallax)
   sway: { amount: 0.03, far: 0.25, shore: 0.45, fore: 1.6, ease: 3 },
   foreground: true,    // faixa desfocada de primeiro plano na beira de baixo
+  // Piloto da etapa 2: personagem da fase normal em 3D (Three.js), fotografado em
+  // sprites quando o jogo abre (src/model3d.js). Sem internet/WebGL fica o 2D.
+  model3d: {
+    enabled: true,
+    url: 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
+    resolution: 2,     // pixels da foto por unidade do mundo
+    runFrames: 8,      // quadros do ciclo de corrida
+    yaw: 0.95,         // quanto o personagem vira para o lado em que anda (rad)
+    elevation: 0.2,    // câmera um pouco acima (rad)
+  },
   minFps: 40,          // abaixo disso (por alguns segundos) o volume é desligado sozinho
 };
 

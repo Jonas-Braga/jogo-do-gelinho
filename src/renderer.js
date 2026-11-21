@@ -1,3 +1,4 @@
+import { drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, CRITTERS_3D } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
 import {
   atDepth, floeTilt, visibleRange, withVolume, volume, sceneLight, camera, followCamera, swayLayer, Foreground, foregroundKind, contactShadow, drawHaze, drawWaterDepth, drawSunPath,
@@ -167,6 +168,8 @@ export class Renderer {
     const tr = ctx.getTransform ? ctx.getTransform() : null;
     // A câmera só vale durante este desenho (fora dele camera.x = 0: projeções puras)
     camera.x = this.camX || 0;
+    // Modelos 3D só nas fases normais (as especiais seguem em 2D até ganharem os seus)
+    this.normal3d = !!(this.use3d && !game.special && DEPTH.model3d?.enabled);
     if (DEPTH.sway && tr && typeof tr.a === 'number') followCamera(game.player.x, dt);
 
     ctx.save();
@@ -405,7 +408,11 @@ export class Renderer {
     const drawP = () => atDepth(ctx, pGround, () => {
       if (p.state === 'jump') contactShadow(ctx, p.x, pGround + 3, 22, pGround - p.y);
       drawPowerBack(ctx, p, t);
-      withVolume(ctx, [p.x - 64, p.y - 150, p.x + 64, p.y + 26], (g) => drawPlayer(g, p, t, cold, ride, outfits.player), undefined, { key: p });
+      // Piloto 3D: na fase normal (parka) usa as fotos do modelo 3D quando prontas
+      const use3d = this.normal3d && !outfits.player;
+      if (!(use3d && drawPlayer3D(ctx, p, t, cold, ride))) {
+        withVolume(ctx, [p.x - 64, p.y - 150, p.x + 64, p.y + 26], (g) => drawPlayer(g, p, t, cold, ride, outfits.player), undefined, { key: p });
+      }
       drawPowerFront(ctx, p, t);
     });
     // O jogador é desenhado depois da última fileira que está "atrás" dele.
@@ -425,7 +432,9 @@ export class Renderer {
     if (game.bear.active) {
       const b = game.bear;
       atDepth(ctx, b.y, () => {
-        withVolume(ctx, [b.x - 150, b.y - 190, b.x + 150, b.y + 24], (g) => drawBear(g, b, t, outfits.bear), undefined, { key: b });
+        // Fase normal: urso 3D quando a foto estiver pronta
+        const bear3d = this.normal3d && !outfits.bear && drawBear3D(ctx, b, t);
+        if (!bear3d) withVolume(ctx, [b.x - 150, b.y - 190, b.x + 150, b.y + 24], (g) => drawBear(g, b, t, outfits.bear), undefined, { key: b });
         if (b.stun > 0) drawDizzy(ctx, b.x, b.y - 92, t);
       });
     }
@@ -454,7 +463,10 @@ export class Renderer {
         ctx.restore();
         for (const c of game.critters.inRow(i)) {
           if (c.x <= minX || c.x >= maxX) continue;
-          const draw = c.kind === 'fish' ? fishDraw : CRITTER_DRAW[c.kind];
+          const draw2d = c.kind === 'fish' ? fishDraw : CRITTER_DRAW[c.kind];
+          // Fase normal: bichos 3D (o desenho 2D vale até a foto ficar pronta)
+          const try3d = this.normal3d && CRITTERS_3D.has(c.kind);
+          const draw = try3d ? (g, cc, y, tt) => drawCritter3D(g, cc, y, tt) || draw2d(g, cc, y, tt) : draw2d;
           if (c.kicked) {
             // Chutado: voa girando por cima da fileira
             ctx.save();
@@ -466,7 +478,9 @@ export class Renderer {
           } else {
             const fly = FLYING.has(c.kind);
             contactShadow(ctx, c.x, row.y + 4, fly ? 18 : 24, fly ? 40 : 0, fly ? 0.18 : 0.26);
-            withVolume(ctx, [c.x - 80, row.y - 120, c.x + 80, row.y + 50], (g) => draw(g, c, row.y, t), undefined, { key: c });
+            if (!(try3d && drawCritter3D(ctx, c, row.y, t))) {
+              withVolume(ctx, [c.x - 80, row.y - 120, c.x + 80, row.y + 50], (g) => draw2d(g, c, row.y, t), undefined, { key: c });
+            }
           }
         }
       });
@@ -476,7 +490,9 @@ export class Renderer {
 
   // Placas de gelo, troncos (floresta) ou asteroides (espaço), conforme o cenário
   drawRow(ctx, row, t, scenery = null) {
-    const sprite = FLOE_SPRITE[scenery] || floeSprite;
+    // Fase normal: blocos de gelo 3D quando as fotos estiverem prontas
+    const sprite = FLOE_SPRITE[scenery]
+      || (this.normal3d ? (pc, on) => floeSprite3D(pc, on) || floeSprite(pc, on) : floeSprite);
     const items = [];
     const [minX, maxX] = visibleRange(row.y);
     for (const r of row.rects()) {

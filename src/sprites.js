@@ -1261,6 +1261,13 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   ctx.restore();
   }
 
+  drawPlayerMarks(ctx, p, t, fleeing, freezing);
+  ctx.restore();
+}
+
+// "!" de susto com gotas de suor (fugindo) e a camada de gelo (congelando), por cima
+// do personagem; usada também pelo personagem 3D (src/model3d.js)
+export function drawPlayerMarks(ctx, p, t, fleeing, freezing) {
   // "!" de susto e gotas de suor voando
   if (fleeing) {
     const bounce = Math.abs(Math.sin(t * 9)) * 4;
@@ -1286,7 +1293,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   // Camada de gelo ao congelar
   if (freezing > 0) {
     ctx.globalAlpha = p.alpha * freezing * 0.75;
-    grd = ctx.createLinearGradient(-18, -74, 18, 0);
+    const grd = ctx.createLinearGradient(-18, -74, 18, 0);
     grd.addColorStop(0, 'rgba(230, 248, 255, 0.95)');
     grd.addColorStop(0.5, 'rgba(150, 215, 240, 0.8)');
     grd.addColorStop(1, 'rgba(90, 170, 210, 0.85)');
@@ -1310,7 +1317,6 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     ctx.lineTo(14, -50);
     ctx.stroke();
   }
-  ctx.restore();
 }
 
 // Personagem visto de costas (pés em 0,0). Simétrico: costas da parka com

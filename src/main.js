@@ -20,6 +20,8 @@ try {
   };
 }
 const game = new Game(canvas, { title: true, backend });
+// Piloto da etapa 2: personagem da fase normal em 3D (fotografado ao abrir o jogo)
+game.renderer.use3d = true;
 new AuthUI(game, backend);
 new InstallButton(game);
 

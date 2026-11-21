@@ -10,6 +10,8 @@ import {
   camera, followCamera, swayAt, maxSway, sceneLight, foregroundKind,
 } from '../../src/depth.js';
 import { SPECIALS } from '../../src/specials.js';
+import { playerPose, poseList, loadModel, model, SUBJECTS, CRITTERS_3D, floeSprite3D } from '../../src/model3d.js';
+import { floeSubject } from '../../src/m3d/floes.js';
 
 // Contexto 2D falso que registra as chamadas
 function recordingCtx() {
@@ -338,4 +340,178 @@ suite('Profundidade: relevo, parallax e primeiro plano', () => {
       expect(on.dark).toBeLessThan(off.dark);
     });
   }
+});
+
+suite('Personagem 3D (piloto da etapa 2)', () => {
+  const player = (o) => ({ state: 'stand', moving: false, facing: 1, kickT: 0, crouch: 0, back: false, ...o });
+
+  test('cada estado do jogador escolhe a foto certa (ou o desenho 2D quando não há foto)', () => {
+    expect(playerPose(player(), 0).key).toBe('idleR');
+    expect(playerPose(player({ facing: -1 }), 0).key).toBe('idleL');
+    expect(playerPose(player({ moving: true }), 0.1).anim).toBe('run');
+    expect(playerPose(player({ state: 'jump' }), 0).key).toBe('jumpR');
+    expect(playerPose(player({ state: 'flee', moving: true }), 0).anim).toBe('flee');
+    expect(playerPose(player({ state: 'flee' }), 0).anim).toBe('scared');
+    // Etapa 1 do 3D (aprovado pelo usuário): todas as poses do jogo têm foto
+    expect(playerPose(player({ state: 'swim' }), 0).anim).toBe('swim');
+    expect(playerPose(player({ state: 'drown' }), 0).anim).toBe('drown');
+    expect(playerPose(player({ state: 'freeze' }), 0).key).toBe('coldR');
+    expect(playerPose(player({ state: 'enter' }), 0).key).toBe('idleR');
+    expect(playerPose(player({ kickT: 0.2 }), 0).anim).toBe('kick');
+    expect(playerPose(player({ back: true }), 0).key).toBe('backIdle');
+    expect(playerPose(player({ back: true, moving: true }), 0.1).key.startsWith('back')).toBe(true);
+    // Agachado usa a mesma foto (a inclinação é feita na hora)
+    expect(playerPose(player({ crouch: 0.5 }), 0).key).toBe('idleR');
+    // Estado sem foto: desenho 2D
+    expect(playerPose(player({ state: 'gone' }), 0)).toBe(null);
+  });
+
+  test('toda foto pedida durante a animação existe na lista de fotos', () => {
+    const keys = new Set(poseList().map((p) => p.key));
+    const states = [{}, { moving: true }, { state: 'jump' }, { state: 'flee', moving: true }, { state: 'flee' }];
+    for (const facing of [1, -1]) {
+      for (const st of states) {
+        for (let t = 0; t < 3; t += 0.013) {
+          const ps = playerPose(player({ facing, ...st }), t);
+          expect(keys.has(ps.key)).toBe(true);
+        }
+      }
+    }
+    // A corrida passa por todos os quadros do ciclo
+    const seen = new Set();
+    for (let t = 0; t < 2; t += 0.005) seen.add(playerPose(player({ moving: true }), t).key);
+    expect(seen.size).toBe(DEPTH.model3d.runFrames);
+  });
+
+  test('o Three.js vem de uma versão fixa', () => {
+    expect(/three@\d+\.\d+\.\d+\//.test(DEPTH.model3d.url)).toBe(true);
+  });
+
+  test('sem as fotos prontas (Node, sem internet ou sem WebGL) o jogador continua com o desenho 2D', () => {
+    if (isNode) {
+      loadModel();
+      expect(model.state).toBe('idle'); // no Node (sem WebGL) nada é carregado
+    }
+    const was = { ...model };
+    try {
+      model.state = 'failed'; // como sem internet
+      model.sprites = null;
+      const g = makeGame({ level: 1 });
+      g.renderer.use3d = true;
+      const { ctx, calls } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      // O jogador é desenhado (em 2D), sem nenhuma foto 3D
+      expect(calls.length > 0).toBe(true);
+      expect(calls.some((c) => c[0] === 'drawImage' && c[1]?.fake3d)).toBe(false);
+    } finally {
+      Object.assign(model, was);
+    }
+  });
+
+  test('com as fotos prontas, só a fase normal usa o personagem 3D (roupas das fases especiais seguem em 2D)', () => {
+    const was = { ...model };
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      const uses3d = (level) => {
+        const g = makeGame({ level });
+        g.renderer.use3d = true;
+        const { ctx, calls } = recordingCtx();
+        g.renderer.ctx = ctx;
+        g.renderer.draw(g);
+        return calls.some((c) => c[0] === 'drawImage' && c[1] === img);
+      };
+      expect(uses3d(1)).toBe(true);
+      expect(uses3d(4)).toBe(true);
+      for (const lv of Object.keys(SPECIALS).map(Number)) expect(uses3d(lv)).toBe(false);
+      // Desligado no renderizador (testes, ?modelo=0): 2D
+      const g = makeGame({ level: 1 });
+      const { ctx, calls } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      expect(calls.some((c) => c[0] === 'drawImage' && c[1] === img)).toBe(false);
+    } finally {
+      Object.assign(model, was);
+    }
+  });
+});
+
+suite('Modelos 3D da fase normal (etapa 1 do 3D)', () => {
+  const keysOf = (S) => new Set(S.poses().map((p) => p.key));
+
+  test('toda pose do jogador (boiando, afundando, congelando, chute, de costas) tem foto', () => {
+    const keys = keysOf(SUBJECTS.player);
+    const base = { state: 'stand', moving: false, facing: 1, kickT: 0, crouch: 0, back: false };
+    const states = [
+      { state: 'swim' }, { state: 'drown' }, { state: 'freeze' }, { state: 'enter' }, { state: 'enter', moving: true },
+      { back: true }, { back: true, moving: true }, { kickT: 0.05 }, { kickT: 0.2 }, { kickT: 0.39 },
+    ];
+    for (const facing of [1, -1]) {
+      for (const st of states) {
+        for (let t = 0; t < 2; t += 0.017) expect(keys.has(playerPose({ ...base, facing, ...st }, t).key)).toBe(true);
+      }
+    }
+  });
+
+  test('urso: toda foto pedida (andando, perseguindo de boca aberta, para os dois lados) existe', () => {
+    const keys = keysOf(SUBJECTS.bear);
+    for (const dir of [1, -1]) {
+      for (const chasing of [false, true]) {
+        for (let w = 0; w < 5; w += 0.031) expect(keys.has(SUBJECTS.bear.bearPose({ walk: w, dir, chasing }, w * 1.7))).toBe(true);
+      }
+    }
+  });
+
+  test('ganso, caranguejo, molusco e peixe: toda foto pedida existe', () => {
+    for (const kind of CRITTERS_3D) {
+      const S = SUBJECTS[kind];
+      const keys = keysOf(S);
+      for (const dir of [1, -1]) {
+        for (let t = 0; t < 3; t += 0.019) expect(keys.has(S.pose({ dir, ph: 1.3, x: 0 }, t))).toBe(true);
+      }
+    }
+  });
+
+  test('a foto da placa de gelo tem as mesmas medidas do sprite 2D', () => {
+    const was = { ...model };
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      for (const w of [36, 82]) {
+        const piece = { w, seed: 7, sprites: {} };
+        const s = floeSprite3D(piece, true);
+        expect(s.canvas).toBe(img);
+        expect([s.ox, s.oy, s.w, s.h]).toEqual([10, 22, w + 20, 70]);
+        const b = floeSubject(w).box;
+        expect(b.right - b.left).toBe(w + 20);
+        expect(b.top - b.bottom).toBe(70);
+      }
+    } finally {
+      Object.assign(model, was);
+    }
+  });
+
+  test('com as fotos prontas, urso, bichos e placas da fase normal também viram 3D', () => {
+    const was = { ...model };
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      const g = makeGame({ level: 4, quiet: false });
+      step(g, 8);
+      Object.assign(g.bear, { active: true, x: 400, dir: 1 });
+      g.renderer.use3d = true;
+      const { ctx, calls } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      const n = calls.filter((c) => c[0] === 'drawImage' && c[1] === img).length;
+      // jogador + urso + pelo menos uma placa e um bicho
+      expect(n).toBeGreaterThan(5);
+    } finally {
+      Object.assign(model, was);
+    }
+  });
 });

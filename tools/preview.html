@@ -15,7 +15,7 @@
        ?medir=1  mede o tempo de desenho (ms por quadro) e põe no título
        ?urso=X   urso/lobisomem/T-rex parado na costa em X (?correr=1 perseguindo)
        ?parado=1 congela a simulação (só o desenho continua)
- ?relevo=0 / ?frente=0 desligam o relevo / o primeiro plano (comparar e medir)
+ ?modelo=0 / ?relevo=0 / ?frente=0 desligam o personagem 3D / o relevo / o primeiro plano (comparar e medir)
        ?x=N      põe o jogador em X na costa (a câmera já chega lá: parallax) -->
   <canvas id="game"></canvas>
   <script type="module">
@@ -51,6 +51,7 @@
       game.player.x = Number(q.get('x'));
       game.renderer.camX = (game.player.x - W / 2) * DEPTH.sway.amount;
     }
+    game.renderer.use3d = q.get('modelo') !== '0';
     if (q.get('relevo') === '0') DEPTH.relief = null;
     if (q.get('frente') === '0') DEPTH.foreground = false;
     if (q.get('parado')) game.update = () => {};

@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Fotos dos modelos 3D</title></head><body style="margin:0;background:#cfe0ea;font:12px sans-serif">
+<!-- Ferramenta de desenvolvimento: mostra as fotos de um modelo 3D (src/m3d/).
+     ?m=player|bear|goose|crab|clam|fish|floe70|floe36  modelo
+     ?k=idleR,run0R,...                   só estas fotos (senão, todas)
+     ?z=1.5                               zoom -->
+<canvas id=c width=1600 height=900></canvas>
+<script type="module">
+import { model, want, SUBJECTS } from '../src/model3d.js';
+import { floeSubject } from '../src/m3d/floes.js';
+const q = new URLSearchParams(location.search);
+const name = q.get('m') || 'player';
+const z = Number(q.get('z') || 1);
+want(name);
+const ctx = document.getElementById('c').getContext('2d');
+const S = SUBJECTS[name] || floeSubject(Number(name.slice(4)));
+const keys = q.get('k')?.split(',') || S.poses().map((p) => p.key);
+const pre = name === 'player' ? '' : name + ':';
+const wait = () => {
+  if (model.state === 'failed') { document.title = 'FALHOU ' + model.error; return; }
+  if (model.state !== 'ready' || !model.sprites[pre + keys[keys.length - 1]]) return setTimeout(wait, 50);
+  const b = S.box, res = 1.6 * z;
+  const w = (b.right - b.left) * res, h = (b.top - b.bottom) * res;
+  const cols = Math.max(1, Math.floor(1600 / (w + 8)));
+  keys.forEach((k, i) => {
+    const x = (i % cols) * (w + 8), y = Math.floor(i / cols) * (h + 16);
+    ctx.drawImage(model.sprites[pre + k], x, y + 12, w, h);
+    ctx.fillText(k, x + 4, y + 10);
+  });
+  document.title = `fotos prontas: ${name}`;
+};
+wait();
+</script></body></html>

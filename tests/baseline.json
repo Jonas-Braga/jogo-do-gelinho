@@ -487,5 +487,15 @@
   "Profundidade: relevo, parallax e primeiro plano › a luz do relevo acompanha o cenário (sol quente de dia, luar frio no Halloween)",
   "Profundidade: relevo, parallax e primeiro plano › com fps um pouco baixo, só o relevo desliga (o resto do volume continua)",
   "Profundidade: relevo, parallax e primeiro plano › os mapas de luz ficam guardados por personagem (não são refeitos todo quadro)",
-  "Profundidade: relevo, parallax e primeiro plano › cada cenário tem o seu primeiro plano (os desconhecidos usam o de gelo)"
+  "Profundidade: relevo, parallax e primeiro plano › cada cenário tem o seu primeiro plano (os desconhecidos usam o de gelo)",
+  "Personagem 3D (piloto da etapa 2) › cada estado do jogador escolhe a foto certa (ou o desenho 2D quando não há foto)",
+  "Personagem 3D (piloto da etapa 2) › toda foto pedida durante a animação existe na lista de fotos",
+  "Personagem 3D (piloto da etapa 2) › o Three.js vem de uma versão fixa",
+  "Personagem 3D (piloto da etapa 2) › sem as fotos prontas (Node, sem internet ou sem WebGL) o jogador continua com o desenho 2D",
+  "Personagem 3D (piloto da etapa 2) › com as fotos prontas, só a fase normal usa o personagem 3D (roupas das fases especiais seguem em 2D)",
+  "Modelos 3D da fase normal (etapa 1 do 3D) › toda pose do jogador (boiando, afundando, congelando, chute, de costas) tem foto",
+  "Modelos 3D da fase normal (etapa 1 do 3D) › urso: toda foto pedida (andando, perseguindo de boca aberta, para os dois lados) existe",
+  "Modelos 3D da fase normal (etapa 1 do 3D) › ganso, caranguejo, molusco e peixe: toda foto pedida existe",
+  "Modelos 3D da fase normal (etapa 1 do 3D) › a foto da placa de gelo tem as mesmas medidas do sprite 2D",
+  "Modelos 3D da fase normal (etapa 1 do 3D) › com as fotos prontas, urso, bichos e placas da fase normal também viram 3D"
 ]
