@@ -150,6 +150,9 @@ export function makeForestBackground() {
 }
 
 // Pinheiros grandes e arbustos na costa (atrás do personagem), longe da cabana
+// Gancho do visual 3D (src/model3d.js): pinheiros e cogumelos em 3D quando ligado
+export const forestArt = { on: false, pine: null, mushroom: null };
+
 export const FOREST_TREES = [
   { x: 44, base: 240, h: 128 },
   { x: 130, base: 234, h: 92 },
@@ -163,6 +166,10 @@ export function drawForestDecor(ctx, t) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(s, s);
+    if (forestArt.on && forestArt.mushroom?.(ctx)) {
+      ctx.restore();
+      continue;
+    }
     ctx.fillStyle = '#F2E8D2';
     ctx.fillRect(-2, -7, 4, 7);
     ctx.fillStyle = '#C93A2E';
@@ -184,10 +191,14 @@ function drawPine(ctx, { x, base, h }, t, k) {
   ctx.beginPath();
   ctx.ellipse(4, 2, w * 0.55, 5, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#5B3A22';
-  ctx.fillRect(-5, -14, 10, 15);
   // O topo balança de leve com o vento
   const sway = Math.sin(t * 1.3 + k * 2) * 0.02;
+  if (forestArt.on && forestArt.pine?.(ctx, h, sway)) {
+    ctx.restore();
+    return;
+  }
+  ctx.fillStyle = '#5B3A22';
+  ctx.fillRect(-5, -14, 10, 15);
   for (let i = 0; i < 4; i++) {
     const yb = -12 - i * h * 0.2;
     const yt = yb - h * 0.34;
@@ -568,6 +579,8 @@ export const CABIN_DOOR = {
   h: IGLOO.doorH,
 };
 const CHIMNEY = { x0: 44, x1: 62, top: -WALL_H - PEAK - 6 };
+// Medidas da cabana (para o modelo 3D em src/m3d/forest.js)
+export const CABIN = { CW, WALL_H, LOG, PEAK, EAVE, ROOF_T, CHIMNEY };
 
 // Peças em coordenadas locais (origem no centro da base, y para cima negativo).
 // Cada peça tem um retângulo de referência (para a fumacinha de serragem).
@@ -836,8 +849,13 @@ export function drawCabin(ctx, igloo, t) {
     ctx.restore();
   }
   ctx.restore();
+  drawCabinDoor(ctx, igloo, t);
+}
 
-  // Porta (peça 16): abertura escura, luz quando acesa, folha e batente
+// Porta (peça 16): abertura escura, luz quando acesa, folha e batente (ou o contorno
+// tracejado enquanto não está pronta). Também usada pela cabana 3D (src/model3d.js)
+export function drawCabinDoor(ctx, igloo, t) {
+  const n = igloo.count;
   const r = doorRect();
   if (n < RULES.iglooPieces) {
     ctx.save();

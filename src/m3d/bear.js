@@ -35,10 +35,14 @@ export function poses() {
 
 export function build(kit, variant = 'polar') {
   const { mat, group, sphere, bone, capsule } = kit;
-  const fur = mat('#F2EDE1', 1);
-  const furShade = mat('#DCD3BF', 1);
-  const furLight = mat('#FBF8EF', 1);
-  const paw = mat('#CFC6B0', 0.95);
+  // Pelagem: urso polar (fase normal e Natal) ou urso marrom (Floresta)
+  const brown = variant === 'brown';
+  const fur = mat(brown ? '#7A4E2A' : '#F2EDE1', 1);
+  const furShade = mat(brown ? '#5A3820' : '#DCD3BF', 1);
+  const furLight = mat(brown ? '#8E5E34' : '#FBF8EF', 1);
+  const paw = mat(brown ? '#3E2616' : '#CFC6B0', 0.95);
+  const snoutM = brown ? mat('#B88C60', 0.95) : furLight;
+  const claw = mat('#E8DCC0', 0.4);
   const black = mat('#26282B', 0.35);
   const mouthIn = mat('#6B2A2A', 0.7);
   const tooth = mat('#FFFFFF', 0.4);
@@ -78,6 +82,14 @@ export function build(kit, variant = 'polar') {
     const lower = capsule(front ? 6.4 : 6.8, L2, m);
     const foot = sphere(7.6, paw, 0, 0, 0, 14);
     foot.scale.set(1, 0.48, 1.3);
+    // Garras (três por pata), saindo da frente da pata
+    if (brown) {
+      for (const cx of [-3.2, 0, 3.2]) {
+        const c = kit.mesh(new kit.THREE.ConeGeometry(1.1, 4.2, 8), claw, cx, -0.6, 7.6);
+        c.rotation.x = Math.PI / 2 + 0.5;
+        foot.add(c);
+      }
+    }
     // Pelo do joelho (deixa a articulação arredondada)
     const knee = sphere(front ? 6.8 : 7.6, m, 0, 0, 0, 12);
     for (const o of [upper, lower, foot, knee]) root.add(o);
@@ -99,7 +111,7 @@ export function build(kit, variant = 'polar') {
     head.add(sphere(1.9, black, s * 6.2, 4, 24.2, 10)); // olhos
   }
   // Focinho e nariz
-  const snout = capsule(7.2, 9, furLight);
+  const snout = capsule(7.2, 9, snoutM);
   snout.rotation.x = Math.PI / 2;
   snout.position.set(0, -3, 28);
   head.add(snout);

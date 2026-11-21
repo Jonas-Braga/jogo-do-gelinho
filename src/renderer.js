@@ -1,5 +1,5 @@
 import {
-  drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D,
+  drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
   CRITTERS_3D, THEMES_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
@@ -15,6 +15,7 @@ import { drawSleigh, drawChristmasTrees, drawIglooLights, xmasArt } from './chri
 import {
   makeForestBackground, logSprite, drawSnake, drawBat, drawPiranha, drawForestDecor,
   drawCabin, drawCabinDoorFront, drawLeaves, drawFireflies, RIVER,
+  forestArt,
 } from './forest.js';
 import {
   makeSpaceBackground, drawSpaceSky, asteroidSprite, drawUfo, drawCrawler, drawComet, drawStarBonus,
@@ -48,6 +49,8 @@ const CRITTER_DRAW = {
 };
 
 // Construções das fases especiais (o iglu se desenha sozinho)
+// Casas 3D por estilo (as que ainda não têm ficam no 2D)
+const HOUSE_3D = { cabin: drawCabin3D };
 const HOUSE_DRAW = {
   cabin: { body: drawCabin, front: drawCabinDoorFront },
   base: { body: drawBase, front: drawBaseDoorFront },
@@ -60,6 +63,8 @@ const HOUSE_DRAW = {
 const WATERS = { forest: RIVER, space: DUST, beach: SEA, halloween: HAUNT, dino: LAVA };
 const ICE_WATER = { water: ['#1C7E99', '#0E5670', '#052A40'], ripple: [190, 235, 250], bank: 'rgba(3, 30, 48, 0.35)' };
 // Placas de cada cenário: gelo, troncos, asteroides ou pranchas
+// Placas 3D por cenário (os que ainda não têm ficam no 2D)
+const FLOE_3D = { ice: floeSprite3D, forest: logSprite3D };
 const FLOE_SPRITE = {
   forest: logSprite, space: asteroidSprite, beach: boardSprite, halloween: pumpkinSprite, dino: rockSprite,
 };
@@ -181,6 +186,9 @@ export class Renderer {
     xmasArt.tree = drawTree3D;
     bonusArt.on = this.normal3d;
     bonusArt.draw = drawBonus3D;
+    forestArt.on = this.normal3d;
+    forestArt.pine = drawPine3D;
+    forestArt.mushroom = drawMushroom3D;
     if (DEPTH.sway && tr && typeof tr.a === 'number') followCamera(game.player.x, dt);
 
     ctx.save();
@@ -435,7 +443,9 @@ export class Renderer {
     atDepth(ctx, SHORE_Y, () => {
       // Fase normal: iglu 3D (a moldura da porta também, inclusive por cima de quem entra)
       game.igloo.frameHook = this.normal3d && !house ? drawIglooFrame3D : null;
-      if (!(this.normal3d && !house && drawIgloo3D(ctx, game.igloo, t))) withVolume(ctx, [IGLOO.x - 200, IGLOO.baseY - 300, IGLOO.x + 200, IGLOO.baseY + 30], (g) => {
+      // Casa 3D da fase (iglu ou a casa do tema já convertido); senão, o desenho 2D
+      const house3d = this.normal3d && (house ? HOUSE_3D[game.igloo.style] : drawIgloo3D);
+      if (!(house3d && house3d(ctx, game.igloo, t))) withVolume(ctx, [IGLOO.x - 200, IGLOO.baseY - 300, IGLOO.x + 200, IGLOO.baseY + 30], (g) => {
         if (house) house.body(g, game.igloo, t);
         else game.igloo.draw(g, t);
       }, undefined, { key: game.igloo });
@@ -477,7 +487,7 @@ export class Renderer {
           if (c.x <= minX || c.x >= maxX) continue;
           const draw2d = c.kind === 'fish' ? fishDraw : CRITTER_DRAW[c.kind];
           // Fase normal: bichos 3D (o desenho 2D vale até a foto ficar pronta)
-          const try3d = this.normal3d && CRITTERS_3D.has(c.kind);
+          const try3d = this.normal3d && CRITTERS_3D.has(c.kind) && !(c.kind === 'fish' && FISH_DRAW[scenery]);
           const draw = try3d ? (g, cc, y, tt) => drawCritter3D(g, cc, y, tt) || draw2d(g, cc, y, tt) : draw2d;
           if (c.kicked) {
             // Chutado: voa girando por cima da fileira
@@ -503,8 +513,10 @@ export class Renderer {
   // Placas de gelo, troncos (floresta) ou asteroides (espaço), conforme o cenário
   drawRow(ctx, row, t, scenery = null) {
     // Fase normal: blocos de gelo 3D quando as fotos estiverem prontas
-    const sprite = FLOE_SPRITE[scenery]
-      || (this.normal3d ? (pc, on) => floeSprite3D(pc, on) || floeSprite(pc, on) : floeSprite);
+    // Placas/troncos 3D quando a fase está convertida e as fotos estão prontas
+    const sprite2d = FLOE_SPRITE[scenery] || floeSprite;
+    const sprite3d = this.normal3d && FLOE_3D[scenery || 'ice'];
+    const sprite = sprite3d ? (pc, on) => sprite3d(pc, on) || sprite2d(pc, on) : sprite2d;
     const items = [];
     const [minX, maxX] = visibleRange(row.y);
     for (const r of row.rects()) {

@@ -14,6 +14,8 @@ import { dome as iglooDome, porch as iglooPorch, BLOCKS as IGLOO_BLOCKS } from '
 import { duck as duckItem, boot as bootItem } from './m3d/powers.js';
 import { sleigh as sleighModel, tree as treeModel, TREE_H } from './m3d/christmas.js';
 import { bag as bagModel, heart as heartModel } from './m3d/bonus.js';
+import { snake, bat, piranha, logSubject, LOG, pine as pineModel, PINE_H, mushroom as mushroomModel, cabin as cabinModel } from './m3d/forest.js';
+import { CABIN, CABIN_PIECES, drawCabinDoor } from './forest.js';
 import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
@@ -25,15 +27,18 @@ export const SUBJECTS = {
   player, bear, goose, crab, clam, fish, igloo: iglooDome, porch: iglooPorch, duck: duckItem, boot: bootItem,
   // Natal
   'player-sweater': player.withOutfit('sweater'), 'bear-santa': bear.withVariant('santa'), sleigh: sleighModel, xtree: treeModel,
+  // Floresta
+  'player-lumberjack': player.withOutfit('lumberjack'), 'bear-brown': bear.withVariant('brown'),
+  snake, bat, piranha, pine: pineModel, mushroom: mushroomModel, cabin: cabinModel,
   // Prêmios das fases especiais (iguais em todas)
   bag: bagModel, heart: heartModel,
 };
 // Fases especiais já convertidas ao 3D (as outras seguem inteiras em 2D)
-export const THEMES_3D = new Set(['natal']);
+export const THEMES_3D = new Set(['natal', 'floresta']);
 // Modelo do jogador por roupa e do urso por variante (null = sem modelo 3D: desenho 2D)
-const PLAYER_BY_OUTFIT = { parka: 'player', sweater: 'player-sweater' };
-const BEAR_BY_OUTFIT = { polar: 'bear', santaHat: 'bear-santa' };
-export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish']);
+const PLAYER_BY_OUTFIT = { parka: 'player', sweater: 'player-sweater', lumberjack: 'player-lumberjack' };
+const BEAR_BY_OUTFIT = { polar: 'bear', santaHat: 'bear-santa', brown: 'bear-brown' };
+export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish', 'snake', 'bat', 'piranha']);
 export const BOX = player.box;
 export const playerPose = player.playerPose;
 export const poseList = player.poses;
@@ -67,6 +72,7 @@ export function loadModel() {
 function subjectOf(name) {
   if (SUBJECTS[name]) return SUBJECTS[name];
   if (name.startsWith('floe')) return floeSubject(Number(name.slice(4)));
+  if (name.startsWith('log')) return logSubject(Number(name.slice(3)));
   return null;
 }
 
@@ -210,6 +216,17 @@ const ANCHOR = {
     const hop = Math.max(0, s) * 18;
     return { y: y + 8 - hop, tilt: Math.cos(t * 4 + c.ph) * (s > 0 ? -0.45 : 0) * c.dir, water: y + 9, cover: hop < 6 ? 40 : 0, hop };
   },
+  // Floresta
+  snake: (c, y) => ({ y: y - 3, shadow: [c.x, y + 1, 22, 3, 'rgba(15, 35, 25, 0.25)'] }),
+  bat: (c, y, t) => ({ y: y - 32 + Math.sin(t * 4 + c.ph) * 5, shadow: [c.x, y + 16, 16, 3.5, 'rgba(15, 35, 25, 0.25)'] }),
+  piranha: (c, y, t) => {
+    const s = Math.sin(t * 3.2 + c.ph);
+    const hop = Math.max(0, s) * 14;
+    return {
+      y: y + 6 - hop, tilt: Math.cos(t * 3.2 + c.ph) * (s > 0 ? -0.4 : 0) * c.dir, water: y + 9,
+      cover: hop < 5 ? 40 : 0, hop, splash: { min: 5, off: 10, color: 'rgba(210, 240, 220, 0.7)' },
+    };
+  },
 };
 
 export function drawCritter3D(ctx, c, y, t) {
@@ -220,10 +237,12 @@ export function drawCritter3D(ctx, c, y, t) {
   if (!img) return false;
   const a = ANCHOR[c.kind](c, y, t);
   ctx.save();
-  if (c.kind === 'goose') {
-    ctx.fillStyle = 'rgba(2, 28, 46, 0.25)';
+  if (c.kind === 'goose') a.shadow = [c.x, y + 18, 18, 4, 'rgba(2, 28, 46, 0.25)'];
+  if (a.shadow) {
+    const [sx, sy, rx, ry, col] = a.shadow;
+    ctx.fillStyle = col;
     ctx.beginPath();
-    ctx.ellipse(c.x, y + 18, 18, 4, 0, 0, TAU);
+    ctx.ellipse(sx, sy, rx, ry, 0, 0, TAU);
     ctx.fill();
   }
   if (a.water != null) {
@@ -236,12 +255,13 @@ export function drawCritter3D(ctx, c, y, t) {
   if (a.tilt) ctx.rotate(a.tilt);
   blit(ctx, img, subject.box);
   ctx.restore();
-  if (a.hop >= 6) {
+  const sp = a.splash || { min: 6, off: 12, color: 'rgba(207, 239, 250, 0.7)' };
+  if (a.hop >= sp.min) {
     // Respingos ao sair da água
-    ctx.fillStyle = 'rgba(207, 239, 250, 0.7)';
+    ctx.fillStyle = sp.color;
     for (let i = 0; i < 3; i++) {
       ctx.beginPath();
-      ctx.arc(c.x - c.dir * (12 + i * 6), y + 9 - (a.hop - 6) * 0.3 * (i + 1) / 3, 1.6, 0, TAU);
+      ctx.arc(c.x - c.dir * (sp.off + i * 6), y + 9 - (a.hop - sp.min) * 0.3 * (i + 1) / 3, 1.6, 0, TAU);
       ctx.fill();
     }
   }
@@ -381,5 +401,98 @@ export function drawBonus3D(ctx, name) {
   const img = sprite(name, name);
   if (!img) return false;
   blit(ctx, img, SUBJECTS[name].box);
+  return true;
+}
+
+// ---------------------------------------------------------------- Floresta
+// Troncos: mesmo formato do sprite 2D (logSprite)
+export function logSprite3D(piece, active) {
+  const cacheKey = active ? '3d-log-on' : '3d-log-off';
+  if (piece.sprites[cacheKey]) return piece.sprites[cacheKey];
+  const name = `log${piece.w}`;
+  want(name);
+  const img = sprite(name, `${piece.seed % LOG.VARIANTS}${active ? 1 : 0}`);
+  if (!img) return null;
+  const s = { canvas: img, ox: LOG.PAD, oy: LOG.TOP, w: piece.w + LOG.PAD * 2, h: LOG.H };
+  piece.sprites[cacheKey] = s;
+  return s;
+}
+
+// Gancho de src/forest.js (forestArt): pinheiro com base em (0, 0) e altura h, com o
+// balanço do vento; cogumelo na escala s
+export function drawPine3D(ctx, h, sway) {
+  want('pine');
+  const img = sprite('pine', 'pine');
+  if (!img) return false;
+  ctx.save();
+  ctx.rotate(sway * 2.5);
+  ctx.scale(h / PINE_H, h / PINE_H);
+  blit(ctx, img, pineModel.box);
+  ctx.restore();
+  return true;
+}
+
+export function drawMushroom3D(ctx) {
+  want('mushroom');
+  const img = sprite('mushroom', 'm');
+  if (!img) return false;
+  blit(ctx, img, mushroomModel.box);
+  return true;
+}
+
+// Cabana 3D: mesmo comportamento da drawCabin 2D (sombra, contorno-guia, peças caindo
+// com o quique, janela acesa e a porta 2D por cima)
+export function drawCabin3D(ctx, igloo, t) {
+  want('cabin');
+  const N = CABIN_PIECES.length - 1; // a última peça é a porta
+  const blocks = Math.min(igloo.count, N);
+  let settled = 0;
+  while (settled < blocks && igloo.anim[settled] >= 1) settled++;
+  if (blocks > 0 && !sprite('cabin', `b${blocks - 1}`)) return false;
+  if (settled > 0 && !sprite('cabin', `n${settled}`)) return false;
+  const { CW, WALL_H, PEAK, EAVE, ROOF_T } = CABIN;
+  ctx.save();
+  ctx.translate(IGLOO.x, IGLOO.baseY);
+  ctx.fillStyle = 'rgba(30, 50, 20, 0.28)';
+  ctx.beginPath();
+  ctx.ellipse(6, 5, CW + 26, 10, 0, 0, TAU);
+  ctx.fill();
+  if (igloo.count < CABIN_PIECES.length) {
+    const roofY = (x) => -WALL_H - PEAK + Math.abs(x) * (PEAK / (CW + EAVE * 0.2));
+    ctx.save();
+    ctx.setLineDash([5, 6]);
+    ctx.strokeStyle = 'rgba(60, 40, 20, 0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-CW, 0);
+    ctx.lineTo(-CW, -WALL_H);
+    ctx.lineTo(-CW - EAVE, roofY(-CW - EAVE) + ROOF_T);
+    ctx.lineTo(0, -WALL_H - PEAK);
+    ctx.lineTo(CW + EAVE, roofY(CW + EAVE) + ROOF_T);
+    ctx.lineTo(CW, -WALL_H);
+    ctx.lineTo(CW, 0);
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (settled > 0) blit(ctx, sprite('cabin', `n${settled}`), cabinModel.box);
+  for (let i = settled; i < blocks; i++) {
+    const a = igloo.anim[i];
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 3);
+    ctx.translate(0, -(1 - easeOutBack(a)) * 46);
+    blit(ctx, sprite('cabin', `b${i}`), cabinModel.box);
+    ctx.restore();
+  }
+  // Janela acesa depois que o lenhador entra (luz quente por cima do vidro)
+  const win = CABIN_PIECES.findIndex((p) => p.kind === 'window');
+  if (igloo.lit && blocks > win) {
+    ctx.fillStyle = `rgba(255, 196, 110, ${0.85 + Math.sin(t * 5) * 0.08})`;
+    ctx.fillRect(-70, -47, 28, 25.5);
+    ctx.fillStyle = '#4A2C16';
+    ctx.fillRect(-57.5, -47, 3, 25.5);
+    ctx.fillRect(-70, -35.7, 28, 3);
+  }
+  ctx.restore();
+  drawCabinDoor(ctx, igloo, t);
   return true;
 }

@@ -7,12 +7,13 @@
 <script type="module">
 import { model, want, SUBJECTS } from '../src/model3d.js';
 import { floeSubject } from '../src/m3d/floes.js';
+import { logSubject } from '../src/m3d/forest.js';
 const q = new URLSearchParams(location.search);
 const name = q.get('m') || 'player';
 const z = Number(q.get('z') || 1);
 want(name);
 const ctx = document.getElementById('c').getContext('2d');
-const S = SUBJECTS[name] || floeSubject(Number(name.slice(4)));
+const S = SUBJECTS[name] || (name.startsWith('log') ? logSubject(Number(name.slice(3))) : floeSubject(Number(name.slice(4))));
 const keys = q.get('k')?.split(',') || S.poses().map((p) => p.key);
 const pre = name === 'player' ? '' : name + ':';
 const wait = () => {

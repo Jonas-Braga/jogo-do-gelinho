@@ -19,6 +19,8 @@ import { powerArt, drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront 
 import { RULES } from '../../src/config.js';
 import { xmasArt, drawChristmasTrees, TREES } from '../../src/christmas.js';
 import { bonusArt, drawMoneyBag, drawHeart } from '../../src/bonus.js';
+import { logSprite3D, drawCabin3D } from '../../src/model3d.js';
+import { CABIN_PIECES } from '../../src/forest.js';
 
 // Contexto 2D falso que registra as chamadas
 function recordingCtx() {
@@ -700,5 +702,82 @@ suite('Natal em 3D', () => {
       Object.assign(xmasArt, was);
       Object.assign(bonusArt, wasB);
     }
+  });
+});
+
+suite('Floresta em 3D', () => {
+  const withFake = (fn) => {
+    const was = { ...model };
+    const asked = [];
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: (_, k) => (asked.push(String(k)), img) });
+      fn(asked, img);
+    } finally {
+      Object.assign(model, was);
+    }
+  };
+
+  test('a Floresta é uma fase convertida: lenhador, urso marrom, troncos, cabana, pinheiros, cogumelos e bichos em 3D', () => {
+    expect(THEMES_3D.has(SPECIALS[10].id)).toBe(true);
+    withFake((asked) => {
+      const g = makeGame({ level: 10, quiet: false });
+      step(g, 6);
+      Object.assign(g.bear, { active: true, x: 400, dir: 1 });
+      for (let i = 0; i < 8; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.critters.list.length = 0;
+      for (const [k, kind] of ['snake', 'bat', 'piranha'].entries()) {
+        g.critters.list.push({ kind, row: k, dir: 1, vx: 0, x: 300 + k * 200, w: 30, ph: 0 });
+      }
+      g.renderer.use3d = true;
+      const { ctx } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      const has = (pre) => asked.some((k) => k.startsWith(pre));
+      for (const pre of ['player-lumberjack:', 'bear-brown:', 'log', 'cabin:', 'pine:', 'mushroom:', 'snake:', 'bat:', 'piranha:']) {
+        expect(has(pre)).toBe(true);
+      }
+    });
+  });
+
+  test('cobra, morcego e piranha: toda foto pedida existe', () => {
+    for (const kind of ['snake', 'bat', 'piranha']) {
+      const S = SUBJECTS[kind];
+      const keys = new Set(S.poses().map((p) => p.key));
+      for (const dir of [1, -1]) for (let t = 0; t < 3; t += 0.011) expect(keys.has(S.pose({ dir, ph: 0.7 }, t))).toBe(true);
+    }
+  });
+
+  test('a foto do tronco tem as mesmas medidas do sprite 2D', () => {
+    withFake((asked, img) => {
+      for (const w of [36, 82]) {
+        const s = logSprite3D({ w, seed: 5, sprites: {} }, false);
+        expect(s.canvas).toBe(img);
+        expect([s.ox, s.oy, s.w, s.h]).toEqual([12, 22, w + 24, 64]);
+      }
+    });
+  });
+
+  test('cabana 3D: peças assentadas numa foto, a que cai por cima, e a porta 2D por cima de tudo', () => {
+    const keys = new Set(SUBJECTS.cabin.poses().map((p) => p.key));
+    for (let n = 1; n < CABIN_PIECES.length; n++) expect(keys.has(`n${n}`)).toBe(true);
+    withFake((asked) => {
+      const g = makeGame({ level: 10 });
+      for (let i = 0; i < 5; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.igloo.add();
+      const { ctx } = recordingCtx();
+      expect(drawCabin3D(ctx, g.igloo, 0)).toBe(true);
+      expect(asked.includes('cabin:n5')).toBe(true);
+      expect(asked.includes('cabin:b5')).toBe(true);
+      // Pronta: a porta (abertura, folha, batente) é o desenho 2D
+      for (let i = 0; i < 16; i++) g.igloo.add();
+      g.igloo.update(5);
+      const r = recordingCtx();
+      drawCabin3D(r.ctx, g.igloo, 0);
+      expect(r.calls.filter((c) => c[0] === 'fillRect').length).toBeGreaterThan(3);
+    });
   });
 });
