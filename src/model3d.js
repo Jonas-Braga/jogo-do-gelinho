@@ -12,6 +12,8 @@ import { goose, crab, clam, fish } from './m3d/critters.js';
 import { floeSubject, variantOf, PAD as FLOE_PAD, TOP as FLOE_TOP, H as FLOE_H } from './m3d/floes.js';
 import { dome as iglooDome, porch as iglooPorch, BLOCKS as IGLOO_BLOCKS } from './m3d/igloo.js';
 import { duck as duckItem, boot as bootItem } from './m3d/powers.js';
+import { sleigh as sleighModel, tree as treeModel, TREE_H } from './m3d/christmas.js';
+import { bag as bagModel, heart as heartModel } from './m3d/bonus.js';
 import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
@@ -19,7 +21,18 @@ import { POWERS } from './powers.js';
 const M = DEPTH.model3d;
 const TAU = Math.PI * 2;
 
-export const SUBJECTS = { player, bear, goose, crab, clam, fish, igloo: iglooDome, porch: iglooPorch, duck: duckItem, boot: bootItem };
+export const SUBJECTS = {
+  player, bear, goose, crab, clam, fish, igloo: iglooDome, porch: iglooPorch, duck: duckItem, boot: bootItem,
+  // Natal
+  'player-sweater': player.withOutfit('sweater'), 'bear-santa': bear.withVariant('santa'), sleigh: sleighModel, xtree: treeModel,
+  // Prêmios das fases especiais (iguais em todas)
+  bag: bagModel, heart: heartModel,
+};
+// Fases especiais já convertidas ao 3D (as outras seguem inteiras em 2D)
+export const THEMES_3D = new Set(['natal']);
+// Modelo do jogador por roupa e do urso por variante (null = sem modelo 3D: desenho 2D)
+const PLAYER_BY_OUTFIT = { parka: 'player', sweater: 'player-sweater' };
+const BEAR_BY_OUTFIT = { polar: 'bear', santaHat: 'bear-santa' };
 export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish']);
 export const BOX = player.box;
 export const playerPose = player.playerPose;
@@ -110,10 +123,12 @@ function blit(ctx, img, b) {
 
 // ---------------------------------------------------------------- Jogador
 // Desenha o jogador com a foto da pose; devolve false se não houver foto (usar o 2D)
-export function drawPlayer3D(ctx, p, t, cold, ride = 0) {
-  want('player');
+export function drawPlayer3D(ctx, p, t, cold, ride = 0, outfit = 'parka') {
+  const name = PLAYER_BY_OUTFIT[outfit || 'parka'];
+  if (!name) return false;
+  want(name);
   const ps = playerPose(p, t);
-  const img = ps && sprite('player', ps.key);
+  const img = ps && sprite(name, ps.key);
   if (!img) return false;
   ctx.save();
   if (p.state === 'drown' && p.sinkLine != null) {
@@ -166,9 +181,11 @@ export function drawPlayer3D(ctx, p, t, cold, ride = 0) {
 }
 
 // ---------------------------------------------------------------- Urso
-export function drawBear3D(ctx, b, t) {
-  want('bear');
-  const img = sprite('bear', bear.bearPose(b, t));
+export function drawBear3D(ctx, b, t, outfit = 'polar') {
+  const name = BEAR_BY_OUTFIT[outfit || 'polar'];
+  if (!name) return false;
+  want(name);
+  const img = sprite(name, bear.bearPose(b, t));
   if (!img) return false;
   ctx.save();
   ctx.fillStyle = 'rgba(70, 105, 125, 0.25)';
@@ -328,5 +345,41 @@ export function drawPower3D(ctx, name, part, dir, scale = 1) {
   ctx.scale(scale, scale);
   blit(ctx, img, SUBJECTS[name].box);
   ctx.restore();
+  return true;
+}
+
+// ---------------------------------------------------------------- Natal
+// Ganchos de src/christmas.js (xmasArt). O trenó chega espelhado e na escala do
+// desenho 2D; a foto já vem virada, então só desfaz o espelho.
+export function drawSleigh3D(ctx, s) {
+  want('sleigh');
+  const img = sprite('sleigh', sleighModel.pose(s));
+  if (!img) return false;
+  ctx.save();
+  if (s.dir < 0) ctx.scale(-1, 1);
+  blit(ctx, img, sleighModel.box);
+  ctx.restore();
+  return true;
+}
+
+// Árvore de Natal com a base em (0, 0) e altura h (a foto é de uma árvore de 104)
+export function drawTree3D(ctx, h) {
+  want('xtree');
+  const img = sprite('xtree', 'tree');
+  if (!img) return false;
+  ctx.save();
+  ctx.scale(h / TREE_H, h / TREE_H);
+  blit(ctx, img, treeModel.box);
+  ctx.restore();
+  return true;
+}
+
+// ---------------------------------------------------------------- Prêmios
+// Gancho de src/bonus.js (bonusArt): saco de dinheiro ou coração no ponto de apoio atual
+export function drawBonus3D(ctx, name) {
+  want(name);
+  const img = sprite(name, name);
+  if (!img) return false;
+  blit(ctx, img, SUBJECTS[name].box);
   return true;
 }

@@ -33,7 +33,7 @@ export function poses() {
   return out;
 }
 
-export function build(kit) {
+export function build(kit, variant = 'polar') {
   const { mat, group, sphere, bone, capsule } = kit;
   const fur = mat('#F2EDE1', 1);
   const furShade = mat('#DCD3BF', 1);
@@ -121,7 +121,36 @@ export function build(kit) {
   lip.scale.set(0.85, 0.35, 1.3);
   head.add(lip);
 
-  return { root, body, legs, head, jaw, lip, THREE: kit.THREE };
+  // Gorro de Papai Noel (Natal): copa vermelha, barra de pelo, ponta articulada
+  // que cai para trás e balança com o passo, e o pompom
+  let hatTip = null;
+  if (variant === 'santa') {
+    const { THREE, mesh } = kit;
+    const red = mat('#C8242B', 0.8);
+    const white = mat('#FFFFFF', 0.95);
+    const hat = group(0, 9, 11);
+    hat.rotation.x = -0.35;
+    head.add(hat);
+    const crown = mesh(new THREE.ConeGeometry(10.5, 14, 20, 1, true), red, 0, 6, 0);
+    hat.add(crown);
+    const rim = mesh(new THREE.TorusGeometry(10.5, 3, 10, 24), white, 0, -0.5, 0);
+    rim.rotation.x = Math.PI / 2;
+    hat.add(rim);
+    hatTip = group(0, 12, 0);
+    hat.add(hatTip);
+    const tip = mesh(new THREE.ConeGeometry(4.2, 12, 14), red, 0, 0, -5);
+    tip.rotation.x = -Math.PI / 2 - 0.4;
+    hatTip.add(tip);
+    hatTip.add(sphere(3.4, white, 0, -3.2, -10.5, 12));
+  }
+  return { root, body, legs, head, jaw, lip, hatTip, THREE: kit.THREE };
+}
+
+// Modelo do urso com uma variante ('polar' ou 'santa', com o gorro do Natal)
+const variants = new Map();
+export function withVariant(v = 'polar') {
+  if (!variants.has(v)) variants.set(v, { box, res, poses, apply, bearPose, build: (kit) => build(kit, v) });
+  return variants.get(v);
 }
 
 // Coloca uma cápsula (eixo y) entre os pontos a e b
@@ -200,5 +229,7 @@ export function apply(rig, p) {
   for (const l of rig.legs) solveLeg(rig, l, (u + l.phase) % 1, bob);
   rig.head.rotation.x = Math.sin(u * TAU * 2 + 0.6) * 0.05;
   rig.jaw.rotation.x = p.mouth;
+  // Ponta do gorro balançando (mais forte rugindo, quando ele corre)
+  if (rig.hatTip) rig.hatTip.rotation.set(Math.sin(u * TAU * 2) * 0.18 - p.mouth * 0.4, 0, Math.sin(u * TAU) * 0.25);
   rig.lip.visible = p.mouth > 0;
 }

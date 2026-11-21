@@ -10,13 +10,15 @@ import {
   camera, followCamera, swayAt, maxSway, sceneLight, foregroundKind,
 } from '../../src/depth.js';
 import { SPECIALS } from '../../src/specials.js';
-import { playerPose, poseList, loadModel, model, SUBJECTS, CRITTERS_3D, floeSprite3D } from '../../src/model3d.js';
+import { playerPose, poseList, loadModel, model, SUBJECTS, CRITTERS_3D, floeSprite3D, THEMES_3D } from '../../src/model3d.js';
 import { floeSubject } from '../../src/m3d/floes.js';
 import * as bear3d from '../../src/m3d/bear.js';
 import { BLOCKS as IGLOO_BLOCKS } from '../../src/m3d/igloo.js';
 import { drawIgloo3D, drawIglooFrame3D } from '../../src/model3d.js';
 import { powerArt, drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront } from '../../src/powers.js';
 import { RULES } from '../../src/config.js';
+import { xmasArt, drawChristmasTrees, TREES } from '../../src/christmas.js';
+import { bonusArt, drawMoneyBag, drawHeart } from '../../src/bonus.js';
 
 // Contexto 2D falso que registra as chamadas
 function recordingCtx() {
@@ -430,7 +432,9 @@ suite('Personagem 3D (piloto da etapa 2)', () => {
       };
       expect(uses3d(1)).toBe(true);
       expect(uses3d(4)).toBe(true);
-      for (const lv of Object.keys(SPECIALS).map(Number)) expect(uses3d(lv)).toBe(false);
+      // Fases especiais ainda não convertidas ao 3D seguem inteiras em 2D (aprovado pelo
+      // usuário: as convertidas, em THEMES_3D, têm testes próprios)
+      for (const [lv, sp] of Object.entries(SPECIALS)) if (!THEMES_3D.has(sp.id)) expect(uses3d(Number(lv))).toBe(false);
       // Desligado no renderizador (testes, ?modelo=0): 2D
       const g = makeGame({ level: 1 });
       const { ctx, calls } = recordingCtx();
@@ -623,6 +627,78 @@ suite('Modelos 3D da fase normal: articulações, iglu e poderes', () => {
       expect(got.length).toBe(0);
     } finally {
       Object.assign(powerArt, was);
+    }
+  });
+});
+
+suite('Natal em 3D', () => {
+  const withFake = (fn) => {
+    const was = { ...model };
+    const asked = [];
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: (_, k) => (asked.push(String(k)), img) });
+      fn(asked, img);
+    } finally {
+      Object.assign(model, was);
+    }
+  };
+
+  test('o Natal é uma fase convertida: suéter, urso de gorro, trenó, árvores, placas e bichos em 3D', () => {
+    expect(THEMES_3D.has(SPECIALS[5].id)).toBe(true);
+    withFake((asked) => {
+      const g = makeGame({ level: 5, quiet: false });
+      step(g, 6);
+      Object.assign(g.bear, { active: true, x: 400, dir: 1 });
+      Object.assign(g.sleigh, { active: true, x: 500, y: 130, dir: 1, t: 0.3 });
+      g.renderer.use3d = true;
+      const { ctx } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      const has = (pre) => asked.some((k) => k.startsWith(pre));
+      expect(has('player-sweater:')).toBe(true);
+      expect(has('bear-santa:')).toBe(true);
+      expect(has('sleigh:')).toBe(true);
+      expect(has('xtree:')).toBe(true);
+      expect(has('floe')).toBe(true);
+    });
+  });
+
+  test('suéter e urso de gorro têm as mesmas poses (e articulações) dos modelos da fase normal', () => {
+    const keys = (S) => S.poses().map((p) => p.key).join();
+    expect(keys(SUBJECTS['player-sweater'])).toBe(keys(SUBJECTS.player));
+    expect(keys(SUBJECTS['bear-santa'])).toBe(keys(SUBJECTS.bear));
+  });
+
+  test('trenó: toda foto pedida durante a passagem existe (renas galopando, para os dois lados)', () => {
+    const S = SUBJECTS.sleigh;
+    const keys = new Set(S.poses().map((p) => p.key));
+    for (const dir of [1, -1]) for (let t = 0; t < 3; t += 0.013) expect(keys.has(S.pose({ t, dir }))).toBe(true);
+  });
+
+  test('árvores 3D mantêm o pisca-pisca 2D por cima; prêmios 3D mantêm brilho e anel', () => {
+    const calls = [];
+    const was = { ...xmasArt };
+    const wasB = { ...bonusArt };
+    try {
+      xmasArt.on = true;
+      xmasArt.tree = (ctx, h) => (calls.push(['tree', h]), true);
+      bonusArt.on = true;
+      bonusArt.draw = (ctx, name) => (calls.push([name]), true);
+      const r = recordingCtx();
+      drawChristmasTrees(r.ctx, 0);
+      expect(calls.filter((c) => c[0] === 'tree').map((c) => c[1])).toEqual(TREES.map((tr) => tr.h));
+      // 12 lâmpadas por árvore continuam sendo desenhadas (arc)
+      expect(r.calls.filter((c) => c[0] === 'arc').length).toBeGreaterThan(20);
+      const b = recordingCtx();
+      drawMoneyBag(b.ctx, { x: 100, ph: 0 }, 300, 0);
+      drawHeart(b.ctx, { x: 100, ph: 0 }, 300, 0);
+      expect(calls.slice(-2)).toEqual([['bag'], ['heart']]);
+      expect(b.calls.some((c) => c[0] === 'ellipse')).toBe(true); // anel d'água
+    } finally {
+      Object.assign(xmasArt, was);
+      Object.assign(bonusArt, wasB);
     }
   });
 });

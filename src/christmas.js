@@ -3,6 +3,11 @@
 // personagem (os dois últimos ficam em sprites.js).
 import { W, IGLOO } from './config.js';
 
+// Gancho do visual 3D (src/model3d.js): com `on` ligado e a foto pronta, o trenó e as
+// árvores viram fotos 3D (o rastro de brilhos, o pisca-pisca e o halo da estrela
+// continuam 2D por cima)
+export const xmasArt = { on: false, sleigh: null, tree: null };
+
 // ---------------------------------------------------------------- Trenó
 export const SLEIGH = {
   firstDelay: 5,     // segundos até a primeira passagem na fase
@@ -78,6 +83,10 @@ export function drawSleigh(ctx, s, t) {
   ctx.globalAlpha = 1;
 
   ctx.scale(s.dir * SLEIGH.scale, SLEIGH.scale);
+  if (xmasArt.on && xmasArt.sleigh?.(ctx, s)) {
+    ctx.restore();
+    return;
+  }
 
   // Renas (a da frente um pouco mais alta, galopando)
   const gallop = s.t * 9;
@@ -284,6 +293,11 @@ function drawTree(ctx, { x, base, h }, t, k) {
   ctx.beginPath();
   ctx.ellipse(4, 2, w * 0.55, 5, 0, 0, Math.PI * 2);
   ctx.fill();
+  if (xmasArt.on && xmasArt.tree?.(ctx, h)) {
+    treeLights(ctx, h, w, t, k);
+    ctx.restore();
+    return;
+  }
   ctx.fillStyle = '#5B3A22';
   ctx.fillRect(-5, -12, 10, 13);
   // Três camadas de galhos, com neve nas pontas
@@ -366,4 +380,28 @@ export function drawIglooLights(ctx, t) {
     }
   }
   ctx.restore();
+}
+
+// Só as luzes da árvore (pisca-pisca nas mesmas posições e o halo da estrela), por cima
+// da árvore 3D
+function treeLights(ctx, h, w, t, k) {
+  const tiers = 3;
+  for (let i = 0; i < tiers; i++) {
+    const yb = -10 - i * h * 0.24;
+    const yt = yb - h * 0.42;
+    const hw = (w / 2) * (1 - i * 0.24);
+    for (let j = 0; j < 4; j++) {
+      const u = (j + 0.5) / 4;
+      const by = yt + (yb - yt) * (0.45 + u * 0.5);
+      const bx = -hw * (0.75 - u * 1.4) * ((by - yt) / (yb - yt));
+      bulb(ctx, bx, by, i * 4 + j + k * 7, t, h > 90 ? 2.6 : 2.1);
+    }
+  }
+  const top = -10 - (tiers - 1) * h * 0.24 - h * 0.42;
+  const s = 7 * (h / 104) * (1 + Math.sin(t * 4 + k) * 0.1);
+  const halo = ctx.createRadialGradient(0, top, 0, 0, top, s * 3);
+  halo.addColorStop(0, 'rgba(255, 225, 120, 0.6)');
+  halo.addColorStop(1, 'rgba(255, 225, 120, 0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(-s * 3, top - s * 3, s * 6, s * 6);
 }

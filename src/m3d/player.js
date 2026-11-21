@@ -84,8 +84,82 @@ export function poses() {
   return out;
 }
 
-export function build(kit) {
+// Perfil torneado do casaco: [raio, altura]
+const COAT = [[0, 13], [17, 13], [16.2, 18], [14, 28], [12, 38], [10, 45], [7, 48.5], [0, 49]];
+
+// Roupas: a parka da fase normal e o suéter natalino (Natal)
+const KNIT_RED = '#C62F2F';
+const KNIT_WHITE = '#F7F2E8';
+const KNIT_GREEN = '#1F7A45';
+
+// Textura de tricô do suéter, na mesma posição da estampa 2D (faixa branca com
+// zigue-zague verde no peito, pontinhos de neve e o floco na barriga). No torneado,
+// u dá a volta (u = 0 é a frente) e v vai de ponto em ponto do perfil, de baixo para cima.
+function knitTexture(THREE) {
+  const W = 512;
+  const H = 256;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d');
+  // altura (unidades do mundo) → v (pelo índice dos pontos do perfil) → y da textura
+  const vOf = (h) => {
+    for (let i = 0; i < COAT.length - 1; i++) {
+      const [, a] = COAT[i];
+      const [, b] = COAT[i + 1];
+      if (h >= a && h <= b && b > a) return (i + (h - a) / (b - a)) / (COAT.length - 1);
+    }
+    return h < COAT[0][1] ? 0 : 1;
+  };
+  const yOf = (h) => (1 - vOf(h)) * H;
+  g.fillStyle = KNIT_RED;
+  g.fillRect(0, 0, W, H);
+  // Pontos de tricô (textura leve)
+  g.fillStyle = 'rgba(0, 0, 0, 0.08)';
+  for (let y = 0; y < H; y += 4) for (let x = (y / 4) % 2 ? 2 : 0; x < W; x += 4) g.fillRect(x, y, 2, 2);
+  // Faixa branca (alturas 29 a 38) com zigue-zague verde embaixo
+  const y38 = yOf(38);
+  const y29 = yOf(29);
+  g.fillStyle = KNIT_WHITE;
+  g.fillRect(0, y38, W, y29 - y38);
+  g.fillStyle = KNIT_GREEN;
+  const zig = (y29 - y38) * 0.55;
+  g.beginPath();
+  g.moveTo(0, y29);
+  for (let x = 0; x <= W; x += 24) {
+    g.lineTo(x, y29 - zig);
+    g.lineTo(x + 12, y29 - zig * 0.35);
+  }
+  g.lineTo(W, y29);
+  g.closePath();
+  g.fill();
+  // Pontinhos de neve acima e abaixo da faixa
+  g.fillStyle = KNIT_WHITE;
+  for (let x = 8; x < W; x += 28) {
+    g.fillRect(x, yOf(43) - 3, 6, 6);
+    g.fillRect(x + 14, yOf(24) - 3, 6, 6);
+  }
+  // Floco de neve na barriga (na frente, um pouco para o lado em que ele anda)
+  g.strokeStyle = KNIT_WHITE;
+  g.lineWidth = 3;
+  const fx = W * 0.06;
+  const fy = yOf(21);
+  for (let i = 0; i < 3; i++) {
+    const a = (i * Math.PI) / 3;
+    g.beginPath();
+    g.moveTo(fx + Math.cos(a) * 14, fy + Math.sin(a) * 9);
+    g.lineTo(fx - Math.cos(a) * 14, fy - Math.sin(a) * 9);
+    g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+export function build(kit, outfit = 'parka') {
   const { THREE, mat, mesh, group, capsule, sphere, furRing, lathe } = kit;
+  const sweater = outfit === 'sweater';
   const parka = mat(C.parka, 0.8);
   const parkaDark = mat(C.parkaShade, 0.85);
   const fur = mat(C.fur, 1);
@@ -127,21 +201,32 @@ export function build(kit) {
     legs.push({ hip, knee });
   }
 
-  // Parka em A (torneada), com bolso e barra de pelo
-  const coat = lathe([[0, 13], [17, 13], [16.2, 18], [14, 28], [12, 38], [10, 45], [7, 48.5], [0, 49]], parka);
+  // Corpo em A (torneado): parka com bolso e barra de pelo, ou suéter de tricô com
+  // barra canelada verde
+  const knit = sweater ? new THREE.MeshStandardMaterial({ map: knitTexture(THREE), roughness: 0.95, metalness: 0 }) : null;
+  const knitGreen = mat(KNIT_GREEN, 0.95);
+  const knitWhite = mat(KNIT_WHITE, 0.95);
+  const coat = lathe(COAT, sweater ? knit : parka, 48);
   coat.scale.set(1, 1, 0.82);
   body.add(coat);
-  const pocket = mesh(new THREE.TorusGeometry(9, 0.45, 6, 24, Math.PI * 0.7), parkaDark);
-  pocket.rotation.set(-0.25, 0, Math.PI * 1.15);
-  pocket.position.set(0, 33, 11.2);
-  body.add(pocket);
-  const hem = furRing(16.6, 3.3, 22, fur, furShade, 1, 0.84);
-  hem.position.y = 13.5;
-  body.add(hem);
+  if (sweater) {
+    const rib = mesh(new THREE.TorusGeometry(16.4, 2.8, 8, 40), knitGreen, 0, 14.5, 0);
+    rib.rotation.x = Math.PI / 2;
+    rib.scale.set(1, 0.84, 1.15);
+    body.add(rib);
+  } else {
+    const pocket = mesh(new THREE.TorusGeometry(9, 0.45, 6, 24, Math.PI * 0.7), parkaDark);
+    pocket.rotation.set(-0.25, 0, Math.PI * 1.15);
+    pocket.position.set(0, 33, 11.2);
+    body.add(pocket);
+    const hem = furRing(16.6, 3.3, 22, fur, furShade, 1, 0.84);
+    hem.position.y = 13.5;
+    body.add(hem);
+  }
 
   // Braços (ombro em y = 42): manga do braço, cotovelo, antebraço, punho de pelo e luva
   const arm = (side) => {
-    const m = side < 0 ? parka : parkaDark;
+    const m = sweater ? mat(side < 0 ? '#E0403F' : '#A52528', 0.95) : side < 0 ? parka : parkaDark;
     const sh = group(side * 11, 42, 0);
     const upper = capsule(4.5, 4.5, m);
     upper.position.y = -4.6;
@@ -152,9 +237,22 @@ export function build(kit) {
     const fore = capsule(4.2, 4, m);
     fore.position.y = -4.4;
     elbow.add(fore);
-    const cuff = furRing(4.6, 1.8, 9, fur, furShade);
-    cuff.position.y = -7;
-    elbow.add(cuff);
+    if (sweater) {
+      // Listra branca na manga e punho de tricô verde com filete branco
+      const stripe = mesh(new THREE.TorusGeometry(4.3, 0.7, 6, 18), knitWhite, 0, -2.4, 0);
+      stripe.rotation.x = Math.PI / 2;
+      elbow.add(stripe);
+      const cuff = mesh(new THREE.TorusGeometry(4.3, 1.6, 8, 18), knitGreen, 0, -7, 0);
+      cuff.rotation.x = Math.PI / 2;
+      elbow.add(cuff);
+      const line = mesh(new THREE.TorusGeometry(4.6, 0.45, 6, 18), knitWhite, 0, -7, 0);
+      line.rotation.x = Math.PI / 2;
+      elbow.add(line);
+    } else {
+      const cuff = furRing(4.6, 1.8, 9, fur, furShade);
+      cuff.position.y = -7;
+      elbow.add(cuff);
+    }
     elbow.add(sphere(4.8, mitten, 0, -10.8, 0, 16));
     body.add(sh);
     sh.userData.elbow = elbow;
@@ -247,4 +345,12 @@ export function apply(rig, p) {
     }
   });
   for (const [k, g] of Object.entries(rig.faces)) g.visible = p.face === k;
+}
+
+// Modelo do personagem com uma roupa ('parka' ou 'sweater')
+const outfits = new Map();
+export const OUTFITS_3D = ['parka', 'sweater'];
+export function withOutfit(outfit = 'parka') {
+  if (!outfits.has(outfit)) outfits.set(outfit, { box, poses, apply, playerPose, build: (kit) => build(kit, outfit) });
+  return outfits.get(outfit);
 }

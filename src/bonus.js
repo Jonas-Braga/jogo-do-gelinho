@@ -53,6 +53,10 @@ function twinkles(ctx, x, y, t, color) {
 }
 
 // Saco de dinheiro boiando: dourado, amarrado com cordão, com o "$" na frente
+// Gancho do visual 3D (src/model3d.js): com `on` ligado e a foto pronta, `draw`
+// desenha o saco ou o coração 3D no ponto de apoio atual
+export const bonusArt = { on: false, draw: null };
+
 export function drawMoneyBag(ctx, c, y, t) {
   const bob = Math.sin(t * 3 + c.ph) * 3;
   const by = y - 4 + bob;
@@ -60,6 +64,12 @@ export function drawMoneyBag(ctx, c, y, t) {
   ctx.save();
   ctx.translate(c.x, by);
   ctx.rotate(Math.sin(t * 2 + c.ph) * 0.08);
+  if (bonusArt.on && bonusArt.draw?.(ctx, 'bag')) {
+    ctx.restore();
+    twinkles(ctx, c.x, by - 12, t, '#FFF4C0');
+    ring(ctx, c.x, y);
+    return;
+  }
   // Corpo do saco
   const g = ctx.createRadialGradient(-5, -16, 2, 0, -10, 18);
   g.addColorStop(0, '#FFE9A0');
@@ -117,6 +127,12 @@ export function drawHeart(ctx, c, y, t) {
   ctx.save();
   ctx.translate(c.x, by);
   ctx.scale(beat, beat);
+  if (bonusArt.on && bonusArt.draw?.(ctx, 'heart')) {
+    ctx.restore();
+    twinkles(ctx, c.x, by, t, '#FFE0E6');
+    ring(ctx, c.x, y);
+    return;
+  }
   const g = ctx.createRadialGradient(-5, -6, 1, 0, 0, 16);
   g.addColorStop(0, '#FF8A98');
   g.addColorStop(0.5, HEART_RED);

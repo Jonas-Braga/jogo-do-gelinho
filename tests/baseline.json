@@ -503,5 +503,9 @@
   "Modelos 3D da fase normal: articulações, iglu e poderes › iglu: uma foto para cada quantidade de blocos e uma para cada bloco caindo",
   "Modelos 3D da fase normal: articulações, iglu e poderes › iglu 3D: blocos assentados numa foto só e o que está caindo por cima, com o mesmo quique",
   "Modelos 3D da fase normal: articulações, iglu e poderes › iglu 3D: a moldura da porta vira foto (também por cima de quem está entrando)",
-  "Modelos 3D da fase normal: articulações, iglu e poderes › boia e chuteira 3D: item na fileira e efeito no jogador usam as fotos; desligado, o 2D"
+  "Modelos 3D da fase normal: articulações, iglu e poderes › boia e chuteira 3D: item na fileira e efeito no jogador usam as fotos; desligado, o 2D",
+  "Natal em 3D › o Natal é uma fase convertida: suéter, urso de gorro, trenó, árvores, placas e bichos em 3D",
+  "Natal em 3D › suéter e urso de gorro têm as mesmas poses (e articulações) dos modelos da fase normal",
+  "Natal em 3D › trenó: toda foto pedida durante a passagem existe (renas galopando, para os dois lados)",
+  "Natal em 3D › árvores 3D mantêm o pisca-pisca 2D por cima; prêmios 3D mantêm brilho e anel"
 ]

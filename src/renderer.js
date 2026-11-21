@@ -1,4 +1,7 @@
-import { drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, CRITTERS_3D } from './model3d.js';
+import {
+  drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D,
+  CRITTERS_3D, THEMES_3D,
+} from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
 import {
   atDepth, floeTilt, visibleRange, withVolume, volume, sceneLight, camera, followCamera, swayLayer, Foreground, foregroundKind, contactShadow, drawHaze, drawWaterDepth, drawSunPath,
@@ -8,7 +11,7 @@ import {
   makeBackground, floeSprite, drawPlayer, drawGoose, drawCrab, drawClam, drawFish, drawBear,
 } from './sprites.js';
 import { floeOffset } from './floes.js';
-import { drawSleigh, drawChristmasTrees, drawIglooLights } from './christmas.js';
+import { drawSleigh, drawChristmasTrees, drawIglooLights, xmasArt } from './christmas.js';
 import {
   makeForestBackground, logSprite, drawSnake, drawBat, drawPiranha, drawForestDecor,
   drawCabin, drawCabinDoorFront, drawLeaves, drawFireflies, RIVER,
@@ -30,7 +33,7 @@ import {
   drawRaptor, drawAmmonite, drawDinoEgg, drawCave, drawCaveDoorFront, LAVA,
 } from './dino.js';
 import { drawHud } from './hud.js';
-import { drawMoneyBag, drawHeart } from './bonus.js';
+import { drawMoneyBag, drawHeart, bonusArt } from './bonus.js';
 import { drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront, drawDizzy, powerArt } from './powers.js';
 
 const CRITTER_DRAW = {
@@ -168,10 +171,16 @@ export class Renderer {
     const tr = ctx.getTransform ? ctx.getTransform() : null;
     // A câmera só vale durante este desenho (fora dele camera.x = 0: projeções puras)
     camera.x = this.camX || 0;
-    // Modelos 3D só nas fases normais (as especiais seguem em 2D até ganharem os seus)
-    this.normal3d = !!(this.use3d && !game.special && DEPTH.model3d?.enabled);
+    // Modelos 3D nas fases normais e nas especiais já convertidas (THEMES_3D); as
+    // outras seguem inteiras em 2D até ganharem os seus modelos
+    this.normal3d = !!(this.use3d && DEPTH.model3d?.enabled && (!game.special || THEMES_3D.has(game.special.id)));
     powerArt.on = this.normal3d;
     powerArt.draw = drawPower3D;
+    xmasArt.on = this.normal3d;
+    xmasArt.sleigh = drawSleigh3D;
+    xmasArt.tree = drawTree3D;
+    bonusArt.on = this.normal3d;
+    bonusArt.draw = drawBonus3D;
     if (DEPTH.sway && tr && typeof tr.a === 'number') followCamera(game.player.x, dt);
 
     ctx.save();
@@ -411,8 +420,7 @@ export class Renderer {
       if (p.state === 'jump') contactShadow(ctx, p.x, pGround + 3, 22, pGround - p.y);
       drawPowerBack(ctx, p, t);
       // Piloto 3D: na fase normal (parka) usa as fotos do modelo 3D quando prontas
-      const use3d = this.normal3d && !outfits.player;
-      if (!(use3d && drawPlayer3D(ctx, p, t, cold, ride))) {
+      if (!(this.normal3d && drawPlayer3D(ctx, p, t, cold, ride, outfits.player))) {
         withVolume(ctx, [p.x - 64, p.y - 150, p.x + 64, p.y + 26], (g) => drawPlayer(g, p, t, cold, ride, outfits.player), undefined, { key: p });
       }
       drawPowerFront(ctx, p, t);
@@ -437,7 +445,7 @@ export class Renderer {
       const b = game.bear;
       atDepth(ctx, b.y, () => {
         // Fase normal: urso 3D quando a foto estiver pronta
-        const bear3d = this.normal3d && !outfits.bear && drawBear3D(ctx, b, t);
+        const bear3d = this.normal3d && drawBear3D(ctx, b, t, outfits.bear);
         if (!bear3d) withVolume(ctx, [b.x - 150, b.y - 190, b.x + 150, b.y + 24], (g) => drawBear(g, b, t, outfits.bear), undefined, { key: b });
         if (b.stun > 0) drawDizzy(ctx, b.x, b.y - 92, t);
       });
