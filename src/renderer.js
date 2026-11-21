@@ -1,4 +1,8 @@
-import { W, H, SHORE_TOP, WATER_TOP, RULES, IGLOO } from './config.js';
+import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
+import {
+  atDepth, floeTilt, visibleRange, withVolume, volume, contactShadow, drawHaze, drawWaterDepth, drawSunPath,
+  drawLighting, drawVignette, Bokeh,
+} from './depth.js';
 import {
   makeBackground, floeSprite, drawPlayer, drawGoose, drawCrab, drawClam, drawFish, drawBear,
 } from './sprites.js';
@@ -55,9 +59,21 @@ const ICE_WATER = { water: ['#1C7E99', '#0E5670', '#052A40'], ripple: [190, 235,
 const FLOE_SPRITE = {
   forest: logSprite, space: asteroidSprite, beach: boardSprite, halloween: pumpkinSprite, dino: rockSprite,
 };
+// Cenários cujas placas já trazem o próprio reflexo na água (sem o espelho genérico)
+const OWN_REFLECTION = new Set(['halloween']);
 const FLOE_HALO = { forest: RIVER.halo, space: DUST.halo, beach: SEA.halo, halloween: HAUNT.halo, dino: LAVA.halo };
 // Peixes de cada cenário (mesmos pontos): estrelinha no espaço, peixinho tropical na praia
 const FISH_DRAW = { space: drawStarBonus, beach: drawTropicalFish, halloween: drawCandy, dino: drawDinoEgg };
+
+// Bichos que voam ou flutuam: a sombra fica mais fraca e menor (estão longe do chão)
+const FLYING = new Set(['goose', 'bat', 'ufo', 'comet', 'gull', 'ghost', 'ptero', 'jellyfish', 'eyeball']);
+// Luz de cada cenário (sol, lua cheia, Terra): cor do banho de luz e do caminho na água
+const LIGHT = {
+  space: { warm: [150, 190, 255], path: [150, 200, 255], strength: 0.6, haze: 0.5 },
+  // Noite: luar frio e fraco, sem névoa (a fase já tem a neblina rasteira própria)
+  halloween: { warm: [190, 180, 255], path: [255, 240, 200], strength: 0.3, haze: 0, glow: 0 },
+  dino: { warm: [255, 170, 80], path: [255, 190, 110], strength: 1, haze: 1.1 },
+};
 
 // Intensidade da aurora boreal (0 = nenhuma). Aparece nas fases avançadas,
 // cresce com a fase e fica mais forte quando o céu escurece.
@@ -112,6 +128,19 @@ export class Renderer {
       ph: Math.random() * Math.PI * 2,
       sp: 1.5 + Math.random() * 2.5,
     }));
+    this.bokeh = new Bokeh();
+    this.lastT = 0;
+    this.slow = 0;
+  }
+
+  // Volume desligado sozinho se o aparelho não aguentar (fps baixo por alguns segundos)
+  watchFps(game, dt) {
+    if (!volume.enabled || !(game.fps > 0) || game.time < 4) return;
+    this.slow = game.fps < DEPTH.minFps ? this.slow + dt : 0;
+    if (this.slow > 3) {
+      volume.enabled = false;
+      console.info('[gelinho] fps baixo: volume dos personagens desligado');
+    }
   }
 
   draw(game) {
@@ -121,6 +150,9 @@ export class Renderer {
       this.skyF += (game.temp / RULES.tempStart - this.skyF) * 0.05;
     }
     const sky = skyAt(this.skyF);
+    const dt = Math.max(0, Math.min(0.1, t - this.lastT));
+    this.lastT = t;
+    this.watchFps(game, dt);
 
     ctx.save();
     if (game.shake > 0) {
@@ -150,6 +182,10 @@ export class Renderer {
     else if (halloween) bg = this.halloweenBg ||= makeHalloweenBackground();
     else if (dino) bg = this.dinoBg ||= makeDinoBackground();
     ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h);
+    const lt = LIGHT[scenery] || { warm: sky.sun, path: sky.sun, strength: 1, haze: 1 };
+    const horizon = space ? [120, 80, 220] : halloween ? HAUNT.sky : dino ? LAVA.sky : sky.hor;
+    // Perspectiva atmosférica: o cenário distante se perde na cor do horizonte
+    drawHaze(ctx, horizon, lt.haze);
     if (scenery === 'beach') drawSkyGulls(ctx, t);
     if (sp?.sleigh) drawSleigh(ctx, game.sleigh, t);
     if (sp?.decor === 'natal') drawChristmasTrees(ctx, t);
@@ -164,11 +200,15 @@ export class Renderer {
     const reflect = space ? { hor: [120, 80, 220] } : halloween ? { hor: HAUNT.sky } : dino ? { hor: LAVA.sky } : sky;
     this.drawWater(ctx, t, reflect, WATERS[scenery] || ICE_WATER);
     if (dino) drawLavaBubbles(ctx, t);
+    drawWaterDepth(ctx, horizon, lt.glow ?? 1);
+    drawSunPath(ctx, t, 300, lt.path, lt.strength * (0.45 + 0.55 * clamp01(this.skyF + (sp ? 0.4 : 0))));
     game.particles.drawRipples(ctx);
     this.drawEntities(ctx, game, t);
     game.particles.drawPuffs(ctx);
     game.particles.drawFx(ctx);
     game.particles.drawDrops(ctx);
+    // Luz do sol (ou da lua) banhando a cena: quente do lado dela, fria do outro
+    drawLighting(ctx, 300, lt.warm, lt.strength);
 
     // Escurecimento do entardecer
     const dusk = 1 - this.skyF;
@@ -181,6 +221,13 @@ export class Renderer {
     else if (game.particles.stardust) drawStardust(ctx, game.particles.snow, t);
     else if (game.particles.embers) drawEmbers(ctx, game.particles.snow, t);
     else if (!game.particles.calm) game.particles.drawSnow(ctx);
+    // Flocos (ou brasas) desfocados bem na frente da câmera
+    const parts = game.particles;
+    if (DEPTH.bokeh && !parts.calm && !parts.leaves && !parts.stardust) {
+      this.bokeh.update(dt, parts.embers);
+      this.bokeh.draw(ctx, parts.embers ? [255, 150, 60] : [255, 255, 255], parts.embers ? 0.3 : 0.2);
+    }
+    drawVignette(ctx);
     ctx.restore();
 
     drawHud(ctx, game);
@@ -284,9 +331,10 @@ export class Renderer {
       const depth = (y - top) / (H - top);
       const rc = pal.ripple.join(', ');
       ctx.strokeStyle = `rgba(${rc}, ${0.2 * (1 - depth) + 0.04})`;
-      ctx.lineWidth = 1.4;
+      // Perspectiva: ondinhas curtas e finas ao fundo, longas e grossas na frente
+      ctx.lineWidth = 0.7 + depth * 1.6;
       const dir = j % 2 ? 1 : -1;
-      const len = 16 + (j % 3) * 12;
+      const len = (16 + (j % 3) * 12) * (0.45 + depth * 1.1);
       ctx.beginPath();
       for (let i = 0; i < 9; i++) {
         const x = mod(i * 167 + j * 61 + dir * t * (14 + j), W + 120) - 60;
@@ -315,51 +363,79 @@ export class Renderer {
     const ride = (p.state === 'stand' || p.state === 'freeze') && p.row >= 0 && p.support
       ? floeOffset(p.support, t) : 0;
     const outfits = game.special?.outfits || {};
+    // Profundidade do jogador: a linha do chão sob ele (no pulo, entre as duas fileiras)
+    const rowY = (r) => (r >= 0 ? game.rows[r]?.y ?? SHORE_Y : SHORE_Y);
+    let pGround = rowY(p.row);
+    if (p.state === 'jump' && p.y0 != null) pGround = p.y0 + (p.y1 - p.y0) * clamp01(p.t);
     // Com um poder: boia de patinho na cintura ou brilho e chuteira dourada
-    const drawP = () => {
+    const drawP = () => atDepth(ctx, pGround, () => {
+      if (p.state === 'jump') contactShadow(ctx, p.x, pGround + 3, 22, pGround - p.y);
       drawPowerBack(ctx, p, t);
-      drawPlayer(ctx, p, t, cold, ride, outfits.player);
+      withVolume(ctx, [p.x - 64, p.y - 150, p.x + 64, p.y + 26], (g) => drawPlayer(g, p, t, cold, ride, outfits.player));
       drawPowerFront(ctx, p, t);
-    };
+    });
     // O jogador é desenhado depois da última fileira que está "atrás" dele.
     let bucket = -1;
     game.rows.forEach((r, i) => { if (r.y <= p.y + 16) bucket = i; });
     if ((p.state === 'drown' || p.state === 'freeze' || p.state === 'swim') && p.row >= 0) bucket = Math.max(bucket, p.row);
 
     const house = HOUSE_DRAW[game.igloo.style];
-    if (house) house.body(ctx, game.igloo, t);
-    else game.igloo.draw(ctx, t);
-    if (game.special?.decor === 'natal' && game.igloo.complete) drawIglooLights(ctx, t);
+    // Costa: a casa, o urso e o jogador na costa ficam na escala do fundo
+    atDepth(ctx, SHORE_Y, () => {
+      withVolume(ctx, [IGLOO.x - 200, IGLOO.baseY - 300, IGLOO.x + 200, IGLOO.baseY + 30], (g) => {
+        if (house) house.body(g, game.igloo, t);
+        else game.igloo.draw(g, t);
+      });
+      if (game.special?.decor === 'natal' && game.igloo.complete) drawIglooLights(ctx, t);
+    });
     if (game.bear.active) {
-      drawBear(ctx, game.bear, t, outfits.bear);
-      if (game.bear.stun > 0) drawDizzy(ctx, game.bear.x, game.bear.y - 92, t);
+      const b = game.bear;
+      atDepth(ctx, b.y, () => {
+        withVolume(ctx, [b.x - 150, b.y - 190, b.x + 150, b.y + 24], (g) => drawBear(g, b, t, outfits.bear));
+        if (b.stun > 0) drawDizzy(ctx, b.x, b.y - 92, t);
+      });
     }
     if (p.state !== 'gone' && bucket === -1) {
       drawP();
       // Passando pela porta: moldura do arco, sombra do interior e cortina por cima dele
       if (p.inDoorway) {
-        if (house) house.front(ctx, game.igloo, t);
-        else game.igloo.drawDoorFront(ctx, t);
+        atDepth(ctx, SHORE_Y, () => {
+          if (house) house.front(ctx, game.igloo, t);
+          else game.igloo.drawDoorFront(ctx, t);
+        });
       }
     }
-    if (game.atDoor) this.drawDoorHint(ctx, game, t);
+    if (game.atDoor) atDepth(ctx, SHORE_Y, () => this.drawDoorHint(ctx, game, t));
     const scenery = game.special?.scenery;
     const fishDraw = FISH_DRAW[scenery] || drawFish;
     game.rows.forEach((row, i) => {
-      this.drawRow(ctx, row, t, scenery);
-      for (const c of game.critters.inRow(i)) {
-        if (c.x <= -60 || c.x >= W + 60) continue;
-        const draw = c.kind === 'fish' ? fishDraw : CRITTER_DRAW[c.kind];
-        if (c.kicked) {
-          // Chutado: voa girando por cima da fileira
-          ctx.save();
-          ctx.translate(c.x, row.y - 18 + c.fly);
-          ctx.rotate(c.spin);
-          ctx.translate(-c.x, -(row.y - 18));
-          draw(ctx, c, row.y, t);
-          ctx.restore();
-        } else draw(ctx, c, row.y, t);
-      }
+      const [minX, maxX] = visibleRange(row.y, 60);
+      atDepth(ctx, row.y, () => {
+        const tilt = floeTilt(row.y);
+        ctx.save();
+        ctx.translate(0, row.y);
+        ctx.scale(1, tilt);
+        ctx.translate(0, -row.y);
+        this.drawRow(ctx, row, t, scenery);
+        ctx.restore();
+        for (const c of game.critters.inRow(i)) {
+          if (c.x <= minX || c.x >= maxX) continue;
+          const draw = c.kind === 'fish' ? fishDraw : CRITTER_DRAW[c.kind];
+          if (c.kicked) {
+            // Chutado: voa girando por cima da fileira
+            ctx.save();
+            ctx.translate(c.x, row.y - 18 + c.fly);
+            ctx.rotate(c.spin);
+            ctx.translate(-c.x, -(row.y - 18));
+            draw(ctx, c, row.y, t);
+            ctx.restore();
+          } else {
+            const fly = FLYING.has(c.kind);
+            contactShadow(ctx, c.x, row.y + 4, fly ? 18 : 24, fly ? 40 : 0, fly ? 0.18 : 0.26);
+            withVolume(ctx, [c.x - 80, row.y - 120, c.x + 80, row.y + 50], (g) => draw(g, c, row.y, t));
+          }
+        }
+      });
       if (p.state !== 'gone' && bucket === i) drawP();
     });
   }
@@ -368,8 +444,9 @@ export class Renderer {
   drawRow(ctx, row, t, scenery = null) {
     const sprite = FLOE_SPRITE[scenery] || floeSprite;
     const items = [];
+    const [minX, maxX] = visibleRange(row.y);
     for (const r of row.rects()) {
-      if (r.x > W + 20 || r.x + r.w < -20) continue;
+      if (r.x > maxX || r.x + r.w < minX) continue;
       const y = row.y + floeOffset(r.piece, t);
       items.push({ x: r.x, y, w: r.w, s: sprite(r.piece, row.active) });
     }
@@ -380,12 +457,14 @@ export class Renderer {
       ctx.beginPath();
       ctx.ellipse(it.x + it.w / 2 + 4, it.y + 28, it.w / 2 + 6, 7, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.save();
-      ctx.globalAlpha = 0.14;
-      ctx.translate(it.x - it.s.ox, it.y + 19);
-      ctx.scale(1, -0.5);
-      ctx.drawImage(it.s.canvas, 0, -(it.s.oy + 19), it.s.w, it.s.h);
-      ctx.restore();
+      if (!OWN_REFLECTION.has(scenery)) {
+        ctx.save();
+        ctx.globalAlpha = 0.14;
+        ctx.translate(it.x - it.s.ox, it.y + 19);
+        ctx.scale(1, -0.5);
+        ctx.drawImage(it.s.canvas, 0, -(it.s.oy + 19), it.s.w, it.s.h);
+        ctx.restore();
+      }
       if (row.active) {
         // Halo elíptico (gradiente radial achatado, sem bordas cortadas)
         const R = it.w * 0.8;

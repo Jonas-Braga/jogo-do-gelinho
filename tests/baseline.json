@@ -468,5 +468,17 @@
   "Fases especiais · Dinossauros (fase 30) › trilha dos Dinossauros: 16 compassos com tambores, marimba, flauta de osso e zumbido",
   "Fases especiais · Dinossauros (fase 30) › trilha dos Dinossauros é sintetizada sem erro, respeita o mudo e para no fim de jogo",
   "Fases especiais · Dinossauros (fase 30) › troféu dos Dinossauros: nome, fita verde-oliva e emblema de pegada com vulcão",
-  "Fases especiais · Dinossauros (fase 30) › temperatura, vidas e regras continuam as mesmas nos Dinossauros"
+  "Fases especiais · Dinossauros (fase 30) › temperatura, vidas e regras continuam as mesmas nos Dinossauros",
+  "Profundidade: perspectiva › a fileira da frente fica em escala 1 e a costa na escala do fundo",
+  "Profundidade: perspectiva › quanto mais ao fundo, menor (escala cresce da costa até a frente)",
+  "Profundidade: perspectiva › o ponto de fuga fica parado e o resto converge para ele ao fundo",
+  "Profundidade: perspectiva › ao fundo o trecho visível do mundo é mais largo que a tela (placas não somem antes da borda)",
+  "Profundidade: perspectiva › placas do fundo têm o topo mais achatado e as da frente, mais aberto",
+  "Profundidade: perspectiva › atDepth escala em volta do ponto de fuga, na linha dos pés",
+  "Profundidade: perspectiva › textos de pontos aparecem na posição projetada da fileira",
+  "Profundidade: perspectiva › desenhar não muda a simulação (posições do jogador, placas e bichos)",
+  "Profundidade: luz, volume e sombras › sombra de contato encolhe quando quem a projeta sobe (pulo)",
+  "Profundidade: luz, volume e sombras › sem canvas de verdade, o volume desenha direto no contexto (cores continuam visíveis)",
+  "Profundidade: luz, volume e sombras › volume desliga sozinho quando o fps fica baixo por alguns segundos",
+  "Profundidade: luz, volume e sombras › toda fase (normal e especial) desenha com a profundidade sem erro, com bichos e pulo"
 ]

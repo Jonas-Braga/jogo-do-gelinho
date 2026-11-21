@@ -1,4 +1,15 @@
-import { W, H, PALETTE } from './config.js';
+import { W, H, PALETTE, DEPTH } from './config.js';
+import { depthScale, projectX } from './depth.js';
+
+// Cada partícula é desenhada na perspectiva da linha onde está (como placas e bichos)
+function enterDepth(ctx, y) {
+  ctx.save();
+  const s = depthScale(y);
+  if (s === 1) return;
+  ctx.translate(DEPTH.vanishX, y);
+  ctx.scale(s, s);
+  ctx.translate(-DEPTH.vanishX, -y);
+}
 
 export class Particles {
   constructor() {
@@ -143,6 +154,7 @@ export class Particles {
     for (const f of this.fx) {
       if (f.t < 0) continue;
       const k = f.t / f.life;
+      enterDepth(ctx, f.y);
       switch (f.kind) {
         case 'chip':
           ctx.globalAlpha = 1 - k;
@@ -198,6 +210,7 @@ export class Particles {
         default:
           break;
       }
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -241,9 +254,11 @@ export class Particles {
       const k = r.t;
       ctx.strokeStyle = `rgba(${(this.liquid?.ripple || [207, 239, 250]).join(', ')}, ${0.7 * (1 - k)})`;
       ctx.lineWidth = 2;
+      enterDepth(ctx, r.y);
       ctx.beginPath();
       ctx.ellipse(r.x, r.y, 10 + k * 60, 3 + k * 12, 0, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -253,8 +268,9 @@ export class Particles {
     ctx.fillStyle = this.liquid?.splash || PALETTE.splash;
     for (const d of this.drops) {
       ctx.globalAlpha = 1 - d.t / d.life;
+      const s = depthScale(d.floor ?? d.y);
       ctx.beginPath();
-      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.arc(projectX(d.x, d.floor ?? d.y), d.y, d.r * s, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
@@ -267,7 +283,7 @@ export class Particles {
       ctx.fillStyle = p.color;
       ctx.globalAlpha = 0.85 * (1 - k);
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r * (1 + k), 0, Math.PI * 2);
+      ctx.arc(projectX(p.x, p.y), p.y, p.r * (1 + k) * depthScale(p.y), 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
@@ -284,7 +300,7 @@ export class Particles {
       ctx.globalAlpha = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
       const sc = s.t < 0.12 ? 0.6 + (s.t / 0.12) * 0.4 : 1;
       ctx.save();
-      ctx.translate(s.x, s.y);
+      ctx.translate(projectX(s.x, s.y), s.y);
       ctx.scale(sc, sc);
       ctx.strokeText(s.str, 0, 0);
       ctx.fillStyle = s.color;

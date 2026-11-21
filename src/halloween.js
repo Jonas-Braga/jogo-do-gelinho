@@ -391,29 +391,57 @@ export function drawJack(ctx, x, y, r, t, lit) {
 }
 
 // Corpo da abóbora com gomos e cabinho, centrado em (cx, cy)
+// Clareia (f > 0) ou escurece (f < 0) uma cor #RRGGBB
+function tone(hex, f) {
+  const c = hex.match(/\w\w/g).map((v) => parseInt(v, 16));
+  const m = c.map((v) => Math.round(f >= 0 ? v + (255 - v) * f : v * (1 + f)));
+  return `rgb(${m[0]},${m[1]},${m[2]})`;
+}
+
+// Abóbora com volume: gomos arredondados (os de fora mais estreitos, como numa
+// esfera), cada um com brilho próprio do lado do luar, luz de borda no alto à
+// esquerda, brilho especular e cabinho torcido.
 function pumpkinBody(ctx, cx, cy, rx, ry, color) {
-  const g = ctx.createRadialGradient(cx - rx * 0.3, cy - ry * 0.4, 1, cx, cy, rx * 1.1);
-  g.addColorStop(0, '#FFB45A');
-  g.addColorStop(0.45, color);
-  g.addColorStop(1, '#8A3A0E');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, TAU);
-  ctx.fill();
-  // Gomos
-  ctx.strokeStyle = 'rgba(110, 40, 8, 0.55)';
-  ctx.lineWidth = Math.max(1, rx * 0.06);
-  for (const k of [-0.55, 0, 0.55]) {
+  const lobes = [-1, 1, -0.5, 0.5, 0];
+  for (const s of lobes) {
+    const lx = cx + s * rx * 0.56;
+    const lw = rx * (0.5 - Math.abs(s) * 0.1);
+    const lh = ry * (1 - Math.abs(s) * 0.07);
+    const dark = -0.15 - (s + 1) * 0.16;   // gomos à direita (longe da lua) mais escuros
+    const g = ctx.createRadialGradient(lx - lw * 0.35, cy - lh * 0.45, 0.5, lx, cy, Math.max(lw, lh) * 1.1);
+    g.addColorStop(0, tone(color, 0.38 - (s + 1) * 0.1));
+    // O gomo do meio, de frente para a câmera, tem a cor própria da abóbora
+    g.addColorStop(0.5, s === 0 ? color : tone(color, dark * 0.4));
+    g.addColorStop(1, tone(color, dark - 0.25));
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.ellipse(cx + k * rx * 0.5, cy, rx * (0.5 - Math.abs(k) * 0.3), ry * 0.96, 0, 0, TAU);
-    ctx.stroke();
+    ctx.ellipse(lx, cy, lw, lh, 0, 0, TAU);
+    ctx.fill();
   }
-  // Cabinho
-  ctx.fillStyle = '#4E6B2A';
+  // Brilho especular no gomo do meio e luz de borda do luar
+  ctx.fillStyle = 'rgba(255, 240, 220, 0.35)';
   ctx.beginPath();
-  ctx.moveTo(cx - rx * 0.1, cy - ry * 0.88);
-  ctx.quadraticCurveTo(cx - rx * 0.05, cy - ry * 1.4, cx + rx * 0.2, cy - ry * 1.45);
-  ctx.lineTo(cx + rx * 0.12, cy - ry * 0.88);
+  ctx.ellipse(cx - rx * 0.22, cy - ry * 0.5, rx * 0.16, ry * 0.18, -0.5, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(225, 210, 255, 0.5)';
+  ctx.lineWidth = Math.max(0.8, rx * 0.05);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx * 0.98, ry * 0.97, 0, Math.PI * 1.08, Math.PI * 1.5);
+  ctx.stroke();
+  // Cabinho torcido (com o topo cortado mais claro)
+  const sg = ctx.createLinearGradient(cx - rx * 0.1, 0, cx + rx * 0.2, 0);
+  sg.addColorStop(0, '#6E8A3C');
+  sg.addColorStop(1, '#344A1A');
+  ctx.fillStyle = sg;
+  ctx.beginPath();
+  ctx.moveTo(cx - rx * 0.12, cy - ry * 0.86);
+  ctx.quadraticCurveTo(cx - rx * 0.06, cy - ry * 1.4, cx + rx * 0.2, cy - ry * 1.48);
+  ctx.lineTo(cx + rx * 0.22, cy - ry * 1.3);
+  ctx.quadraticCurveTo(cx + rx * 0.1, cy - ry * 1.2, cx + rx * 0.12, cy - ry * 0.86);
+  ctx.fill();
+  ctx.fillStyle = '#9DB26A';
+  ctx.beginPath();
+  ctx.ellipse(cx + rx * 0.21, cy - ry * 1.39, rx * 0.05, ry * 0.08, 0.3, 0, TAU);
   ctx.fill();
 }
 
@@ -459,41 +487,99 @@ export function pumpkinSprite(piece, active) {
   const { c, g } = offscreen(w + PUMP_PAD * 2, PUMP_H);
   g.translate(PUMP_PAD, PUMP_TOP);
   const rnd = seeded(piece.seed + 23);
-  // Reflexo laranja na água
-  g.fillStyle = active ? 'rgba(255, 150, 40, 0.25)' : 'rgba(30, 10, 40, 0.35)';
-  g.beginPath();
-  g.ellipse(w / 2, 15, w / 2 + 5, 5, 0, 0, TAU);
-  g.fill();
   const n = Math.max(1, Math.round(w / 40));
   const pw = w / n;
-  // Rama verde ligando as abóboras
-  g.strokeStyle = '#3E5A22';
-  g.lineWidth = 2;
+  const WL = 10; // linha d'água (os pés pisam em 0, no alto das abóboras)
+  const color = active ? JACK_ORANGE : '#B85A1C';
+  const pumps = Array.from({ length: n }, (_, i) => ({
+    cx: i * pw + pw / 2 + (rnd() - 0.5) * 2,
+    rx: pw / 2 + 1.5,
+    ry: 11 + rnd() * 1.5,
+    bob: (rnd() - 0.5) * 1.6,
+  }));
+
+  // Reflexo de cada abóbora na água escura (alongado e esmaecido para baixo)
+  for (const p of pumps) {
+    const rg = g.createLinearGradient(0, WL, 0, WL + 22);
+    rg.addColorStop(0, active ? 'rgba(255, 150, 40, 0.38)' : 'rgba(184, 90, 28, 0.26)');
+    rg.addColorStop(1, 'rgba(184, 90, 28, 0)');
+    g.fillStyle = rg;
+    g.beginPath();
+    g.ellipse(p.cx, WL + 4, p.rx * 0.85, 16, 0, 0, Math.PI);
+    g.fill();
+  }
+
+  // Rama verde ligando as abóboras por trás, com gavinhas enroladas
+  g.lineCap = 'round';
+  g.strokeStyle = '#2E4618';
+  g.lineWidth = 2.6;
   g.beginPath();
-  g.moveTo(2, 2);
-  for (let i = 0; i < n; i++) g.quadraticCurveTo(i * pw + pw / 2, -6, (i + 1) * pw - 2, 2);
+  g.moveTo(2, -2);
+  for (let i = 0; i < n; i++) g.quadraticCurveTo(i * pw + pw / 2, -9, (i + 1) * pw - 2, -2);
+  g.stroke();
+  g.strokeStyle = '#5A7A2E';
+  g.lineWidth = 1;
   g.stroke();
   for (let i = 0; i < n; i++) {
-    const cx = i * pw + pw / 2;
-    const rx = pw / 2 + 1.5;
-    const ry = 11 + rnd() * 1.5;
-    pumpkinBody(g, cx, 4, rx, ry, active ? JACK_ORANGE : '#B85A1C');
+    const x = (i + 1) * pw - 4;
+    g.strokeStyle = '#4C6E2A';
+    g.lineWidth = 0.9;
+    g.beginPath();
+    g.arc(x, -6, 2.4, Math.PI * 0.2, Math.PI * 1.7);
+    g.stroke();
+  }
+
+  for (const [i, p] of pumps.entries()) {
+    const cy = 4 + p.bob;
+    pumpkinBody(g, p.cx, cy, p.rx, p.ry, color);
+    // Parte de baixo dentro d'água: tingida pela cor do rio
+    g.save();
+    g.beginPath();
+    g.ellipse(p.cx, cy, p.rx + 1, p.ry + 1, 0, 0, TAU);
+    g.clip();
+    const wg = g.createLinearGradient(0, WL - 4, 0, cy + p.ry);
+    wg.addColorStop(0, 'rgba(46, 22, 74, 0)');
+    wg.addColorStop(0.35, 'rgba(46, 22, 74, 0.45)');
+    wg.addColorStop(1, 'rgba(26, 10, 46, 0.8)');
+    g.fillStyle = wg;
+    g.fillRect(p.cx - p.rx - 2, WL - 4, p.rx * 2 + 4, 30);
+    g.restore();
+    // Anel d'água em volta: só a metade da frente aparece clara (curva, não reta)
+    g.strokeStyle = 'rgba(205, 180, 255, 0.38)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.ellipse(p.cx, WL - 1, p.rx * 0.86, 2.4, 0, 0.35, 1.25);
+    g.stroke();
+    g.beginPath();
+    g.ellipse(p.cx, WL - 1, p.rx * 0.86, 2.4, 0, 1.9, Math.PI - 0.35);
+    g.stroke();
     if (active) {
-      carvedFace(g, cx, 4, Math.min(rx, 15), 0.3 + i);
+      carvedFace(g, p.cx, cy, Math.min(p.rx, 15), 0.3 + i);
+      // Luz da vela vazando pelo rosto
+      const lg = g.createRadialGradient(p.cx, cy + 1, 1, p.cx, cy + 1, p.rx * 1.2);
+      lg.addColorStop(0, 'rgba(255, 200, 90, 0.35)');
+      lg.addColorStop(1, 'rgba(255, 160, 40, 0)');
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      g.fillStyle = lg;
+      g.beginPath();
+      g.arc(p.cx, cy + 1, p.rx * 1.2, 0, TAU);
+      g.fill();
+      g.restore();
     } else {
-      // Folha da rama
+      // Folha da rama (com a nervura)
       g.fillStyle = '#4C6E2A';
       g.beginPath();
-      g.ellipse(cx + rx * 0.5, -6, 4, 2.2, -0.5, 0, TAU);
+      g.ellipse(p.cx + p.rx * 0.5, cy - p.ry - 1, 4.5, 2.4, -0.5, 0, TAU);
       g.fill();
+      g.strokeStyle = 'rgba(160, 200, 110, 0.6)';
+      g.lineWidth = 0.6;
+      g.beginPath();
+      g.moveTo(p.cx + p.rx * 0.5 - 3.5, cy - p.ry + 1);
+      g.lineTo(p.cx + p.rx * 0.5 + 3.5, cy - p.ry - 3);
+      g.stroke();
     }
   }
-  // Brilho no topo onde se pisa
-  g.fillStyle = active ? 'rgba(255, 230, 160, 0.6)' : 'rgba(255, 210, 160, 0.25)';
-  g.fillRect(4, -6, w - 8, 1.2);
-  // Anel de água em volta
-  g.fillStyle = 'rgba(205, 180, 255, 0.35)';
-  g.fillRect(-3, 14, w + 7, 1.4);
   const sprite = { canvas: c, ox: PUMP_PAD, oy: PUMP_TOP, w: w + PUMP_PAD * 2, h: PUMP_H };
   piece.sprites[key] = sprite;
   return sprite;
@@ -724,12 +810,82 @@ export function drawCandy(ctx, c, y, t) {
 }
 
 // ---------------------------------------------------------------- Lobisomem
-// No lugar do urso: corcunda, de pé nas patas de trás, pelo cinza-azulado
-// desgrenhado, orelhas pontudas, focinho comprido, olhos amarelos brilhando,
-// garras e a calça roxa rasgada. Parado, uiva para a lua de vez em quando.
+// No lugar do urso: corcunda, de pé nas patas de trás (pernas de lobo, com o
+// calcanhar alto), pelo cinza-azulado desgrenhado, juba de pelo no pescoço,
+// orelhas pontudas, focinho comprido com mandíbula que abre, olhos amarelos
+// brilhando, mãos com garras e a calça roxa rasgada. Tudo em formas cheias com
+// luz do luar (alto à esquerda): músculos arredondados, pelo em mechas e sombra
+// própria do lado oposto. Parado, uiva para a lua de vez em quando.
 export const WEREWOLF = {
-  fur: ['#7A7488', '#5A5468', '#3A3448'], belly: '#9C94A8', eye: '#FFE14A', pants: ['#5A2E7A', '#3E1E58'], claw: '#F1EADA',
+  fur: ['#8C86A0', '#5E5874', '#3A344C'], belly: '#A69EB4', eye: '#FFE14A', pants: ['#6A3A8C', '#3E1E58'], claw: '#F1EADA',
 };
+const WOLF_DEEP = '#241E32';
+const MOUTH = '#5A1A2A';
+
+// Segmento de membro cheio (cápsula afunilada de A até B), sombreado na
+// perpendicular: lado da luz mais claro, lado oposto mais escuro.
+function limb(ctx, ax, ay, bx, by, ra, rb, light, colors) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len = Math.hypot(dx, dy) || 1;
+  let nx = -dy / len;
+  let ny = dx / len;
+  if (nx * light[0] + ny * light[1] > 0) { nx = -nx; ny = -ny; } // n aponta para longe da luz
+  const ang = Math.atan2(dy, dx);
+  const mx = (ax + bx) / 2;
+  const my = (ay + by) / 2;
+  const r = Math.max(ra, rb);
+  const g = ctx.createLinearGradient(mx - nx * r, my - ny * r, mx + nx * r, my + ny * r);
+  g.addColorStop(0, colors[0]);
+  g.addColorStop(0.5, colors[1]);
+  g.addColorStop(1, colors[2]);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(ax, ay, ra, ang + Math.PI / 2, ang - Math.PI / 2);
+  ctx.arc(bx, by, rb, ang - Math.PI / 2, ang + Math.PI / 2);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Tufo de pelo pontudo (para a borda das costas, cotovelos, juba)
+function tuft(ctx, x, y, ang, len, w) {
+  ctx.beginPath();
+  ctx.moveTo(x - Math.sin(ang) * w, y + Math.cos(ang) * w);
+  ctx.quadraticCurveTo(
+    x + Math.cos(ang) * len * 0.6, y + Math.sin(ang) * len * 0.6 - 1,
+    x + Math.cos(ang) * len, y + Math.sin(ang) * len,
+  );
+  ctx.lineTo(x + Math.sin(ang) * w, y - Math.cos(ang) * w);
+  ctx.fill();
+}
+
+// Ponto e tangente numa curva de Bézier cúbica
+function bez(p, k) {
+  const u = 1 - k;
+  const x = u * u * u * p[0] + 3 * u * u * k * p[2] + 3 * u * k * k * p[4] + k * k * k * p[6];
+  const y = u * u * u * p[1] + 3 * u * u * k * p[3] + 3 * u * k * k * p[5] + k * k * k * p[7];
+  const tx = 3 * u * u * (p[2] - p[0]) + 6 * u * k * (p[4] - p[2]) + 3 * k * k * (p[6] - p[4]);
+  const ty = 3 * u * u * (p[3] - p[1]) + 6 * u * k * (p[5] - p[3]) + 3 * k * k * (p[7] - p[5]);
+  return { x, y, a: Math.atan2(ty, tx) };
+}
+
+// Mechas de pelo (traços curtos claros e escuros) dentro do recorte atual
+function furStrands(ctx, x0, y0, w, h, seed, ang, light, dark) {
+  const rnd = seeded(seed);
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 1.1;
+  for (let i = 0; i < 46; i++) {
+    const x = x0 + rnd() * w;
+    const y = y0 + rnd() * h;
+    const l = 4 + rnd() * 6;
+    const a = ang + (rnd() - 0.5) * 0.5;
+    ctx.strokeStyle = i % 3 === 0 ? light : dark;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + Math.cos(a) * l * 0.5 + 1, y + Math.sin(a) * l * 0.5, x + Math.cos(a) * l, y + Math.sin(a) * l);
+    ctx.stroke();
+  }
+}
 
 export function drawWerewolf(ctx, b, t) {
   const Wf = WEREWOLF;
@@ -739,195 +895,365 @@ export function drawWerewolf(ctx, b, t) {
   const breath = Math.sin(t * 2) * 1;
   // Uivo: de tempos em tempos, quando não está perseguindo
   const howl = run ? 0 : Math.max(0, Math.sin(t * 0.7) - 0.75) * 4;
-  ctx.fillStyle = 'rgba(10, 6, 16, 0.35)';
+  // Luz do luar no sistema local (o desenho é espelhado quando anda para a esquerda)
+  const L = [-0.7 * b.dir, -0.7];
+  const furC = [Wf.fur[0], Wf.fur[1], Wf.fur[2]];
+  const backC = [Wf.fur[1], Wf.fur[2], WOLF_DEEP];
+
+  // Sombra no chão
+  const sh = ctx.createRadialGradient(b.x, b.y + 2, 4, b.x, b.y + 2, 56);
+  sh.addColorStop(0, 'rgba(8, 4, 14, 0.45)');
+  sh.addColorStop(1, 'rgba(8, 4, 14, 0)');
+  ctx.save();
+  ctx.translate(b.x, b.y + 2);
+  ctx.scale(1, 0.16);
+  ctx.fillStyle = sh;
   ctx.beginPath();
-  ctx.ellipse(b.x, b.y + 3, 52, 7, 0, 0, TAU);
+  ctx.arc(0, 0, 56, 0, TAU);
   ctx.fill();
+  ctx.restore();
+
   ctx.save();
   ctx.translate(b.x, b.y);
   ctx.scale(b.dir, 1);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  // Cauda peluda
-  ctx.fillStyle = Wf.fur[2];
+  // Cauda peluda (atrás de tudo), balançando
+  const tailTip = [-64, -22 + sw * 6];
+  const tg = ctx.createLinearGradient(-20, -50, tailTip[0], tailTip[1]);
+  tg.addColorStop(0, Wf.fur[1]);
+  tg.addColorStop(1, Wf.fur[2]);
+  ctx.fillStyle = tg;
   ctx.beginPath();
-  ctx.moveTo(-26, -46);
-  ctx.quadraticCurveTo(-56, -40 + sw * 4, -60, -20 + sw * 6);
-  ctx.quadraticCurveTo(-46, -30, -22, -36);
-  ctx.fill();
-
-  // Pernas (de trás mais escura), com joelho dobrado e patas
-  const leg = (s, back) => {
-    const k = (back ? -sw : sw) * (run ? 1 : 0.5);
-    ctx.strokeStyle = back ? Wf.fur[2] : Wf.fur[1];
-    ctx.lineWidth = back ? 13 : 14;
-    ctx.beginPath();
-    ctx.moveTo(-8 + s, -40);
-    ctx.lineTo(-2 + s + k * 10, -20);
-    ctx.lineTo(-12 + s + k * 16, -4);
-    ctx.stroke();
-    ctx.fillStyle = back ? Wf.fur[2] : Wf.fur[1];
-    ctx.beginPath();
-    ctx.ellipse(-8 + s + k * 16, -3, 11, 5, 0, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = Wf.claw;
-    for (let i = 0; i < 3; i++) ctx.fillRect(-1 + s + k * 16 + i * 3, -3, 2, 3);
-  };
-  leg(6, true);
-  // Calça roxa rasgada (até o joelho)
-  ctx.fillStyle = Wf.pants[1];
-  ctx.beginPath();
-  ctx.moveTo(-22, -50);
-  ctx.lineTo(16, -50);
-  ctx.lineTo(14, -30);
-  ctx.lineTo(8, -26);
-  ctx.lineTo(4, -32);
-  ctx.lineTo(-2, -25);
-  ctx.lineTo(-8, -31);
-  ctx.lineTo(-16, -27);
+  ctx.moveTo(-20, -52);
+  ctx.bezierCurveTo(-44, -60, -60, -44 + sw * 3, tailTip[0], tailTip[1]);
+  ctx.bezierCurveTo(-52, -26 + sw * 4, -40, -34, -18, -40);
   ctx.closePath();
   ctx.fill();
-  leg(-2, false);
+  ctx.fillStyle = Wf.fur[2];
+  for (let i = 0; i < 5; i++) {
+    const k = 0.25 + i * 0.16;
+    tuft(ctx, -20 + (tailTip[0] + 20) * k, -46 + (tailTip[1] + 46) * k + 4, 1.9 + k * 0.6, 8, 2.5);
+  }
+  ctx.fillStyle = Wf.fur[0];
+  tuft(ctx, tailTip[0] + 3, tailTip[1] - 1, Math.PI + 0.4, 8, 2.4);
+
+  // Pernas de lobo: coxa musculosa, canela, calcanhar alto e pata com garras
+  const leg = (s, back) => {
+    const k = (back ? -sw : sw) * (run ? 1 : 0.45);
+    const C = back ? backC : furC;
+    const hip = [-6 + s, -50];
+    const knee = [8 + s + k * 8, -31];
+    const hock = [-5 + s + k * 12, -14];
+    const paw = [3 + s + k * 16, -4];
+    limb(ctx, hock[0], hock[1], paw[0], paw[1], 4.6, 4, L, C);
+    limb(ctx, knee[0], knee[1], hock[0], hock[1], 7, 4.8, L, C);
+    limb(ctx, hip[0], hip[1], knee[0], knee[1], 13, 7.5, L, C);
+    // Massa do músculo da coxa
+    const mg = ctx.createRadialGradient(hip[0] + 2 - 4 * b.dir, hip[1] + 4, 1, hip[0] + 4, hip[1] + 8, 16);
+    mg.addColorStop(0, C[0]);
+    mg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = mg;
+    ctx.beginPath();
+    ctx.ellipse(hip[0] + 4, hip[1] + 9, 12, 9, 0.9, 0, TAU);
+    ctx.fill();
+    // Tufo no calcanhar
+    ctx.fillStyle = C[1];
+    tuft(ctx, hock[0] - 2, hock[1], Math.PI * 0.85, 7, 2.5);
+    // Pata: almofada, dedos e garras
+    const pg = ctx.createLinearGradient(0, paw[1] - 5, 0, paw[1] + 4);
+    pg.addColorStop(0, C[0]);
+    pg.addColorStop(1, C[2]);
+    ctx.fillStyle = pg;
+    ctx.beginPath();
+    ctx.ellipse(paw[0] + 5, paw[1] + 0.5, 11, 4.6, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = Wf.claw;
+    for (let i = 0; i < 3; i++) {
+      const cx = paw[0] + 10 + i * 3.2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 1.4, paw[1] + 1);
+      ctx.quadraticCurveTo(cx + 2.4, paw[1] + 1, cx + 3.2, paw[1] + 4.5);
+      ctx.lineTo(cx + 0.6, paw[1] + 3.6);
+      ctx.closePath();
+      ctx.fill();
+    }
+  };
+  leg(6, true);
+  leg(-3, false);
+
+  // Calça roxa rasgada por cima dos quadris (até a coxa), com buracos e costura
+  const pgr = ctx.createLinearGradient(-26, -60, 20, -32);
+  pgr.addColorStop(0, Wf.pants[0]);
+  pgr.addColorStop(1, Wf.pants[1]);
+  ctx.fillStyle = pgr;
+  ctx.beginPath();
+  ctx.moveTo(-26, -58);
+  ctx.quadraticCurveTo(-4, -62, 18, -56);
+  ctx.lineTo(17, -40);
+  ctx.lineTo(12, -34);
+  ctx.lineTo(8, -40);
+  ctx.lineTo(3, -32);
+  ctx.lineTo(-2, -39);
+  ctx.lineTo(-9, -33);
+  ctx.lineTo(-14, -40);
+  ctx.lineTo(-21, -36);
+  ctx.lineTo(-25, -44);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = Wf.pants[1];
+  ctx.fillRect(-25, -57, 42, 3); // cós
+  ctx.fillStyle = Wf.fur[1];
+  ctx.beginPath();
+  ctx.ellipse(-12, -47, 3.5, 2.2, 0.3, 0, TAU);
+  ctx.ellipse(9, -45, 2.6, 1.8, -0.2, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 220, 255, 0.25)';
+  ctx.lineWidth = 0.8;
+  ctx.setLineDash([2, 2]);
+  ctx.beginPath();
+  ctx.moveTo(-3, -54);
+  ctx.lineTo(-2, -40);
+  ctx.stroke();
+  ctx.setLineDash([]);
 
   // Tronco corcunda (inclinado para frente)
   ctx.save();
   ctx.translate(0, breath);
   ctx.rotate(run ? 0.35 : 0.18 - howl * 0.08);
-  const g = ctx.createLinearGradient(0, -100, 0, -40);
-  g.addColorStop(0, Wf.fur[0]);
-  g.addColorStop(1, Wf.fur[1]);
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.moveTo(-24, -46);
-  ctx.quadraticCurveTo(-34, -84, -8, -98);
-  ctx.quadraticCurveTo(22, -102, 26, -80);
-  ctx.quadraticCurveTo(28, -58, 16, -46);
-  ctx.closePath();
-  ctx.fill();
-  // Peito claro e tufos de pelo desgrenhado
-  ctx.fillStyle = Wf.belly;
-  ctx.beginPath();
-  ctx.ellipse(12, -66, 10, 16, 0.2, 0, TAU);
-  ctx.fill();
-  ctx.fillStyle = Wf.fur[0];
-  for (let i = 0; i < 6; i++) {
-    const a = -2.6 + i * 0.35;
+  const back = [-22, -50, -38, -64, -36, -94, -12, -104];
+  const torso = () => {
     ctx.beginPath();
-    ctx.moveTo(-6 + Math.cos(a) * 26, -74 + Math.sin(a) * 26);
-    ctx.lineTo(-6 + Math.cos(a) * 34, -74 + Math.sin(a) * 34 + 2);
-    ctx.lineTo(-6 + Math.cos(a + 0.18) * 26, -74 + Math.sin(a + 0.18) * 26);
-    ctx.fill();
+    ctx.moveTo(-22, -50);
+    ctx.bezierCurveTo(back[2], back[3], back[4], back[5], back[6], back[7]);
+    ctx.quadraticCurveTo(6, -112, 20, -104);
+    ctx.bezierCurveTo(34, -98, 36, -76, 25, -63);
+    ctx.quadraticCurveTo(18, -54, 14, -50);
+    ctx.closePath();
+  };
+  // Arrepiado nas costas (desenhado antes, para sair por trás da silhueta)
+  const hr = seeded(41);
+  for (let i = 0; i < 13; i++) {
+    const p = bez(back, 0.1 + i * 0.068 + (hr() - 0.5) * 0.03);
+    ctx.fillStyle = i % 3 === 0 ? Wf.fur[2] : Wf.fur[1];
+    tuft(ctx, p.x, p.y, p.a - Math.PI / 2 - 0.75 + (hr() - 0.5) * 0.5, 5 + hr() * 6, 2.6 + hr() * 1.4);
   }
-  // Braço de trás
-  const arm = (back) => {
-    const k = (back ? sw : -sw) * (run ? 1 : 0.4);
-    ctx.strokeStyle = back ? Wf.fur[2] : Wf.fur[1];
-    ctx.lineWidth = back ? 9 : 10;
+  const tgr = ctx.createRadialGradient(-12 - 6 * b.dir, -96, 4, 0, -76, 46);
+  tgr.addColorStop(0, '#A8A2BC');
+  tgr.addColorStop(0.45, Wf.fur[1]);
+  tgr.addColorStop(1, Wf.fur[2]);
+  ctx.fillStyle = tgr;
+  torso();
+  ctx.fill();
+  ctx.save();
+  torso();
+  ctx.clip();
+  // Peito claro e barriga com mechas
+  const cg = ctx.createRadialGradient(16, -84, 2, 16, -76, 22);
+  cg.addColorStop(0, '#C4BCD0');
+  cg.addColorStop(1, 'rgba(166, 158, 180, 0)');
+  ctx.fillStyle = cg;
+  ctx.beginPath();
+  ctx.ellipse(16, -78, 15, 24, 0.25, 0, TAU);
+  ctx.fill();
+  // Peitoral e costelas marcados
+  ctx.strokeStyle = 'rgba(30, 24, 44, 0.45)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(6, -92);
+  ctx.quadraticCurveTo(18, -82, 30, -86);
+  ctx.moveTo(10, -72);
+  ctx.quadraticCurveTo(16, -68, 24, -70);
+  ctx.moveTo(10, -64);
+  ctx.quadraticCurveTo(15, -60, 21, -62);
+  ctx.stroke();
+  furStrands(ctx, -34, -108, 66, 60, 7, 1.9, 'rgba(200, 194, 220, 0.45)', 'rgba(30, 24, 44, 0.4)');
+  // Sombra própria embaixo da corcunda
+  const sg = ctx.createLinearGradient(0, -70, 0, -48);
+  sg.addColorStop(0, 'rgba(20, 14, 32, 0)');
+  sg.addColorStop(1, 'rgba(20, 14, 32, 0.45)');
+  ctx.fillStyle = sg;
+  ctx.fillRect(-40, -70, 80, 24);
+  ctx.restore();
+
+  // Braços longos e musculosos com mãos de garras
+  const arm = (isBack) => {
+    const k = (isBack ? sw : -sw) * (run ? 1 : 0.4);
+    const C = isBack ? backC : furC;
+    const sx = isBack ? 4 : 10;
+    const sy = -92;
+    const hx = run ? 36 + k * 8 : 24 + k * 6 + howl * 4;
+    const hy = run ? -64 - k * 6 : -44 - howl * 20;
+    const ex = (sx + hx) / 2 + (run ? -2 : 6);
+    const ey = (sy + hy) / 2 + 8;
+    limb(ctx, ex, ey, hx, hy, 6, 4.6, L, C);
+    limb(ctx, sx, sy, ex, ey, 10, 6.5, L, C);
+    // Ombro arredondado e tufo no cotovelo
+    const og = ctx.createRadialGradient(sx - 3 * b.dir, sy - 4, 1, sx, sy, 12);
+    og.addColorStop(0, C[0]);
+    og.addColorStop(1, C[1]);
+    ctx.fillStyle = og;
     ctx.beginPath();
-    ctx.moveTo(10, -82);
-    const hx = run ? 34 + k * 8 : 22 + k * 6 + howl * 4;
-    const hy = run ? -66 - k * 6 : -46 - howl * 20;
-    ctx.lineTo((10 + hx) / 2 + 4, (-82 + hy) / 2 + 6);
-    ctx.lineTo(hx, hy);
-    ctx.stroke();
-    // Mão com garras
-    ctx.fillStyle = back ? Wf.fur[2] : Wf.fur[1];
-    ctx.beginPath();
-    ctx.arc(hx, hy, 6, 0, TAU);
+    ctx.ellipse(sx + 1, sy + 2, 8.5, 10, 0.4, 0, TAU);
     ctx.fill();
-    ctx.strokeStyle = Wf.claw;
-    ctx.lineWidth = 1.6;
-    for (let i = -1; i <= 1; i++) {
+    ctx.fillStyle = C[1];
+    tuft(ctx, ex - 2, ey + 2, Math.PI * 0.7, 7, 2.6);
+    // Mão: palma e quatro dedos curvos com garras
+    const a = Math.atan2(hy - ey, hx - ex);
+    ctx.save();
+    ctx.translate(hx, hy);
+    ctx.rotate(a);
+    ctx.fillStyle = C[1];
+    ctx.beginPath();
+    ctx.ellipse(2, 0, 6.5, 5.5, 0, 0, TAU);
+    ctx.fill();
+    for (let i = 0; i < 4; i++) {
+      const fy = -4.5 + i * 3;
+      ctx.fillStyle = C[1];
       ctx.beginPath();
-      ctx.moveTo(hx + 4, hy + i * 3);
-      ctx.lineTo(hx + 9, hy + i * 3 + 2);
-      ctx.stroke();
+      ctx.ellipse(8, fy, 4, 1.7, 0.2, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = Wf.claw;
+      ctx.beginPath();
+      ctx.moveTo(11, fy - 1.4);
+      ctx.quadraticCurveTo(16, fy - 0.5, 16.5, fy + 2.6);
+      ctx.lineTo(11, fy + 1);
+      ctx.closePath();
+      ctx.fill();
     }
+    ctx.restore();
   };
   arm(true);
 
   // Cabeça de lobo (ergue o focinho quando uiva)
   ctx.save();
-  ctx.translate(18, -98);
+  ctx.translate(20, -102);
   ctx.rotate(-howl * 0.5 + (run ? -0.25 : 0));
+  ctx.scale(1.18, 1.18);
+  const open = run ? 0.18 + Math.abs(Math.sin(t * 14)) * 0.12 : howl > 0.2 ? 0.32 : 0.04;
+  // Juba de pelo em volta do pescoço (atrás da cabeça)
   ctx.fillStyle = Wf.fur[1];
-  // Orelhas pontudas
-  for (const [ex, lean] of [[-8, -0.2], [2, 0.1]]) {
+  for (let i = 0; i < 9; i++) {
+    const a = Math.PI * 0.45 + i * 0.2;
+    tuft(ctx, -4 + Math.cos(a) * 10, 4 + Math.sin(a) * 10, a, 11, 3.4);
+  }
+  // Orelhas pontudas com o miolo rosado
+  for (const [ex, lean, C] of [[-10, -0.25, Wf.fur[2]], [0, 0.05, Wf.fur[1]]]) {
+    ctx.fillStyle = C;
     ctx.beginPath();
-    ctx.moveTo(ex - 5, -6);
-    ctx.lineTo(ex + Math.sin(lean) * 6, -26);
-    ctx.lineTo(ex + 6, -8);
+    ctx.moveTo(ex - 6, -6);
+    ctx.quadraticCurveTo(ex - 3, -20, ex + Math.sin(lean) * 8, -30);
+    ctx.quadraticCurveTo(ex + 6, -18, ex + 7, -7);
     ctx.fill();
   }
-  ctx.fillStyle = '#C49AA8';
+  ctx.fillStyle = '#B88A9C';
   ctx.beginPath();
-  ctx.moveTo(-1, -8);
-  ctx.lineTo(2, -20);
-  ctx.lineTo(5, -8);
+  ctx.moveTo(-3, -9);
+  ctx.quadraticCurveTo(-1, -19, 0.5, -25);
+  ctx.quadraticCurveTo(4, -17, 4, -9);
   ctx.fill();
-  const hg = ctx.createRadialGradient(-2, -6, 2, 0, -2, 18);
-  hg.addColorStop(0, Wf.fur[0]);
-  hg.addColorStop(1, Wf.fur[1]);
+  // Crânio
+  const hg = ctx.createRadialGradient(-4 - 3 * b.dir, -9, 2, 0, -2, 18);
+  hg.addColorStop(0, '#ABA4C0');
+  hg.addColorStop(0.55, Wf.fur[1]);
+  hg.addColorStop(1, Wf.fur[2]);
   ctx.fillStyle = hg;
   ctx.beginPath();
   ctx.ellipse(0, -2, 15, 13, 0, 0, TAU);
   ctx.fill();
-  // Focinho comprido com o nariz preto
-  ctx.fillStyle = Wf.belly;
+  // Bochecha peluda para trás
+  ctx.fillStyle = Wf.fur[0];
+  tuft(ctx, -8, 4, Math.PI * 0.8, 9, 3);
+  tuft(ctx, -6, 8, Math.PI * 0.65, 8, 2.6);
+  // Mandíbula de baixo (abre girando no canto da boca), boca e dentes
+  ctx.save();
+  ctx.translate(8, 4);
+  ctx.rotate(open);
+  ctx.fillStyle = MOUTH;
   ctx.beginPath();
-  ctx.moveTo(6, -6);
-  ctx.quadraticCurveTo(28, -6, 31, 1);
-  ctx.quadraticCurveTo(26, 8, 6, 8);
+  ctx.moveTo(0, -3);
+  ctx.lineTo(20, -2);
+  ctx.lineTo(18, 1);
+  ctx.lineTo(0, 1);
+  ctx.fill();
+  const jg = ctx.createLinearGradient(0, -2, 0, 7);
+  jg.addColorStop(0, Wf.belly);
+  jg.addColorStop(1, Wf.fur[2]);
+  ctx.fillStyle = jg;
+  ctx.beginPath();
+  ctx.moveTo(-2, 0);
+  ctx.lineTo(19, 0);
+  ctx.quadraticCurveTo(18, 5, 12, 6);
+  ctx.quadraticCurveTo(2, 7, -2, 4);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = '#1A141E';
-  ctx.beginPath();
-  ctx.ellipse(30, -1, 3.5, 2.6, 0, 0, TAU);
-  ctx.fill();
-  // Boca: aberta mostrando os dentes (perseguindo ou uivando)
-  if (run || howl > 0.2) {
-    ctx.fillStyle = '#5A1A2A';
+  ctx.fillStyle = Wf.claw;
+  for (let x = 4; x < 18; x += 3.5) {
     ctx.beginPath();
-    ctx.moveTo(10, 4);
-    ctx.lineTo(28, 3);
-    ctx.lineTo(24, 10 + Math.abs(Math.sin(t * 14)) * 3);
-    ctx.lineTo(10, 10);
+    ctx.moveTo(x, 0.2);
+    ctx.lineTo(x + 1.2, -2.6 - (x > 14 ? 1.4 : 0));
+    ctx.lineTo(x + 2.4, 0.2);
     ctx.fill();
-    ctx.fillStyle = Wf.claw;
-    for (let x = 12; x < 26; x += 4) {
-      ctx.beginPath();
-      ctx.moveTo(x, 3.6);
-      ctx.lineTo(x + 1.5, 6.5);
-      ctx.lineTo(x + 3, 3.6);
-      ctx.fill();
-    }
-  } else {
-    ctx.strokeStyle = '#2A1E2A';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(10, 5);
-    ctx.lineTo(26, 4);
-    ctx.stroke();
   }
-  // Olho amarelo brilhando, com sobrancelha brava
-  const eg = ctx.createRadialGradient(6, -6, 0.5, 6, -6, 9);
-  eg.addColorStop(0, 'rgba(255, 225, 74, 0.6)');
+  ctx.restore();
+  // Focinho comprido (de cima), com sombra embaixo e a ponta brilhando
+  const mz = ctx.createLinearGradient(0, -9, 0, 6);
+  mz.addColorStop(0, '#C4BCD0');
+  mz.addColorStop(0.5, Wf.belly);
+  mz.addColorStop(1, Wf.fur[1]);
+  ctx.fillStyle = mz;
+  ctx.beginPath();
+  ctx.moveTo(4, -9);
+  ctx.quadraticCurveTo(22, -9, 32, -3);
+  ctx.quadraticCurveTo(34, 2, 29, 4);
+  ctx.lineTo(8, 5);
+  ctx.closePath();
+  ctx.fill();
+  // Dentes de cima e as presas
+  ctx.fillStyle = Wf.claw;
+  for (let x = 10; x < 28; x += 3.5) {
+    const fang = x < 11 || x > 24;
+    ctx.beginPath();
+    ctx.moveTo(x, 4.2);
+    ctx.lineTo(x + 1.3, 7 + (fang ? 3 : 0) + open * 4);
+    ctx.lineTo(x + 2.6, 4.2);
+    ctx.fill();
+  }
+  // Nariz preto com brilho
+  ctx.fillStyle = '#16101C';
+  ctx.beginPath();
+  ctx.ellipse(31.5, -2.5, 3.8, 2.8, 0.2, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.beginPath();
+  ctx.ellipse(30.5, -3.8, 1.3, 0.7, 0.2, 0, TAU);
+  ctx.fill();
+  // Olho amarelo brilhando (pupila em fenda), com a sobrancelha brava
+  const eg = ctx.createRadialGradient(7, -6, 0.5, 7, -6, 10);
+  eg.addColorStop(0, 'rgba(255, 225, 74, 0.65)');
   eg.addColorStop(1, 'rgba(255, 225, 74, 0)');
   ctx.fillStyle = eg;
-  ctx.fillRect(-3, -15, 18, 18);
+  ctx.beginPath();
+  ctx.arc(7, -6, 10, 0, TAU);
+  ctx.fill();
   ctx.fillStyle = Wf.eye;
   ctx.beginPath();
-  ctx.ellipse(6, -6, 3.6, 2.6, -0.2, 0, TAU);
+  ctx.moveTo(2.5, -6);
+  ctx.quadraticCurveTo(7, -10, 11.5, -6.5);
+  ctx.quadraticCurveTo(7, -3, 2.5, -6);
   ctx.fill();
-  ctx.fillStyle = '#1A141E';
-  ctx.fillRect(6, -8, 1.6, 4);
-  ctx.strokeStyle = '#2A2434';
-  ctx.lineWidth = 2;
+  ctx.fillStyle = '#16101C';
+  ctx.beginPath();
+  ctx.ellipse(7.5, -6.4, 0.9, 2.4, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = WOLF_DEEP;
   ctx.beginPath();
   ctx.moveTo(0, run ? -12 : -11);
-  ctx.lineTo(11, run ? -8 : -10);
-  ctx.stroke();
+  ctx.quadraticCurveTo(7, run ? -12 : -12.5, 13, run ? -8 : -9.5);
+  ctx.lineTo(12, -7.5);
+  ctx.quadraticCurveTo(6, -10, 0, -9);
+  ctx.fill();
   ctx.restore();
 
   arm(false);

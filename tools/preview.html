@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Prévia das fases</title>
+  <style>body{margin:0;background:#000}canvas{display:block;width:1280px;height:720px}</style>
+</head>
+<body>
+  <!-- Ferramenta de desenvolvimento (npm start → /tools/preview.html): abre direto numa fase, sem conta.
+       ?fase=N   fase
+       ?temp=N   temperatura
+       ?iglu=N   blocos do iglu já colocados
+       ?tempo=S  avança a simulação S segundos antes de mostrar (bichos já em cena)
+       ?pulo=1   o jogador está no meio de um pulo para a primeira fileira
+       ?medir=1  mede o tempo de desenho (ms por quadro) e põe no título
+       ?urso=X   urso/lobisomem/T-rex parado na costa em X (?correr=1 perseguindo)
+       ?parado=1 congela a simulação (só o desenho continua) -->
+  <canvas id="game"></canvas>
+  <script type="module">
+    import { W, H, STEP } from '../src/config.js';
+    import { Game } from '../src/game.js';
+    const q = new URLSearchParams(location.search);
+    const canvas = document.getElementById('game');
+    canvas.width = W; canvas.height = H;
+    const game = new Game(canvas);
+    game.setScale(1);
+    game.level = Number(q.get('fase') || 1);
+    game.startLevel();
+    game.banner = null;
+    const temp = Number(q.get('temp') || 0);
+    for (let i = 0; i < Number(q.get('iglu') || 0); i++) game.igloo.add();
+    const steps = Math.round(Number(q.get('tempo') || 0) / STEP);
+    for (let i = 0; i < steps; i++) {
+      if (temp) game.temp = temp;
+      if (game.player.state !== 'stand' || game.player.row !== -1) { game.player.state = 'stand'; game.player.row = -1; }
+      game.update(STEP);
+    }
+    if (temp) game.temp = temp;
+    game.banner = null;
+    if (q.get('pulo')) {
+      game.player.jump(0);
+      for (let i = 0; i < 0.2 / STEP; i++) game.update(STEP);
+    }
+    // ?urso=X: urso (ou o que o substitui no tema) parado na costa em X; ?correr=1 perseguindo
+    if (q.get('urso')) {
+      Object.assign(game.bear, { active: true, x: Number(q.get('urso')), dir: 1, chasing: !!q.get('correr'), walk: 0.6 });
+    }
+    if (q.get('parado')) game.update = () => {};
+    game.start();
+    window.__game = game;
+    // ?medir=1: tempo médio de desenho de um quadro (ms) no título da página
+    if (q.get('medir')) {
+      const t0 = performance.now();
+      for (let i = 0; i < 120; i++) { game.time += 1 / 60; game.renderer.draw(game); }
+      document.title = `desenho: ${((performance.now() - t0) / 120).toFixed(2)} ms/quadro`;
+    }
+  </script>
+</body>
+</html>

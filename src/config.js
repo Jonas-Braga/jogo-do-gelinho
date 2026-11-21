@@ -49,6 +49,25 @@ export const IGLOO = {
   doorZone: 28,              // distância da porta em que ↑ faz entrar
 };
 
+// Profundidade 2.5D (src/depth.js). Só muda o desenho, nunca a simulação.
+export const DEPTH = {
+  vanishX: W / 2,      // ponto de fuga horizontal
+  farScale: 0.82,      // escala na costa (a fileira da frente fica em 1)
+  tilt: [0.84, 1.14],  // altura das placas na fileira do fundo e na da frente
+  volume: true,        // luz, sombra própria e luz de borda nos personagens
+  bokeh: true,         // flocos desfocados na frente da câmera
+  shadowSkew: 0.6,     // quanto a sombra de quem está no ar escorrega para longe do sol
+  // Direção em que a luz viaja (do alto à esquerda para baixo à direita) e cores
+  light: {
+    x: 0.72, y: 0.69,
+    warm: 'rgba(255, 236, 205, 0.26)',
+    shade: 'rgba(8, 22, 52, 0.40)',
+    rim: 'rgba(255, 246, 226, 1)',
+    core: 'rgba(6, 16, 40, 1)',
+  },
+  minFps: 40,          // abaixo disso (por alguns segundos) o volume é desligado sozinho
+};
+
 // Altura do personagem em pé (pés até o topo do capuz)
 export const PLAYER_HEIGHT = 74;
 export const CROUCH_SCALE = 0.78; // altura relativa quando agachado
