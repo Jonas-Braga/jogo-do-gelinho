@@ -4,7 +4,7 @@
 import { suite, test, expect } from '../harness.js';
 import { isNode } from '../env.js';
 import { makeGame, step } from '../helpers.js';
-import { W, SHORE_Y, ROW_Y, DEPTH } from '../../src/config.js';
+import { W, SHORE_Y, ROW_Y, DEPTH, WATER_TOP, SHORE_TOP, IGLOO } from '../../src/config.js';
 import {
   depthScale, projectX, visibleRange, floeTilt, withVolume, volume, contactShadow, atDepth,
   camera, followCamera, swayAt, maxSway, sceneLight, foregroundKind,
@@ -1420,6 +1420,102 @@ suite('"Ursos" 3D revisados: corpo contínuo', () => {
       expect(bb.max.z).toBeGreaterThan(44);
       expect(bb.max.y).toBeGreaterThan(64);
       expect(bb.max.y).toBeLessThan(70);
+    });
+  }
+});
+
+suite('Cenários de fundo em 3D: fase normal (piloto da etapa 3)', () => {
+  test('a câmera do cenário põe a beira da costa, o campo de neve e a água nas mesmas linhas da tela do fundo 2D', async () => {
+    const sc = await import('../../src/m3d/scenery.js');
+    const { SUBJECTS } = await import('../../src/model3d.js');
+    const S = SUBJECTS['bg-ice'];
+    // Mesmo tamanho do fundo 2D (1280 × WATER_TOP + 12) e a mesma resolução (2×)
+    expect(sc.BG_H).toBe(WATER_TOP + 12);
+    expect([S.box.left, S.box.right, S.box.top, S.box.bottom]).toEqual([0, W, 0, -sc.BG_H]);
+    expect(S.res).toBe(2);
+    expect(S.elevation).toBe(sc.SCENE_EL);
+    expect(S.poses().map((p) => p.key)).toEqual(['main']);
+    // y da tela = z·sen(e) − y·cos(e): o chão na profundidade da beira cai na linha da beira
+    expect(sc.screenOf(0, sc.zAt(sc.EDGE_TOP))).toBeCloseTo(sc.EDGE_TOP, 1e-9);
+    expect(sc.screenOf(sc.yAt(150, 300), 300)).toBeCloseTo(150, 1e-9);
+    expect(sc.EDGE_TOP).toBe(WATER_TOP - 14);
+    // O campo de neve começa logo acima da faixa de neve do 2D e o jogador pisa no meio dele
+    expect(sc.SNOW_BACK).toBeLessThanOrEqual(SHORE_TOP);
+    expect(SHORE_Y).toBeGreaterThan(sc.SNOW_BACK);
+    expect(SHORE_Y).toBeLessThan(sc.EDGE_TOP);
+    // A câmera fica longe o bastante para o cenário inteiro estar na frente dela
+    const depth = (y, z) => S.distance - (y * Math.sin(sc.SCENE_EL) + z * Math.cos(sc.SCENE_EL));
+    expect(depth(0, sc.zAt(sc.BG_H))).toBeGreaterThan(1);
+  });
+
+  test('montanhas com os picos entre as linhas do 2D; blocos e gelo de pressão atrás do jogador e longe do iglu', async () => {
+    const sc = await import('../../src/m3d/scenery.js');
+    for (const r of sc.ICE_RIDGES) {
+      expect(r.peaks[0]).toBeGreaterThanOrEqual(90);
+      expect(r.peaks[1]).toBeLessThanOrEqual(180);
+      expect(r.peaks[0]).toBeLessThan(r.peaks[1]);
+    }
+    // A cordilheira distante fica mais para trás (mais azulada pela névoa)
+    expect(sc.ICE_RIDGES[0].zc).toBeLessThan(sc.ICE_RIDGES[1].zc);
+    for (const [x, sy, r] of sc.ICE_BLOCKS) {
+      expect(sy + r * 0.5).toBeLessThan(SHORE_Y - 25);
+      expect(Math.abs(x - IGLOO.x)).toBeGreaterThan(IGLOO.rx + r * 1.4);
+    }
+    expect(sc.PRESSURE.line).toBeGreaterThanOrEqual(sc.SNOW_BACK);
+    expect(sc.PRESSURE.line).toBeLessThan(SHORE_Y - 40);
+    // Ruído determinístico e entre 0 e 1 (a foto sai sempre igual)
+    expect(sc.fbm(1.3, 2.7, 5)).toBe(sc.fbm(1.3, 2.7, 5));
+    for (let i = 0; i < 50; i++) {
+      const v = sc.ridged(i * 0.37, i * 0.11, 3);
+      expect(v >= 0 && v <= 1).toBe(true);
+    }
+  });
+
+  test('com a foto pronta, a fase normal e o Natal usam o fundo 3D; sem 3D, ou num cenário ainda sem foto, continua o 2D', () => {
+    const was = { ...model };
+    const img = { fake3d: true };
+    const bgDrawn = (level, use3d) => {
+      const g = makeGame({ level });
+      g.renderer.use3d = use3d;
+      const { ctx, calls } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      return calls.some((c) => c[0] === 'drawImage' && c[1] === img && c[2] === 0 && c[3] === 0 && c[4] === W && c[5] === WATER_TOP + 12);
+    };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      expect(bgDrawn(1, true), 'fase normal').toBe(true);
+      expect(bgDrawn(5, true), 'Natal').toBe(true);
+      expect(bgDrawn(1, false), 'sem 3D').toBe(false);
+      expect(bgDrawn(10, true), 'Floresta (sem cenário 3D ainda)').toBe(false);
+    } finally {
+      Object.assign(model, was);
+    }
+  });
+
+  if (!isNode) {
+    test('no navegador: a foto do cenário gelado sai com céu transparente, neve clara e o paredão de gelo azul na beira', async () => {
+      const { background3D } = await import('../../src/model3d.js');
+      const t0 = Date.now();
+      let bg = null;
+      while (!(bg = background3D('ice')) && Date.now() - t0 < 40000) await new Promise((r) => setTimeout(r, 100));
+      expect(!!bg).toBe(true);
+      expect(bg.w).toBe(W);
+      expect(bg.h).toBe(WATER_TOP + 12);
+      const g = bg.canvas.getContext('2d');
+      const k = bg.canvas.width / W;
+      const px = (x, y) => g.getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data;
+      // Céu: transparente (o céu 2D aparece por baixo)
+      expect(px(640, 10)[3]).toBe(0);
+      // Neve onde o jogador anda: opaca e clara
+      const snow = px(300, SHORE_Y - 10);
+      expect(snow[3]).toBe(255);
+      expect((snow[0] + snow[1] + snow[2]) / 3).toBeGreaterThan(170);
+      // Paredão: opaco e mais azul que vermelho
+      const wall = px(300, WATER_TOP - 6);
+      expect(wall[3]).toBe(255);
+      expect(wall[2]).toBeGreaterThan(wall[0] + 20);
     });
   }
 });

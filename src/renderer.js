@@ -1,7 +1,7 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
   rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
-  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D,
+  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D,
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
@@ -237,6 +237,8 @@ export class Renderer {
     else if (scenery === 'beach') bg = this.beachBg ||= makeBeachBackground();
     else if (halloween) bg = this.halloweenBg ||= makeHalloweenBackground();
     else if (dino) bg = this.dinoBg ||= makeDinoBackground();
+    // Cenário 3D (foto do mesmo tamanho), quando já existe para este cenário e está pronto
+    if (this.normal3d) bg = background3D(scenery || 'ice') || bg;
     swayLayer(ctx, shore, () => ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h));
     const lt = LIGHT[scenery] || { warm: sky.sun, path: sky.sun, strength: 1, haze: 1 };
     // Luz do relevo dos personagens: a cor do sol misturada ao branco

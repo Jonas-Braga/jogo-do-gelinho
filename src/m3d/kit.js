@@ -268,15 +268,22 @@ export class Studio {
     const w = Math.round((b.right - b.left) * S);
     const h = Math.round((b.top - b.bottom) * S);
     this.renderer.setSize(w, h, false);
-    const cam = new THREE.OrthographicCamera(b.left, b.right, b.top, b.bottom, 1, 2000);
+    // Distância da câmera: cenários grandes precisam dela mais longe (só desloca ao longo
+    // da direção de visão; na câmera ortográfica a foto não muda)
+    const dist = subject.distance ?? 600;
+    const cam = new THREE.OrthographicCamera(b.left, b.right, b.top, b.bottom, 1, dist * 2 + 1400);
     const el = subject.elevation ?? DEPTH.model3d.elevation;
-    cam.position.set(0, Math.sin(el) * 600, Math.cos(el) * 600);
+    cam.position.set(0, Math.sin(el) * dist, Math.cos(el) * dist);
     cam.lookAt(0, 0, 0);
     const rig = subject.build(this.kit);
     this.scene.add(rig.root);
+    // Luz e névoa próprias do modelo (cenários); desfeitas no fim
+    const restore = subject.stage?.(this);
     const out = {};
     let n = 0;
     try {
+      // Cenários (cena grande): montar e fotografar em passos separados, sem travar de uma vez
+      if (subject.distance) yield null;
       for (const p of subject.poses()) {
         subject.apply(rig, p, this.kit);
         rig.root.updateMatrixWorld(true);
@@ -290,7 +297,52 @@ export class Studio {
       }
     } finally {
       this.scene.remove(rig.root);
+      restore?.();
     }
     return out;
+  }
+
+  // Luz de cenário: a luz principal cobre uma área grande (sombra em alta resolução),
+  // com névoa atmosférica. Devolve a função que volta tudo ao normal.
+  stageScenery({ target, size, mapSize = 2048, fog = null, sky = null, ground = null, keyIntensity = null, sun = null, exposure = null }) {
+    const { key, scene } = this;
+    const was = {
+      pos: key.position.clone(), tgt: key.target.position.clone(), cam: (({ left, right, top, bottom, near, far }) => ({ left, right, top, bottom, near, far }))(key.shadow.camera), map: key.shadow.mapSize.clone(),
+      fog: scene.fog, sky: this.sky.intensity, ground: this.sky.groundColor.clone(), ki: key.intensity, bias: key.shadow.bias, exp: this.renderer.toneMappingExposure,
+    };
+    const resetMap = () => {
+      key.shadow.map?.dispose();
+      key.shadow.map = null;
+    };
+    // Direção do sol: a dos personagens (do alto à esquerda, um pouco de frente) ou a do cenário
+    const dir = (sun ? new this.THREE.Vector3(...sun) : was.pos.clone()).normalize();
+    key.target.position.set(...target);
+    key.position.set(target[0] + dir.x * 1500, target[1] + dir.y * 1500, target[2] + dir.z * 1500);
+    scene.add(key.target);
+    Object.assign(key.shadow.camera, { left: -size, right: size, top: size, bottom: -size, near: 1, far: 4000 });
+    key.shadow.camera.updateProjectionMatrix();
+    key.shadow.mapSize.set(mapSize, mapSize);
+    key.shadow.bias = -0.0006;
+    resetMap();
+    if (fog) scene.fog = new this.THREE.Fog(fog.color, fog.near, fog.far);
+    if (sky != null) this.sky.intensity = sky;
+    if (ground) this.sky.groundColor.set(ground);
+    if (keyIntensity != null) key.intensity = keyIntensity;
+    if (exposure != null) this.renderer.toneMappingExposure = exposure;
+    return () => {
+      this.renderer.toneMappingExposure = was.exp;
+      key.position.copy(was.pos);
+      key.target.position.copy(was.tgt);
+      scene.remove(key.target);
+      Object.assign(key.shadow.camera, was.cam);
+      key.shadow.camera.updateProjectionMatrix();
+      key.shadow.mapSize.copy(was.map);
+      key.shadow.bias = was.bias;
+      resetMap();
+      scene.fog = was.fog;
+      this.sky.intensity = was.sky;
+      this.sky.groundColor.copy(was.ground);
+      key.intensity = was.ki;
+    };
   }
 }

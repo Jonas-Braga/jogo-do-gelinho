@@ -35,6 +35,8 @@ import { CAVE, CAVE_PIECES, drawCaveDoor, drawCaveTorchFlame } from './dino.js';
 import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
+import { iceScenery, BG_H } from './m3d/scenery.js';
+import { SHORE_TOP } from './config.js';
 
 const M = DEPTH.model3d;
 const TAU = Math.PI * 2;
@@ -57,6 +59,8 @@ export const SUBJECTS = {
   'player-caveman': player.withOutfit('caveman'), trex, ptero, raptor, ammonite, egg: eggModel, cave: caveModel, caveTusks, fern: fernModel, nest: nestModel,
   // Prêmios das fases especiais (iguais em todas)
   bag: bagModel, heart: heartModel,
+  // Cenários de fundo (uma foto do tamanho do fundo 2D)
+  'bg-ice': iceScenery,
 };
 // Fases especiais já convertidas ao 3D (as outras seguem inteiras em 2D)
 export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia', 'halloween', 'dinossauros']);
@@ -1015,4 +1019,53 @@ export function drawCave3D(ctx, igloo, t) {
     ctx.restore();
   }
   return true;
+}
+
+// ---------------------------------------------------------------- Cenários de fundo
+// Fundo 3D de um cenário, no mesmo formato do fundo 2D ({ canvas, w, h }), ou null
+// enquanto a foto não fica pronta (vale o 2D). A névoa na base das montanhas e os
+// brilhos da neve continuam em 2D, por cima da foto, como no desenho antigo.
+export const SCENERY_3D = { ice: 'bg-ice' };
+const backgrounds = {};
+export function background3D(kind) {
+  const name = SCENERY_3D[kind];
+  if (!name) return null;
+  want(name);
+  const img = sprite(name, 'main');
+  const cached = backgrounds[name];
+  // Depois de montado, a foto crua é liberada (fica só o fundo pronto, img = null);
+  // a foto usada direto (sem canvas) só vale enquanto for a mesma
+  if (cached && (cached.img ? cached.img === img : true)) return cached.bg;
+  if (!img) return null;
+  // Sem canvas de verdade (testes no Node): a foto direto
+  if (typeof document === 'undefined' || !img.width) {
+    backgrounds[name] = { img, bg: { canvas: img, w: W, h: BG_H } };
+    return backgrounds[name].bg;
+  }
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0);
+  g.scale(img.width / W, img.height / BG_H);
+  if (kind === 'ice') iceFinish(g);
+  backgrounds[name] = { img: null, bg: { canvas: c, w: W, h: BG_H } };
+  delete model.sprites[`${name}:main`];
+  return backgrounds[name].bg;
+}
+
+function iceFinish(g) {
+  // Névoa na base das montanhas (esconde onde elas encontram o campo de neve)
+  const grd = g.createLinearGradient(0, SHORE_TOP - 34, 0, SHORE_TOP + 4);
+  grd.addColorStop(0, 'rgba(240, 248, 250, 0)');
+  grd.addColorStop(1, 'rgba(240, 248, 250, 0.7)');
+  g.fillStyle = grd;
+  g.fillRect(0, SHORE_TOP - 34, W, 38);
+  // Brilhos da neve
+  let s = 7;
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 140; i++) {
+    g.fillStyle = rnd() < 0.6 ? 'rgba(255,255,255,0.9)' : 'rgba(200, 230, 245, 0.6)';
+    g.fillRect(rnd() * W, SHORE_TOP + 4 + rnd() * 62, 1.1, 1.1);
+  }
 }
