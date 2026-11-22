@@ -5,6 +5,7 @@
 // água caem exatamente onde o jogo espera, e o resto ganha relevo, luz e sombra de verdade.
 import { W, SHORE_TOP, WATER_TOP, IGLOO } from '../config.js';
 import { TAU } from './kit.js';
+import { GRAVES } from '../halloween.js';
 
 export const BG_H = WATER_TOP + 12;
 const IGLOO_X = IGLOO.x; // a casa de cada fase fica aqui (nada de pedras ou buracos embaixo dela) // mesma altura do fundo 2D
@@ -774,6 +775,229 @@ export const beachScenery = {
       },
     });
     root.add(kit.mesh(bank.geo, vcol({ roughness: 0.35 })));
+    return { root };
+  },
+  apply() {},
+};
+
+// ---------------------------------------------------------------- Halloween
+// Fase 25 (Halloween): noite de lua cheia. Morros escuros com relevo e árvores secas
+// de galhos retorcidos, o casarão ao longe (torre, telhados e janelas acesas) no alto do
+// morro, a cerca de ferro com lanças, lápides de pedra com "RIP" gravado e cruzes (as
+// mesmas posições do 2D) com o montinho da cova, gramado escuro com folhas secas e o
+// barranco de terra na beira do rio. Luar frio vindo da esquerda (onde fica a lua).
+export const HAUNT_HILLS = [
+  { zc: 230, depth: 200, top: [118, 150], base: 205, seed: 23, freq: 0.0055, tint: '#2E1C3E' },
+];
+export const MANSION = { x: 805, base: SHORE_TOP - 26 };
+export const DEAD_TREES_FAR = [[560, 0.7], [690, 0.5], [930, 0.6], [1220, 0.8]];
+export const FENCE = { from: 60, to: 700, line: SHORE_TOP + 8, step: 14 };
+
+// Árvore seca: tronco e galhos retorcidos em peças contínuas (altura ~60·s, pé em 0)
+function deadTreeParts(kit, x, y, z, s, m, seed) {
+  const g = kit.group(x, y, z);
+  const H = 60 * s / C;
+  g.add(kit.sweep([
+    { p: [0, -2, 0], w: 3 * s, h: 3 * s },
+    { p: [1 * s, H * 0.5, 0], w: 2 * s, h: 2 * s },
+    { p: [2 * s, H, 0], w: 0.7 * s, h: 0.7 * s },
+  ], m, { radial: 8, cap: 0.5 }));
+  [[-0.9, 28], [0.7, 24], [-0.4, 18], [1.1, 16]].forEach(([a, l], i) => {
+    const by = H * (0.45 + i * 0.13);
+    const L = (l * s) / C;
+    const tw = (hash(i, 1, seed) - 0.5) * 6 * s;
+    g.add(kit.sweep([
+      { p: [1 * s, by, 0], w: 1.3 * s, h: 1.3 * s },
+      { p: [1 * s + Math.sin(a) * L * 0.55, by + Math.cos(a) * L * 0.5, tw], w: 0.9 * s, h: 0.9 * s },
+      { p: [1 * s + Math.sin(a) * L, by + Math.cos(a) * L * 0.85 - L * 0.1, tw * 1.5], w: 0.35 * s, h: 0.35 * s },
+    ], m, { radial: 6, cap: 0.5 }));
+  });
+  return g;
+}
+
+// Lápide arredondada com "RIP" e a linha gravados na frente (textura com relevo)
+function graveTexture(THREE, w, H) {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 96;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 64, 0);
+  grd.addColorStop(0, '#B4B0C4');
+  grd.addColorStop(1, '#8C889E');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 64, 96);
+  for (let i = 0; i < 160; i++) {
+    g.fillStyle = i % 2 ? 'rgba(60, 56, 76, 0.25)' : 'rgba(255, 255, 255, 0.15)';
+    g.fillRect(hash(i, 1, 5) * 64, hash(i, 2, 5) * 96, 2, 2);
+  }
+  g.fillStyle = 'rgba(40, 36, 56, 0.8)';
+  g.font = '700 18px system-ui, sans-serif';
+  g.textAlign = 'center';
+  g.fillText('RIP', 32, 30);
+  g.fillRect(16, 46, 32, 3);
+  g.fillRect(20, 56, 24, 2);
+  // Musgo no pé
+  g.fillStyle = 'rgba(70, 110, 70, 0.6)';
+  g.fillRect(0, 86, 64, 10);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  // UV da frente da peça extrudada = coordenadas da forma (x de −w/2 a w/2, y de 0 a H)
+  t.repeat.set(1 / w, 1 / H);
+  t.offset.set(0.5, 0);
+  return t;
+}
+
+export const halloweenScenery = {
+  box: { left: 0, right: W, top: 0, bottom: -BG_H },
+  res: 2,
+  elevation: SCENE_EL,
+  distance: 1300,
+  poses: () => [{ key: 'main' }],
+  stage: (studio) => studio.stageScenery({
+    target: [640, 0, 480], size: 950, fog: { color: '#2A1838', near: 950, far: 2000 },
+    sky: 0.55, skyColor: '#6A5A9A', ground: '#1E1A28', keyIntensity: 2.2, keyColor: '#CFC8FF',
+    // Luar da esquerda e um pouco de frente: as lápides e o casarão aparecem (de costas
+    // para a lua ficariam só silhuetas)
+    sun: [-0.62, 0.6, 0.45], exposure: 1.1,
+  }),
+  build(kit) {
+    const { THREE, group, mat } = kit;
+    const root = group();
+    const vcol = (extra = {}) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0, ...extra });
+    let seed = 1;
+    const rnd = () => hash(seed++, 13, 211);
+    const bark = mat('#1E1420', 0.9);
+    // Morros escuros
+    const r = HAUNT_HILLS[0];
+    const tint = new THREE.Color(r.tint);
+    root.add(kit.mesh(heightField(THREE, {
+      x0: -140, x1: W + 140, z0: r.zc - r.depth / 2, z1: r.zc + r.depth / 2, dx: 8, dz: 6,
+      h: (x, z) => hillHeight(r, x, z),
+      colorAt: (c, x, y, z) => c.copy(tint).multiplyScalar(0.85 + fbm(x * 0.02, z * 0.03, 213, 3) * 0.3),
+    }), vcol()));
+    // Árvores secas em cima dos morros
+    DEAD_TREES_FAR.forEach(([x, s], i) => {
+      const z = r.zc + 20;
+      root.add(deadTreeParts(kit, x, hillHeight(r, x, z) - 2, z, s * 1.1, bark, 30 + i));
+    });
+    // Casarão ao longe, no alto do morro: corpo, telhado de duas águas, torre com
+    // pináculo e as janelas acesas
+    const mz = r.zc + 30;
+    const my = yAt(MANSION.base, mz);
+    const house = group(MANSION.x, my, mz);
+    root.add(house);
+    const wall = mat('#2C2036', 0.85);
+    const roofM = mat('#1A1222', 0.8);
+    const lit = mat('#FFD86A', 0.4, { emissive: '#FFC040', emissiveIntensity: 1.6 });
+    const hb = 50 / C;
+    house.add(kit.mesh(new THREE.BoxGeometry(70, hb, 34), wall, -18, hb / 2, 0));
+    const roofShape = new THREE.Shape([new THREE.Vector2(-40, 0), new THREE.Vector2(40, 0), new THREE.Vector2(0, 26 / C)]);
+    const roof = kit.mesh(new THREE.ExtrudeGeometry(roofShape, { depth: 38, bevelEnabled: false }), roofM, -18, hb, -19);
+    house.add(roof);
+    const tb = 78 / C;
+    house.add(kit.mesh(new THREE.BoxGeometry(22, tb, 22), wall, 26, tb / 2, 2));
+    const spire = kit.mesh(new THREE.ConeGeometry(15, 22 / C, 4), roofM, 26, tb + 11 / C, 2);
+    spire.rotation.y = Math.PI / 4;
+    house.add(spire);
+    for (const [x, y, w, h] of [[-15, 14, 7, 8], [-36, 14, 7, 8], [26, 52, 6, 7], [2, 14, 6, 8]]) {
+      house.add(kit.mesh(new THREE.BoxGeometry(w, h / C, 0.6), y > 40 && x < 0 ? wall : lit, x, y / C, x > 20 ? 13.2 : 17.2));
+    }
+    // Gramado do cemitério: montinhos, mais escuro na frente
+    const zBack = zAt(SNOW_BACK - 4);
+    const zEdge = zAt(EDGE_TOP);
+    const cG1 = new THREE.Color('#4A5A4E');
+    const cG2 = new THREE.Color('#2C3A31');
+    const lawnH = (x, z) => {
+      const k = (z - zBack) / (zEdge - zBack);
+      let y = (fbm(x * 0.012, z * 0.03, 217, 4) - 0.45) * (8 - k * 5) * Math.min(1, (1 - k) * 6);
+      // Montinho de terra de cada cova, na frente da lápide
+      for (const gr of GRAVES) {
+        const dz = (z - (zAt(gr.y) + 14)) / 11;
+        const dx = (x - gr.x) / (gr.w * 0.75);
+        const d = dx * dx + dz * dz;
+        if (d < 1) y += (1 - d) * 3.2;
+      }
+      return y;
+    };
+    root.add(kit.mesh(heightField(THREE, {
+      x0: -40, x1: W + 40, z0: zBack, z1: zEdge, dx: 5, dz: 4,
+      h: lawnH,
+      colorAt: (c, x, y, z) => c.copy(cG1).lerp(cG2, Math.min(1, (z - zBack) / (zEdge - zBack) + fbm(x * 0.03, z * 0.06, 219, 2) * 0.4)),
+    }), vcol({ bumpMap: grainTexture(THREE, 21), bumpScale: 0.5 })));
+    // Cerca de ferro: postes com ponta de lança e duas travessas
+    const iron = new THREE.MeshStandardMaterial({ color: '#141018', roughness: 0.45, metalness: 0.5 });
+    const fz = zAt(FENCE.line);
+    const postH = 30 / C;
+    const posts = [];
+    const tips = [];
+    for (let x = FENCE.from + 4; x <= FENCE.to; x += FENCE.step) {
+      const lean = (hash(x, 3, 223) - 0.5) * 0.08;
+      posts.push({ x, y: postH / 2 - 1, z: fz, s: 1, sy: postH, rz: lean });
+      tips.push({ x: x - lean * postH / 2, y: postH + 2, z: fz, s: 1, rz: lean });
+    }
+    root.add(instanced(THREE, new THREE.CylinderGeometry(0.9, 0.9, 1, 6), iron, posts));
+    root.add(instanced(THREE, new THREE.ConeGeometry(2.2, 6, 4), iron, tips));
+    for (const y of [postH * 0.2, postH * 0.75]) {
+      const bar = kit.mesh(new THREE.BoxGeometry(FENCE.to - FENCE.from, 1.6, 1.2), iron, (FENCE.from + FENCE.to) / 2 + 4, y, fz);
+      root.add(bar);
+    }
+    // Lápides e cruzes (as mesmas do 2D), um pouco tortas
+    const stoneSide = mat('#7C788E', 0.85);
+    GRAVES.forEach((gr, i) => {
+      const z = zAt(gr.y);
+      const H = gr.h / C;
+      const tilt = (hash(i, 5, 227) - 0.5) * 0.14;
+      if (gr.cross) {
+        const cm = mat('#9A96AC', 0.8);
+        const cr = group(gr.x, 0, z);
+        cr.rotation.z = tilt;
+        cr.add(kit.mesh(new THREE.BoxGeometry(6, H, 5), cm, 0, H / 2 - 1, 0));
+        cr.add(kit.mesh(new THREE.BoxGeometry(20, 6 / C, 5), cm, 0, H - 10 / C, 0));
+        root.add(cr);
+        return;
+      }
+      const w = gr.w;
+      const sh = new THREE.Shape();
+      sh.moveTo(-w / 2, 0);
+      sh.lineTo(-w / 2, H - w / 2);
+      sh.absarc(0, H - w / 2, w / 2, Math.PI, 0, true);
+      sh.lineTo(w / 2, 0);
+      sh.closePath();
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: 6, bevelEnabled: true, bevelThickness: 0.8, bevelSize: 0.8, bevelSegments: 2, curveSegments: 16 });
+      const face = new THREE.MeshStandardMaterial({ map: graveTexture(THREE, w, H), roughness: 0.85 });
+      const slab = kit.mesh(geo, [face, stoneSide], gr.x, -1.5, z - 3);
+      slab.rotation.z = tilt;
+      slab.rotation.x = -tilt * 0.6;
+      root.add(slab);
+    });
+    // Folhas secas espalhadas no gramado
+    const leaves = [];
+    for (let i = 0; i < 260; i++) {
+      const x = rnd() * W;
+      const z = zBack + 8 + rnd() * (zEdge - zBack - 14);
+      leaves.push({ x, y: lawnH(x, z) + 0.3, z, s: 2.2 + rnd() * 1.2, sy: 0.25, sz: 0.55, ry: rnd() * TAU, color: ['#A0522D', '#C8742A', '#7A4A2A'][i % 3] });
+    }
+    root.add(instanced(THREE, new THREE.SphereGeometry(1, 8, 4), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.8 }), leaves, { shadow: false }));
+    // Barranco de terra escura na beira do rio
+    const cTop = new THREE.Color('#8A6E5E');
+    const cMid = new THREE.Color('#62504A');
+    const cLow = new THREE.Color('#34262E');
+    const bank = bankWall(THREE, {
+      zEdge, step: 5,
+      bulge: (x, v) => (noise2(x * 0.07, v * 3, 229) - 0.5) * 5 + v * 10,
+      color: (c, x, v) => {
+        if (v < 0.45) c.copy(cTop).lerp(cMid, v / 0.45);
+        else c.copy(cMid).lerp(cLow, (v - 0.45) / 0.55);
+        c.multiplyScalar(0.88 + noise2(x * 0.3, v * 8, 231) * 0.24);
+      },
+    });
+    root.add(kit.mesh(bank.geo, vcol()));
+    const lip = [];
+    for (let x = -60; x <= W + 60; x += 30) {
+      const k = noise2(x * 0.05, 9, 233);
+      lip.push({ p: [x, 0.4 + k * 0.7, zEdge + 1], w: 2.2 + k, h: 1.4 + k * 0.5 });
+    }
+    root.add(kit.sweep(lip, mat('#2E3A32', 0.9), { radial: 10, cap: 0.5, steps: lip.length * 6 }));
     return { root };
   },
   apply() {},

@@ -35,7 +35,7 @@ import { CAVE, CAVE_PIECES, drawCaveDoor, drawCaveTorchFlame } from './dino.js';
 import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
-import { iceScenery, forestScenery, spaceScenery, beachScenery, BG_H } from './m3d/scenery.js';
+import { iceScenery, forestScenery, spaceScenery, beachScenery, halloweenScenery, BG_H } from './m3d/scenery.js';
 import { SHORE_TOP } from './config.js';
 
 const M = DEPTH.model3d;
@@ -60,7 +60,7 @@ export const SUBJECTS = {
   // Prêmios das fases especiais (iguais em todas)
   bag: bagModel, heart: heartModel,
   // Cenários de fundo (uma foto do tamanho do fundo 2D)
-  'bg-ice': iceScenery, 'bg-forest': forestScenery, 'bg-space': spaceScenery, 'bg-beach': beachScenery,
+  'bg-ice': iceScenery, 'bg-forest': forestScenery, 'bg-space': spaceScenery, 'bg-beach': beachScenery, 'bg-halloween': halloweenScenery,
 };
 // Fases especiais já convertidas ao 3D (as outras seguem inteiras em 2D)
 export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia', 'halloween', 'dinossauros']);
@@ -237,7 +237,8 @@ export function drawBear3D(ctx, b, t, outfit = 'polar') {
   ctx.fill();
   ctx.translate(b.x, b.y);
   ctx.scale(1, 1 + Math.sin(t * 2) * 0.008);
-  blit(ctx, img, bear.box);
+  // Cada "urso" na caixa em que foi fotografado (lobisomem e T-rex são maiores)
+  blit(ctx, img, SUBJECTS[name].box || bear.box);
   ctx.restore();
   return true;
 }
@@ -1037,7 +1038,7 @@ export function drawCave3D(ctx, igloo, t) {
 // Fundo 3D de um cenário, no mesmo formato do fundo 2D ({ canvas, w, h }), ou null
 // enquanto a foto não fica pronta (vale o 2D). A névoa na base das montanhas e os
 // brilhos da neve continuam em 2D, por cima da foto, como no desenho antigo.
-export const SCENERY_3D = { ice: 'bg-ice', forest: 'bg-forest', space: 'bg-space', beach: 'bg-beach' };
+export const SCENERY_3D = { ice: 'bg-ice', forest: 'bg-forest', space: 'bg-space', beach: 'bg-beach', halloween: 'bg-halloween' };
 const backgrounds = {};
 export function background3D(kind) {
   const name = SCENERY_3D[kind];

@@ -62,8 +62,12 @@ function ik2(a, c, L1, L2, bend) {
 // No lugar do urso. Fotos: walk{quadro}{lado}{boca} (anda; perseguindo, corre com os
 // braços esticados e a boca abrindo) e howl{lado} (parado, uivando para a lua)
 export const WOLF_FRAMES = 12;
+// Tamanho do lobisomem (o 2D é grandalhão; modelado em 1 ele ficava pequeno na fase):
+// altura × WOLF_SCALE e o corpo ainda mais largo e fundo (WOLF_BULK), encorpado como o 2D
+export const WOLF_SCALE = 1.25;
+export const WOLF_BULK = 1.15;
 export const werewolf = {
-  box: { left: bearBox.left, right: bearBox.right, top: 160, bottom: bearBox.bottom },
+  box: { left: -120, right: 120, top: 200, bottom: bearBox.bottom },
   res: 2,
   pose(b, t) {
     const d = b.dir < 0 ? 'L' : 'R';
@@ -101,6 +105,7 @@ export const werewolf = {
     const eyeM = mat('#FFE14A', 0.2, { emissive: '#FFD020', emissiveIntensity: 1.4 });
     const root = group();
     root.rotation.order = 'YXZ';
+    root.scale.set(WOLF_SCALE * WOLF_BULK, WOLF_SCALE, WOLF_SCALE * WOLF_BULK);
     const body = group();
     root.add(body);
     // Tronco em V (cintura fina, peito e ombros largos), curvado para a frente

@@ -304,11 +304,11 @@ export class Studio {
 
   // Luz de cenário: a luz principal cobre uma área grande (sombra em alta resolução),
   // com névoa atmosférica. Devolve a função que volta tudo ao normal.
-  stageScenery({ target, size, mapSize = 2048, fog = null, sky = null, ground = null, keyIntensity = null, sun = null, exposure = null }) {
+  stageScenery({ target, size, mapSize = 2048, fog = null, sky = null, ground = null, keyIntensity = null, sun = null, exposure = null, keyColor = null, skyColor = null }) {
     const { key, scene } = this;
     const was = {
       pos: key.position.clone(), tgt: key.target.position.clone(), cam: (({ left, right, top, bottom, near, far }) => ({ left, right, top, bottom, near, far }))(key.shadow.camera), map: key.shadow.mapSize.clone(),
-      fog: scene.fog, sky: this.sky.intensity, ground: this.sky.groundColor.clone(), ki: key.intensity, bias: key.shadow.bias, exp: this.renderer.toneMappingExposure,
+      fog: scene.fog, sky: this.sky.intensity, ground: this.sky.groundColor.clone(), ki: key.intensity, bias: key.shadow.bias, exp: this.renderer.toneMappingExposure, kc: key.color.clone(), sc: this.sky.color.clone(),
     };
     const resetMap = () => {
       key.shadow.map?.dispose();
@@ -329,7 +329,11 @@ export class Studio {
     if (ground) this.sky.groundColor.set(ground);
     if (keyIntensity != null) key.intensity = keyIntensity;
     if (exposure != null) this.renderer.toneMappingExposure = exposure;
+    if (keyColor) key.color.set(keyColor);
+    if (skyColor) this.sky.color.set(skyColor);
     return () => {
+      key.color.copy(was.kc);
+      this.sky.color.copy(was.sc);
       this.renderer.toneMappingExposure = was.exp;
       key.position.copy(was.pos);
       key.target.position.copy(was.tgt);

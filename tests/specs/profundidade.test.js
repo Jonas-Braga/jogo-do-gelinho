@@ -1815,3 +1815,105 @@ suite('Praia: barco e jet ski no mar ao fundo', () => {
     }
   });
 });
+
+suite('Cenários de fundo em 3D: Halloween', () => {
+  test('cemitério nas posições do 2D (lápides, cruzes e a cerca atrás delas), casarão e árvores secas nos morros ao longe', async () => {
+    const sc = await import('../../src/m3d/scenery.js');
+    const { GRAVES } = await import('../../src/halloween.js');
+    const { SUBJECTS } = await import('../../src/model3d.js');
+    expect(SCENERY_3D.halloween).toBe('bg-halloween');
+    const S = SUBJECTS['bg-halloween'];
+    expect([S.box.left, S.box.right, S.box.top, S.box.bottom]).toEqual([0, W, 0, -(WATER_TOP + 12)]);
+    expect(S.elevation).toBe(sc.SCENE_EL);
+    // A cerca fica atrás de todas as lápides e cobre todas elas
+    for (const gr of GRAVES) {
+      expect(sc.FENCE.line).toBeLessThan(gr.y);
+      expect(gr.x).toBeGreaterThan(sc.FENCE.from);
+      expect(gr.x).toBeLessThan(sc.FENCE.to);
+      // Lápides atrás da linha do jogador
+      expect(gr.y).toBeLessThan(SHORE_Y);
+    }
+    // Casarão no alto do morro, longe da casa assombrada da fase (à direita)
+    expect(sc.MANSION.base).toBeLessThan(SHORE_TOP);
+    expect(Math.abs(sc.MANSION.x - IGLOO.x)).toBeGreaterThan(IGLOO.rx + 60);
+    expect(sc.DEAD_TREES_FAR.length).toBe(4);
+  });
+
+  test('no Halloween, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)', () => {
+    const was = { ...model };
+    const img = { fake3d: true };
+    const bgDrawn = (use3d) => {
+      const g = makeGame({ level: 25 });
+      g.renderer.use3d = use3d;
+      const { ctx, calls } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      return calls.some((c) => c[0] === 'drawImage' && c[1] === img && c[2] === 0 && c[3] === 0 && c[4] === W && c[5] === WATER_TOP + 12);
+    };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      expect(bgDrawn(true)).toBe(true);
+      expect(bgDrawn(false)).toBe(false);
+    } finally {
+      Object.assign(model, was);
+    }
+  });
+
+  if (!isNode) {
+    test('no navegador: a foto do Halloween sai com céu transparente, gramado escuro, lápide clara e as janelas do casarão acesas', async () => {
+      const sc = await import('../../src/m3d/scenery.js');
+      const { GRAVES } = await import('../../src/halloween.js');
+      const { background3D } = await import('../../src/model3d.js');
+      const t0 = Date.now();
+      let bg = null;
+      while (!(bg = background3D('halloween')) && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 100));
+      expect(!!bg).toBe(true);
+      const g = bg.canvas.getContext('2d');
+      const k = bg.canvas.width / W;
+      const lum = (x, y) => {
+        const p = g.getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data;
+        return (p[0] + p[1] + p[2]) / 3;
+      };
+      expect(g.getImageData(10, 10, 1, 1).data[3]).toBe(0);
+      const lawn = lum(900, SHORE_Y - 10);
+      expect(lawn).toBeLessThan(110);
+      // A lápide (sem cruz) fica mais clara que o gramado em volta
+      const gr = GRAVES.find((q) => !q.cross);
+      expect(lum(gr.x, gr.y - gr.h * 0.35)).toBeGreaterThan(lawn + 25);
+      // Alguma janela acesa no casarão (amarelo brilhante)
+      let bright = 0;
+      const d = g.getImageData(Math.round((sc.MANSION.x - 50) * k), Math.round((sc.MANSION.base - 90) * k), Math.round(100 * k), Math.round(90 * k)).data;
+      for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 160 && d[i] > d[i + 2] + 50) bright++;
+      expect(bright).toBeGreaterThan(20);
+    });
+  }
+});
+
+suite('"Ursos" 3D no tamanho certo', () => {
+  test('cada "urso" 3D é desenhado na caixa em que foi fotografado (o lobisomem e o T-rex não ficam espremidos na caixa do urso polar)', async () => {
+    const { drawBear3D } = await import('../../src/model3d.js');
+    const was = { ...model };
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      for (const outfit of ['polar', 'santaHat', 'brown', 'alien', 'giantCrab', 'werewolf', 'trex']) {
+        const { ctx, calls } = recordingCtx();
+        const b = { x: 300, y: 200, dir: 1, walk: 0.3, chasing: false };
+        expect(drawBear3D(ctx, b, 1, outfit), outfit).toBe(true);
+        const d = calls.find((c) => c[0] === 'drawImage' && c[1] === img);
+        const name = { polar: 'bear', santaHat: 'bear-santa', brown: 'bear-brown', werewolf: 'werewolf', trex: 'trex', alien: 'alien', giantCrab: 'giantCrab' }[outfit];
+        const box = SUBJECTS[name].box;
+        expect(d.slice(2), outfit).toEqual([box.left, -box.top, box.right - box.left, box.top - box.bottom]);
+      }
+      // O lobisomem de pé é mais alto que o urso polar de quatro
+      expect(SUBJECTS.werewolf.box.top).toBeGreaterThan(SUBJECTS.bear.box.top);
+      // e é maior que o modelo original (que ficava pequeno perto do 2D)
+      const { WOLF_SCALE } = await import('../../src/m3d/halloween.js');
+      expect(WOLF_SCALE).toBeGreaterThanOrEqual(1.2);
+    } finally {
+      Object.assign(model, was);
+    }
+  });
+});
