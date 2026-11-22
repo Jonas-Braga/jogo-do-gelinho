@@ -1597,3 +1597,70 @@ suite('Cenários de fundo em 3D: Floresta', () => {
     });
   }
 });
+
+suite('Cenários de fundo em 3D: Espaço', () => {
+  test('crateras de verdade longe da base e fora da linha do jogador; cordilheiras lunares nas faixas do 2D', async () => {
+    const sc = await import('../../src/m3d/scenery.js');
+    const { SUBJECTS } = await import('../../src/model3d.js');
+    expect(SCENERY_3D.space).toBe('bg-space');
+    const S = SUBJECTS['bg-space'];
+    expect([S.box.left, S.box.right, S.box.top, S.box.bottom]).toEqual([0, W, 0, -(WATER_TOP + 12)]);
+    expect(S.elevation).toBe(sc.SCENE_EL);
+    for (const r of sc.MOON_RIDGES) {
+      expect(r.peaks[0]).toBeGreaterThanOrEqual(90);
+      expect(r.peaks[1]).toBeLessThanOrEqual(180);
+    }
+    const half = (r) => r * Math.sin(sc.SCENE_EL) * 1.7; // meia altura da cratera na tela, com a borda
+    for (const [x, sy, r] of sc.CRATERS) {
+      // Longe da base (casa da fase)
+      expect(Math.abs(x - IGLOO.x), `cratera em ${x}`).toBeGreaterThan(IGLOO.rx + r * 1.7 - 40);
+      // No campo de chão, sem cruzar a linha onde o jogador pisa
+      expect(sy - half(r)).toBeGreaterThan(sc.SNOW_BACK - 2);
+      expect(sy + half(r) < SHORE_Y - 1 || sy - half(r) > SHORE_Y + 1, `cratera em ${x}`).toBe(true);
+    }
+  });
+
+  test('no Espaço, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)', () => {
+    const was = { ...model };
+    const img = { fake3d: true };
+    const bgDrawn = (use3d) => {
+      const g = makeGame({ level: 15 });
+      g.renderer.use3d = use3d;
+      const { ctx, calls } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      return calls.some((c) => c[0] === 'drawImage' && c[1] === img && c[2] === 0 && c[3] === 0 && c[4] === W && c[5] === WATER_TOP + 12);
+    };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      expect(bgDrawn(true)).toBe(true);
+      expect(bgDrawn(false)).toBe(false);
+    } finally {
+      Object.assign(model, was);
+    }
+  });
+
+  if (!isNode) {
+    test('no navegador: a foto do Espaço sai com céu transparente, chão cinza-lilás e a bacia da cratera mais escura que a borda', async () => {
+      const sc = await import('../../src/m3d/scenery.js');
+      const { background3D } = await import('../../src/model3d.js');
+      const t0 = Date.now();
+      let bg = null;
+      while (!(bg = background3D('space')) && Date.now() - t0 < 40000) await new Promise((r) => setTimeout(r, 100));
+      expect(!!bg).toBe(true);
+      const g = bg.canvas.getContext('2d');
+      const k = bg.canvas.width / W;
+      const px = (x, y) => g.getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data;
+      const lum = (p) => (p[0] + p[1] + p[2]) / 3;
+      expect(px(640, 10)[3]).toBe(0);
+      const ground = px(1000, SHORE_Y - 8);
+      expect(ground[3]).toBe(255);
+      expect(lum(ground)).toBeGreaterThan(110);
+      expect(ground[2]).toBeGreaterThanOrEqual(ground[1]); // tom lilás/frio
+      // Cratera grande: o lado de dentro perto da luz (esquerda) fica na sombra da borda
+      const [cx, cy, r] = sc.CRATERS.find((c) => c[2] >= 30);
+      expect(lum(px(cx - r * 0.55, cy))).toBeLessThan(lum(px(cx + r * 1.4, cy)));
+    });
+  }
+});

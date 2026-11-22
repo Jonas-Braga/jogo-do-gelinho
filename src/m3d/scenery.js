@@ -3,10 +3,11 @@
 // que x da cena = x da tela e um ponto do chão em profundidade z aparece em
 // y_tela = z·sen(e) − y·cos(e). Assim a beira da costa, a linha onde o jogador pisa e a
 // água caem exatamente onde o jogo espera, e o resto ganha relevo, luz e sombra de verdade.
-import { W, SHORE_TOP, WATER_TOP } from '../config.js';
+import { W, SHORE_TOP, WATER_TOP, IGLOO } from '../config.js';
 import { TAU } from './kit.js';
 
-export const BG_H = WATER_TOP + 12; // mesma altura do fundo 2D
+export const BG_H = WATER_TOP + 12;
+const IGLOO_X = IGLOO.x; // a casa de cada fase fica aqui (nada de pedras ou buracos embaixo dela) // mesma altura do fundo 2D
 export const SCENE_EL = 0.35; // inclinação da câmera dos cenários
 const S = Math.sin(SCENE_EL);
 const C = Math.cos(SCENE_EL);
@@ -520,6 +521,142 @@ export const forestScenery = {
       lip.push({ p: [x, 0.4 + k * 0.8, zEdge + 1], w: 2.4 + k * 1.2, h: 1.5 + k * 0.6 });
     }
     root.add(kit.sweep(lip, mat('#6E9B44', 0.9), { radial: 10, cap: 0.5, steps: lip.length * 6 }));
+    return { root };
+  },
+  apply() {},
+};
+
+// ---------------------------------------------------------------- Espaço (Lua)
+// Fase 15 (Espaço): cordilheiras lunares recortadas, chão de regolito com crateras
+// de verdade (bacia funda e borda elevada; com a câmera inclinada viram elipses,
+// como no 2D), pedregulhos espalhados longe da base e o barranco de rocha entrando
+// no rio de poeira estelar. Sem atmosfera: luz dura vinda da Terra (à esquerda),
+// pouca luz de céu e sombras fortes; a névoa só escurece a cordilheira de trás.
+export const MOON_RIDGES = [
+  { zc: 150, depth: 150, peaks: [100, 150], base: 215, seed: 13, freq: 0.0062, tint: '#4B4862' },
+  { zc: 330, depth: 130, peaks: [140, 178], base: 215, seed: 17, freq: 0.0078, tint: '#6E6A84' },
+];
+// Crateras do chão: [x, linha da tela, raio] (longe da base, que fica em IGLOO.x, e sem
+// cruzar a linha onde o jogador anda)
+export const CRATERS = [
+  [60, 214, 30], [250, 228, 22], [395, 206, 34], [520, 234, 16], [640, 212, 26], [760, 226, 30], [865, 200, 16],
+  [1245, 214, 20], [150, 236, 12], [300, 196, 12],
+];
+export const MOON_EDGE = { boulders: 14 };
+
+// Altura de uma cratera no ponto (distância d em raios): bacia e borda
+function craterAt(x, z, cx, cz, r, deep) {
+  const d = Math.hypot(x - cx, z - cz) / r;
+  if (d > 1.7) return 0;
+  const bowl = d < 1 ? -deep * (1 - d * d) : 0;
+  const rim = deep * 0.55 * Math.exp(-(((d - 1) / 0.22) ** 2));
+  return bowl + rim;
+}
+
+export const spaceScenery = {
+  box: { left: 0, right: W, top: 0, bottom: -BG_H },
+  res: 2,
+  elevation: SCENE_EL,
+  distance: 1300,
+  poses: () => [{ key: 'main' }],
+  stage: (studio) => studio.stageScenery({
+    target: [640, 0, 480], size: 950, fog: { color: '#2E2A48', near: 1000, far: 2300 },
+    sky: 0.45, ground: '#4A4660', keyIntensity: 3.6, sun: [-0.8, 0.45, -0.2], exposure: 0.95,
+  }),
+  build(kit) {
+    const { THREE, group, mat } = kit;
+    const root = group();
+    const vcol = (extra = {}) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, ...extra });
+    let seed = 1;
+    const rnd = () => hash(seed++, 9, 131);
+    // Cordilheiras lunares: cristas pontudas com faces em degraus, cinza-lilás
+    for (const r of MOON_RIDGES) {
+      const [pTop, pLow] = r.peaks;
+      const tint = new THREE.Color(r.tint);
+      const light = tint.clone().offsetHSL(0, 0, 0.18);
+      const geo = heightField(THREE, {
+        x0: -140, x1: W + 140, z0: r.zc - r.depth / 2, z1: r.zc + r.depth / 2, dx: 5, dz: 5,
+        h: (x, z) => {
+          const across = 1 - Math.abs(z - r.zc) / (r.depth / 2);
+          const shape = Math.pow(Math.max(0, across), 1.05);
+          const prof = ridged(x * r.freq, r.seed * 1.9, r.seed);
+          const peakScreen = pLow - (pLow - pTop) * Math.min(1, prof * 1.3);
+          const detail = (ridged(x * 0.03, z * 0.03, r.seed + 3, 3) - 0.4) * 9 * shape;
+          return yAt(r.base, z) + ((r.base - peakScreen) / C) * shape + detail;
+        },
+        colorAt: (c, x, y, z, ny) => {
+          c.copy(tint).lerp(light, Math.max(0, ny - 0.5) * 1.6);
+          c.multiplyScalar(0.9 + fbm(x * 0.07, y * 0.07, r.seed + 7, 2) * 0.2);
+        },
+      });
+      root.add(kit.mesh(geo, vcol()));
+    }
+    // Chão de regolito com crateras
+    const zBack = zAt(SNOW_BACK);
+    const zEdge = zAt(EDGE_TOP);
+    const craters = CRATERS.map(([x, sy, r]) => ({ x, z: zAt(sy), r: r * 1.0, deep: r * 0.22 }));
+    const cG = new THREE.Color('#B9B6C6');
+    const cDark = new THREE.Color('#7E7A94');
+    const cBright = new THREE.Color('#D6D3E2');
+    const groundH = (x, z) => {
+      const k = (z - zBack) / (zEdge - zBack);
+      let y = (fbm(x * 0.01, z * 0.03, 141, 4) - 0.45) * (8 - k * 4) * Math.min(1, (1 - k) * 6);
+      for (const c of craters) y += craterAt(x, z, c.x, c.z, c.r, c.deep);
+      return y;
+    };
+    const ground = heightField(THREE, {
+      x0: -40, x1: W + 40, z0: zBack, z1: zEdge, dx: 4, dz: 3,
+      h: groundH,
+      colorAt: (c, x, y, z, ny) => {
+        c.copy(cG).lerp(cDark, Math.min(1, fbm(x * 0.015, z * 0.04, 143, 3) * 0.7));
+        // Material claro jogado em volta das crateras (raios de ejeção)
+        for (const cr of craters) {
+          const d = Math.hypot(x - cr.x, z - cr.z) / cr.r;
+          if (d > 1 && d < 2.4) c.lerp(cBright, (1 - (d - 1) / 1.4) * 0.35);
+        }
+        if (y < -1) c.multiplyScalar(0.92);
+      },
+    });
+    root.add(kit.mesh(ground, vcol({ bumpMap: grainTexture(THREE, 13), bumpScale: 0.8 })));
+    // Pedregulhos espalhados (longe da base) e pedrinhas
+    const rocks = [];
+    for (let i = 0; i < 70; i++) {
+      const x = rnd() * W;
+      if (Math.abs(x - IGLOO_X) < 190) continue;
+      const z = zBack + 6 + rnd() * (zEdge - zBack - 12);
+      const big = rnd() < 0.15;
+      const s = big ? 5 + rnd() * 5 : 1.2 + rnd() * 2;
+      rocks.push({ x, y: groundH(x, z) + s * 0.2, z, s, sy: 0.6 + rnd() * 0.4, rx: rnd() * 3, ry: rnd() * 3, color: rnd() < 0.5 ? '#9E9AB0' : '#837F98' });
+    }
+    root.add(instanced(THREE, new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.9, flatShading: true }), rocks));
+    // Barranco de rocha: claro em cima, roxo-escuro embaixo, com blocos
+    // Cores mais claras que as do 2D: o barranco fica de costas para a luz
+    const cTop = new THREE.Color('#D8D4E8');
+    const cMid = new THREE.Color('#A6A2BE');
+    const cLow = new THREE.Color('#5A5478');
+    const bank = bankWall(THREE, {
+      zEdge, step: 4,
+      bulge: (x, v) => (noise2(x * 0.08, v * 3, 151) - 0.5) * 6 + (noise2(x * 0.25, v * 6, 153) - 0.5) * 2 + v * 8,
+      color: (c, x, v) => {
+        if (v < 0.45) c.copy(cTop).lerp(cMid, v / 0.45);
+        else c.copy(cMid).lerp(cLow, (v - 0.45) / 0.55);
+        c.multiplyScalar(0.88 + noise2(x * 0.3, v * 8, 155) * 0.24);
+      },
+    });
+    root.add(kit.mesh(bank.geo, vcol()));
+    const blocks = [];
+    for (let x = -10; x < W + 10; x += 14 + rnd() * 30) {
+      const v = 0.1 + rnd() * 0.6;
+      blocks.push({ x, y: bank.bottom * v, z: zEdge + 2 + v * 8, s: 4 + rnd() * 5, sy: 0.6 + rnd() * 0.4, sz: 0.7, rx: rnd() * 2, ry: rnd() * 3, color: rnd() < 0.5 ? '#B4B0C8' : '#9490AC' });
+    }
+    root.add(instanced(THREE, new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.85, flatShading: true }), blocks));
+    // Borda clara de poeira por cima do barranco
+    const lip = [];
+    for (let x = -60; x <= W + 60; x += 30) {
+      const k = noise2(x * 0.06, 7, 157);
+      lip.push({ p: [x, 0.3 + k * 0.7, zEdge + 1], w: 2.2 + k * 1.2, h: 1.3 + k * 0.6 });
+    }
+    root.add(kit.sweep(lip, mat('#CFCCDC', 0.95), { radial: 10, cap: 0.5, steps: lip.length * 6 }));
     return { root };
   },
   apply() {},
