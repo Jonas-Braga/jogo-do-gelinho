@@ -27,6 +27,8 @@ import { boardSprite3D, drawHut3D } from '../../src/model3d.js';
 import { HUT_PIECES, beachArt, drawBeachDecor, PALMS } from '../../src/beach.js';
 import { boardSubject } from '../../src/m3d/beach.js';
 import { JUMP_YAW } from '../../src/m3d/player.js';
+import { pumpkinSprite3D, drawHaunted3D } from '../../src/model3d.js';
+import { HAUNTED_PIECES, halloweenArt, drawHalloweenDecor, SHORE_PUMPKINS } from '../../src/halloween.js';
 
 // Contexto 2D falso que registra as chamadas
 function recordingCtx() {
@@ -1056,5 +1058,130 @@ suite('Pulo 3D de frente, de costas e na diagonal', () => {
     g.player.jump(0);
     step(g, 0.1);
     expect(playerPose(g.player, 0).key.startsWith('jumpF')).toBe(true);
+  });
+});
+
+suite('Halloween em 3D', () => {
+  const withFake = (fn) => {
+    const was = { ...model };
+    const asked = [];
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: (_, k) => (asked.push(String(k)), img) });
+      fn(asked, img);
+    } finally {
+      Object.assign(model, was);
+    }
+  };
+
+  test('o Halloween é uma fase convertida: bruxinho, lobisomem, abóboras, casa, árvore, bichos e bala em 3D', () => {
+    expect(THEMES_3D.has(SPECIALS[25].id)).toBe(true);
+    withFake((asked) => {
+      const g = makeGame({ level: 25, quiet: false });
+      step(g, 6);
+      Object.assign(g.bear, { active: true, x: 400, dir: 1, chasing: true });
+      for (let i = 0; i < 8; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.critters.list.length = 0;
+      for (const [k, kind] of ['ghost', 'spider', 'eyeball', 'fish'].entries()) {
+        g.critters.list.push({ kind, row: k, dir: 1, vx: 0, x: 300 + k * 200, w: 30, ph: 0 });
+      }
+      g.renderer.use3d = true;
+      const { ctx } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      const has = (pre) => asked.some((k) => k.startsWith(pre));
+      for (const pre of ['player-wizard:', 'werewolf:', 'pumpkin', 'haunted:', 'deadTree:', 'jack:', 'ghost:', 'spider:', 'eyeball:', 'candy:']) {
+        expect(has(pre)).toBe(true);
+      }
+      expect(FISH_3D.halloween).toBe('candy');
+      expect(has('fish:')).toBe(false);
+    });
+  });
+
+  test('fantasma, aranha, olho e bala: toda foto pedida existe; o lobisomem anda, corre e uiva', () => {
+    for (const kind of ['ghost', 'spider', 'eyeball', 'candy']) {
+      const S = SUBJECTS[kind];
+      const keys = new Set(S.poses().map((p) => p.key));
+      for (const dir of [1, -1]) for (let t = 0; t < 3; t += 0.011) expect(keys.has(S.pose({ dir, ph: 0.7 }, t))).toBe(true);
+    }
+    const Wf = SUBJECTS.werewolf;
+    const keys = new Set(Wf.poses().map((p) => p.key));
+    const seen = new Set();
+    for (const chasing of [false, true]) {
+      for (const dir of [1, -1]) {
+        for (let t = 0; t < 12; t += 0.05) {
+          const k = Wf.pose({ walk: t * 3, dir, chasing }, t);
+          expect(keys.has(k)).toBe(true);
+          seen.add(k.slice(0, 4));
+        }
+      }
+    }
+    // Parado de tempos em tempos ele uiva (como no 2D); perseguindo, nunca
+    expect(seen.has('howl')).toBe(true);
+    for (let t = 0; t < 12; t += 0.05) expect(Wf.pose({ walk: 1, dir: 1, chasing: true }, t).startsWith('howl')).toBe(false);
+  });
+
+  test('a foto das abóboras tem as mesmas medidas do sprite 2D e ganha o reflexo na água (o 2D já traz o dele)', () => {
+    withFake((asked, img) => {
+      for (const w of [36, 82]) {
+        const s = pumpkinSprite3D({ w, seed: 4, sprites: {} }, true);
+        expect(s.canvas).toBe(img);
+        expect([s.ox, s.oy, s.w, s.h]).toEqual([12, 26, w + 24, 62]);
+        expect(s.is3d).toBe(true);
+      }
+    });
+  });
+
+  test('casa assombrada 3D: peças assentadas numa foto, a que cai por cima, janelas acesas com brilho e a porta 2D por cima', () => {
+    const keys = new Set(SUBJECTS.haunted.poses().map((p) => p.key));
+    for (let n = 1; n < HAUNTED_PIECES.length; n++) expect(keys.has(`n${n}`)).toBe(true);
+    for (let i = 0; i < HAUNTED_PIECES.length - 1; i++) expect(keys.has(`b${i}`)).toBe(true);
+    expect(keys.has('lit')).toBe(true);
+    withFake((asked) => {
+      const g = makeGame({ level: 25 });
+      for (let i = 0; i < 5; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.igloo.add();
+      const { ctx } = recordingCtx();
+      expect(drawHaunted3D(ctx, g.igloo, 0)).toBe(true);
+      expect(asked.includes('haunted:n5')).toBe(true);
+      expect(asked.includes('haunted:b5')).toBe(true);
+      for (let i = 0; i < 16; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.igloo.lit = true;
+      asked.length = 0;
+      const r = recordingCtx();
+      drawHaunted3D(r.ctx, g.igloo, 0);
+      expect(asked.includes('haunted:lit')).toBe(true);
+      // Brilho das 2 janelas e da lanterna
+      expect(r.calls.filter((c) => c[0] === 'createRadialGradient').length).toBe(3);
+      // Porta: abertura em arco, folha e batente com o degrau
+      expect(r.calls.some((c) => c[0] === 'quadraticCurveTo')).toBe(true);
+    });
+  });
+
+  test('árvore seca e abóboras da costa: 3D pelo gancho (a lanterna continua 2D), e o 2D de sempre sem a foto', () => {
+    const was = { ...halloweenArt };
+    try {
+      const calls = [];
+      Object.assign(halloweenArt, { on: true, tree: () => (calls.push('tree'), true), jack: () => (calls.push('jack'), true) });
+      const a = recordingCtx();
+      drawHalloweenDecor(a.ctx, 0);
+      expect(calls).toEqual(['tree', ...SHORE_PUMPKINS.map(() => 'jack')]);
+      // A lanterna da árvore (vela com o contorno) continua desenhada
+      expect(a.calls.some((c) => c[0] === 'strokeRect')).toBe(true);
+      Object.assign(halloweenArt, { tree: () => false, jack: () => false });
+      const b = recordingCtx();
+      drawHalloweenDecor(b.ctx, 0);
+      halloweenArt.on = false;
+      const c = recordingCtx();
+      drawHalloweenDecor(c.ctx, 0);
+      expect(b.calls.length).toBe(c.calls.length);
+      expect(b.calls.length).toBeGreaterThan(a.calls.length + 40);
+    } finally {
+      Object.assign(halloweenArt, was);
+    }
   });
 });

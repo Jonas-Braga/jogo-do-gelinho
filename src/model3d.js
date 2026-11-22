@@ -24,6 +24,10 @@ import {
   giantCrab, gull, siri, jellyfish, tfish, boardSubject, BOARD, BOARD_SCHEMES, hut as hutModel, palms as palmModels, parasol as parasolModel,
 } from './m3d/beach.js';
 import { HUT, HUT_PIECES, drawHutDoor, drawTorchFlame, isBuoy } from './beach.js';
+import {
+  werewolf, ghost, spider, eyeball, candy, pumpkinSubject, PUMP, jack as jackModel, JACK_R, deadTree as deadTreeModel, haunted as hauntedModel,
+} from './m3d/halloween.js';
+import { HAUNTED, HAUNTED_PIECES, drawHauntedDoor, drawWindowSilhouette, drawWindowGlow, drawLanternGlow } from './halloween.js';
 import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
@@ -43,17 +47,19 @@ export const SUBJECTS = {
   // Praia
   'player-surfer': player.withOutfit('surfer'), giantCrab, gull, siri, jellyfish, tfish, hut: hutModel, parasol: parasolModel,
   ...Object.fromEntries(palmModels.map((m, k) => [`palm${k}`, m])),
+  // Halloween
+  'player-wizard': player.withOutfit('wizard'), werewolf, ghost, spider, eyeball, candy, jack: jackModel, deadTree: deadTreeModel, haunted: hauntedModel,
   // Prêmios das fases especiais (iguais em todas)
   bag: bagModel, heart: heartModel,
 };
 // Fases especiais já convertidas ao 3D (as outras seguem inteiras em 2D)
-export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia']);
+export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia', 'halloween']);
 // Modelo do jogador por roupa e do urso por variante (null = sem modelo 3D: desenho 2D)
-const PLAYER_BY_OUTFIT = { parka: 'player', sweater: 'player-sweater', lumberjack: 'player-lumberjack', astronaut: 'player-astronaut', surfer: 'player-surfer' };
-const BEAR_BY_OUTFIT = { polar: 'bear', santaHat: 'bear-santa', brown: 'bear-brown', alien: 'alien', giantCrab: 'giantCrab' };
-export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish', 'snake', 'bat', 'piranha', 'ufo', 'crawler', 'comet', 'star', 'gull', 'siri', 'jellyfish', 'tfish']);
+const PLAYER_BY_OUTFIT = { parka: 'player', sweater: 'player-sweater', lumberjack: 'player-lumberjack', astronaut: 'player-astronaut', surfer: 'player-surfer', wizard: 'player-wizard' };
+const BEAR_BY_OUTFIT = { polar: 'bear', santaHat: 'bear-santa', brown: 'bear-brown', alien: 'alien', giantCrab: 'giantCrab', werewolf: 'werewolf' };
+export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish', 'snake', 'bat', 'piranha', 'ufo', 'crawler', 'comet', 'star', 'gull', 'siri', 'jellyfish', 'tfish', 'ghost', 'spider', 'eyeball', 'candy']);
 // O que substitui o peixe em cada cenário convertido (sem entrada = o peixe 3D normal)
-export const FISH_3D = { space: 'star', beach: 'tfish' };
+export const FISH_3D = { space: 'star', beach: 'tfish', halloween: 'candy' };
 export const BOX = player.box;
 export const playerPose = player.playerPose;
 export const poseList = player.poses;
@@ -90,6 +96,7 @@ function subjectOf(name) {
   if (name.startsWith('log')) return logSubject(Number(name.slice(3)));
   if (name.startsWith('rock')) return rockSubject(Number(name.slice(4)));
   if (name.startsWith('board')) return boardSubject(Number(name.slice(5)));
+  if (name.startsWith('pumpkin')) return pumpkinSubject(Number(name.slice(7)));
   return null;
 }
 
@@ -271,6 +278,55 @@ const ANCHOR = {
   tfish: (c, y, t) => {
     const hop = Math.max(0, Math.sin(t * 3 + c.ph)) * 12;
     return { y: y + 4 - hop, tilt: hop > 2 ? -0.25 * c.dir : 0, water: y + 9, cover: hop < 3 ? 36 : 0 };
+  },
+  // Halloween: o brilho do fantasma, o fio da aranha e os anéis na água são 2D
+  ghost: (c, y, t) => {
+    const by = y - 34 + Math.sin(t * 3 + c.ph) * 5;
+    return {
+      y: by, shadow: [c.x, y + 14, 14, 3, 'rgba(20, 10, 40, 0.25)'],
+      before: (ctx) => {
+        const glow = ctx.createRadialGradient(c.x, by, 4, c.x, by, 30);
+        glow.addColorStop(0, 'rgba(220, 210, 255, 0.35)');
+        glow.addColorStop(1, 'rgba(220, 210, 255, 0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(c.x - 30, by - 30, 60, 60);
+      },
+    };
+  },
+  spider: (c, y) => ({
+    y: y - 8, shadow: [c.x, y + 2, 18, 3, 'rgba(20, 10, 40, 0.3)'],
+    before: (ctx) => {
+      ctx.strokeStyle = 'rgba(230, 230, 255, 0.35)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(c.x - c.dir * 6, y - 18);
+      ctx.lineTo(c.x - c.dir * 22, y - 68);
+      ctx.stroke();
+    },
+  }),
+  eyeball: (c, y, t) => ({
+    y: y + 3 + Math.sin(t * 3 + c.ph) * 2, water: y + 8,
+    after: (ctx) => {
+      ctx.strokeStyle = 'rgba(205, 180, 255, 0.45)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.ellipse(c.x, y + 8, 16, 3, 0, 0, TAU);
+      ctx.stroke();
+    },
+  }),
+  candy: (c, y, t) => {
+    const hop = Math.max(0, Math.sin(t * 3 + c.ph)) * 14;
+    return {
+      y: y + 2 - hop, tilt: t * 3 * c.dir + c.ph,
+      after: (ctx) => {
+        if (hop >= 3) return;
+        ctx.strokeStyle = 'rgba(205, 180, 255, 0.5)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.ellipse(c.x, y + 9, 14, 3, 0, 0, TAU);
+        ctx.stroke();
+      },
+    };
   },
 };
 
@@ -721,5 +777,94 @@ export function drawHut3D(ctx, igloo, t) {
   });
   ctx.restore();
   drawHutDoor(ctx, igloo, t);
+  return true;
+}
+
+// ---------------------------------------------------------------- Halloween
+// Abóboras no rio: mesmo formato do sprite 2D (pumpkinSprite). A foto 3D não traz o
+// reflexo pintado (is3d): o renderizador desenha o reflexo na água
+export function pumpkinSprite3D(piece, active) {
+  const cacheKey = active ? '3d-pump-on' : '3d-pump-off';
+  if (piece.sprites[cacheKey]) return piece.sprites[cacheKey];
+  const name = `pumpkin${piece.w}`;
+  want(name);
+  const img = sprite(name, `${piece.seed % PUMP.VARIANTS}${active ? 1 : 0}`);
+  if (!img) return null;
+  const s = { canvas: img, ox: PUMP.PAD, oy: PUMP.TOP, w: piece.w + PUMP.PAD * 2, h: PUMP.H, is3d: true };
+  piece.sprites[cacheKey] = s;
+  return s;
+}
+
+// Ganchos de src/halloween.js (halloweenArt): árvore seca e abóbora de rosto aceso
+// (na base de cada uma; a abóbora de raio r é a foto de raio 15 em escala)
+export function drawDeadTree3D(ctx) {
+  want('deadTree');
+  const img = sprite('deadTree', 't');
+  if (!img) return false;
+  blit(ctx, img, deadTreeModel.box);
+  return true;
+}
+
+export function drawJack3D(ctx, r) {
+  want('jack');
+  const img = sprite('jack', 'j');
+  if (!img) return false;
+  ctx.save();
+  ctx.scale(r / JACK_R, r / JACK_R);
+  blit(ctx, img, jackModel.box);
+  ctx.restore();
+  return true;
+}
+
+// Casa assombrada 3D: mesmo comportamento da drawHaunted 2D (sombra, contornos-guia,
+// peças caindo com o quique, janelas acesas com a silhueta e o brilho, brilho da
+// lanterna e a porta 2D por cima)
+export function drawHaunted3D(ctx, igloo, t) {
+  want('haunted');
+  const N = HAUNTED_PIECES.length - 1; // a última peça é a porta
+  const blocks = Math.min(igloo.count, N);
+  let settled = 0;
+  while (settled < blocks && igloo.anim[settled] >= 1) settled++;
+  const settledKey = settled === N && igloo.lit ? 'lit' : `n${settled}`;
+  if (blocks > 0 && !sprite('haunted', `b${blocks - 1}`)) return false;
+  if (settled > 0 && !sprite('haunted', settledKey)) return false;
+  const { HW, WALL_H, ROOF } = HAUNTED;
+  ctx.save();
+  ctx.translate(IGLOO.x, IGLOO.baseY);
+  ctx.fillStyle = 'rgba(10, 6, 16, 0.4)';
+  ctx.beginPath();
+  ctx.ellipse(6, 3, HW + 32, 9, 0, 0, TAU);
+  ctx.fill();
+  if (igloo.count < HAUNTED_PIECES.length) {
+    ctx.save();
+    ctx.setLineDash([5, 6]);
+    ctx.strokeStyle = 'rgba(201, 190, 224, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-HW, -WALL_H, HW * 2, WALL_H);
+    ctx.beginPath();
+    ctx.moveTo(-ROOF.eave, ROOF.base);
+    ctx.lineTo(0, ROOF.peak);
+    ctx.lineTo(ROOF.eave, ROOF.base);
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (settled > 0) blit(ctx, sprite('haunted', settledKey), hauntedModel.box);
+  for (let i = settled; i < blocks; i++) {
+    const a = igloo.anim[i];
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 3);
+    ctx.translate(0, -(1 - easeOutBack(a)) * 46);
+    blit(ctx, sprite('haunted', `b${i}`), hauntedModel.box);
+    ctx.restore();
+  }
+  HAUNTED_PIECES.forEach((p, i) => {
+    if (i >= settled) return;
+    if (p.kind === 'window') {
+      drawWindowSilhouette(ctx, p.side, t);
+      drawWindowGlow(ctx, p.side);
+    } else if (p.kind === 'lantern') drawLanternGlow(ctx, t);
+  });
+  ctx.restore();
+  drawHauntedDoor(ctx, igloo, t);
   return true;
 }

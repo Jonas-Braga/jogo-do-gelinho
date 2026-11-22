@@ -1,6 +1,6 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
-  rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D,
+  rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
@@ -28,7 +28,7 @@ import {
 } from './beach.js';
 import {
   makeHalloweenBackground, drawHalloweenSky, drawHalloweenDecor, pumpkinSprite, drawGhost, drawSpider,
-  drawEyeball, drawCandy, drawHaunted, drawHauntedDoorFront, HAUNT,
+  drawEyeball, drawCandy, drawHaunted, drawHauntedDoorFront, HAUNT, halloweenArt,
 } from './halloween.js';
 import {
   makeDinoBackground, drawDinoSky, drawDinoDecor, drawLavaBubbles, drawEmbers, rockSprite, drawPtero,
@@ -51,7 +51,7 @@ const CRITTER_DRAW = {
 
 // Construções das fases especiais (o iglu se desenha sozinho)
 // Casas 3D por estilo (as que ainda não têm ficam no 2D)
-const HOUSE_3D = { cabin: drawCabin3D, base: drawBase3D, hut: drawHut3D };
+const HOUSE_3D = { cabin: drawCabin3D, base: drawBase3D, hut: drawHut3D, haunted: drawHaunted3D };
 const HOUSE_DRAW = {
   cabin: { body: drawCabin, front: drawCabinDoorFront },
   base: { body: drawBase, front: drawBaseDoorFront },
@@ -65,7 +65,7 @@ const WATERS = { forest: RIVER, space: DUST, beach: SEA, halloween: HAUNT, dino:
 const ICE_WATER = { water: ['#1C7E99', '#0E5670', '#052A40'], ripple: [190, 235, 250], bank: 'rgba(3, 30, 48, 0.35)' };
 // Placas de cada cenário: gelo, troncos, asteroides ou pranchas
 // Placas 3D por cenário (os que ainda não têm ficam no 2D)
-const FLOE_3D = { ice: floeSprite3D, forest: logSprite3D, space: rockSprite3D, beach: boardSprite3D };
+const FLOE_3D = { ice: floeSprite3D, forest: logSprite3D, space: rockSprite3D, beach: boardSprite3D, halloween: pumpkinSprite3D };
 const FLOE_SPRITE = {
   forest: logSprite, space: asteroidSprite, beach: boardSprite, halloween: pumpkinSprite, dino: rockSprite,
 };
@@ -196,6 +196,9 @@ export class Renderer {
     beachArt.on = this.normal3d;
     beachArt.palm = drawPalm3D;
     beachArt.parasol = drawParasol3D;
+    halloweenArt.on = this.normal3d;
+    halloweenArt.tree = drawDeadTree3D;
+    halloweenArt.jack = drawJack3D;
     if (DEPTH.sway && tr && typeof tr.a === 'number') followCamera(game.player.x, dt);
 
     ctx.save();
@@ -540,7 +543,8 @@ export class Renderer {
       ctx.beginPath();
       ctx.ellipse(it.x + it.w / 2 + 4, it.y + 28, it.w / 2 + 6, 7, 0, 0, Math.PI * 2);
       ctx.fill();
-      if (!OWN_REFLECTION.has(scenery)) {
+      // As abóboras 2D já trazem o reflexo pintado; as fotos 3D, não
+      if (!OWN_REFLECTION.has(scenery) || it.s.is3d) {
         ctx.save();
         ctx.globalAlpha = 0.14;
         ctx.translate(it.x - it.s.ox, it.y + 19);

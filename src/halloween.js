@@ -279,6 +279,8 @@ export function makeHalloweenBackground() {
 export const DEAD_TREE = { x: 40, base: 246 };
 export const SHORE_PUMPKINS = [{ x: 168, y: 246, s: 1 }, { x: 300, y: 240, s: 0.8 }, { x: 590, y: 244, s: 0.9 }];
 export const TREE_BARK = '#2B1E22';
+// Gancho do visual 3D (src/model3d.js): árvore seca e abóboras da costa em 3D
+export const halloweenArt = { on: false, tree: null, jack: null };
 
 export function drawHalloweenDecor(ctx, t) {
   drawDeadTree(ctx, t);
@@ -310,6 +312,11 @@ function drawDeadTree(ctx, t) {
   ctx.beginPath();
   ctx.ellipse(10, 2, 34, 5, 0, 0, TAU);
   ctx.fill();
+  if (halloweenArt.on && halloweenArt.tree?.(ctx)) {
+    drawTreeLantern(ctx, t);
+    ctx.restore();
+    return;
+  }
   ctx.strokeStyle = TREE_BARK;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -342,7 +349,12 @@ function drawDeadTree(ctx, t) {
   ctx.beginPath();
   ctx.ellipse(1, -46, 4, 7, 0, 0, TAU);
   ctx.fill();
-  // Lanterna pendurada no galho, balançando
+  drawTreeLantern(ctx, t);
+  ctx.restore();
+}
+
+// Lanterna pendurada no galho, balançando (também com a árvore 3D)
+function drawTreeLantern(ctx, t) {
   const sw = Math.sin(t * 1.8) * 0.25;
   ctx.save();
   ctx.translate(52, -89);
@@ -367,7 +379,6 @@ function drawDeadTree(ctx, t) {
   ctx.lineWidth = 1.2;
   ctx.strokeRect(-4.5, 21, 9, 15);
   ctx.restore();
-  ctx.restore();
 }
 
 // Abóbora com rosto entalhado (lit = vela acesa dentro). Base em (x, y).
@@ -384,6 +395,10 @@ export function drawJack(ctx, x, y, r, t, lit) {
     gl.addColorStop(1, 'rgba(255, 170, 60, 0)');
     ctx.fillStyle = gl;
     ctx.fillRect(-r * 2.6, -r * 3.3, r * 5.2, r * 5.2);
+  }
+  if (lit && halloweenArt.on && halloweenArt.jack?.(ctx, r)) {
+    ctx.restore();
+    return;
   }
   pumpkinBody(ctx, 0, -r * 0.82, r * 1.12, r * 0.82, lit ? JACK_ORANGE : '#C8641E');
   if (lit) carvedFace(ctx, 0, -r * 0.82, r, t);
@@ -1272,6 +1287,8 @@ const ROOF = { eave: 116, base: -78, peak: -146 };
 const CHIMNEY = { x: 58, top: -140, w: 18 };
 
 export const HAUNTED_DOOR = { x: IGLOO.x, bottom: SHORE_Y + 1, w: IGLOO.doorRx, h: IGLOO.doorH };
+// Medidas da casa (para o modelo 3D em src/m3d/halloween.js)
+export const HAUNTED = { HW, WALL_H, ROOF, CHIMNEY };
 
 const third = (HW * 2) / 3;
 const band = (ROOF.base - ROOF.peak) / 3;
@@ -1368,14 +1385,7 @@ function drawHouseWindow(ctx, side, lit, t) {
   const flick = 0.82 + Math.sin(t * 7 + side) * 0.08 + Math.sin(t * 23) * 0.05;
   ctx.fillStyle = lit ? `rgba(255, 200, 100, ${flick})` : `rgba(255, 216, 106, ${flick * 0.7})`;
   ctx.fillRect(x, y, w, h);
-  // Silhueta assustadora na janela (só na da direita, de vez em quando)
-  if (side > 0 && Math.sin(t * 0.5) > 0.6) {
-    ctx.fillStyle = 'rgba(40, 20, 50, 0.55)';
-    ctx.beginPath();
-    ctx.arc(x + 13, y + 14, 6, 0, TAU);
-    ctx.fillRect(x + 6, y + 18, 14, 12);
-    ctx.fill();
-  }
+  drawWindowSilhouette(ctx, side, t);
   // Caixilho em cruz e moldura
   ctx.fillStyle = '#1A1224';
   ctx.fillRect(x + w / 2 - 1.2, y, 2.4, h);
@@ -1392,7 +1402,28 @@ function drawHouseWindow(ctx, side, lit, t) {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
   for (let k = 4; k < h; k += 5) ctx.fillRect(side < 0 ? -11 : 0, k, 11, 1.2);
   ctx.restore();
-  // Brilho saindo da janela
+  drawWindowGlow(ctx, side);
+}
+
+// Silhueta assustadora na janela (só na da direita, de vez em quando) e o brilho
+// saindo da janela: também desenhados por cima da casa 3D
+export function drawWindowSilhouette(ctx, side, t) {
+  if (side > 0 && Math.sin(t * 0.5) > 0.6) {
+    const x = side * 58 - 13;
+    const y = -60;
+    ctx.fillStyle = 'rgba(40, 20, 50, 0.55)';
+    ctx.beginPath();
+    ctx.arc(x + 13, y + 14, 6, 0, TAU);
+    ctx.fillRect(x + 6, y + 18, 14, 12);
+    ctx.fill();
+  }
+}
+
+export function drawWindowGlow(ctx, side) {
+  const x = side * 58 - 13;
+  const y = -60;
+  const w = 26;
+  const h = 30;
   const gl = ctx.createRadialGradient(x + w / 2, y + h / 2, 4, x + w / 2, y + h / 2, 34);
   gl.addColorStop(0, 'rgba(255, 210, 110, 0.22)');
   gl.addColorStop(1, 'rgba(255, 210, 110, 0)');
@@ -1434,17 +1465,29 @@ function drawLantern(ctx, t) {
   ctx.fillStyle = '#1A1224';
   ctx.fillRect(-7, -6, 14, 3);
   ctx.fillRect(-1, -10, 2, 5);
-  const gl = ctx.createRadialGradient(0, 6, 2, 0, 6, 26);
-  gl.addColorStop(0, `rgba(255, 210, 110, ${0.45 + Math.sin(t * 9) * 0.07})`);
-  gl.addColorStop(1, 'rgba(255, 210, 110, 0)');
-  ctx.fillStyle = gl;
-  ctx.fillRect(-26, -20, 52, 52);
+  lanternGlow(ctx, t);
   ctx.fillStyle = CANDLE;
   ctx.fillRect(-5, -3, 10, 15);
   ctx.strokeStyle = '#1A1224';
   ctx.lineWidth = 1.4;
   ctx.strokeRect(-5, -3, 10, 15);
   ctx.fillRect(-6, 12, 12, 3);
+  ctx.restore();
+}
+
+// Brilho da lanterna ao lado da porta (em volta de (40, −66); também na casa 3D)
+function lanternGlow(ctx, t) {
+  const gl = ctx.createRadialGradient(0, 6, 2, 0, 6, 26);
+  gl.addColorStop(0, `rgba(255, 210, 110, ${0.45 + Math.sin(t * 9) * 0.07})`);
+  gl.addColorStop(1, 'rgba(255, 210, 110, 0)');
+  ctx.fillStyle = gl;
+  ctx.fillRect(-26, -20, 52, 52);
+}
+
+export function drawLanternGlow(ctx, t) {
+  ctx.save();
+  ctx.translate(40, -66);
+  lanternGlow(ctx, t);
   ctx.restore();
 }
 
@@ -1563,8 +1606,13 @@ export function drawHaunted(ctx, igloo, t) {
     ctx.restore();
   }
   ctx.restore();
+  drawHauntedDoor(ctx, igloo, t);
+}
 
-  // Porta (peça 16): abertura escura, luz quando acesa, porta de tábuas e batente
+// Porta (peça 16): abertura escura, luz quando acesa, porta de tábuas e batente (ou o
+// contorno tracejado enquanto não está pronta). Também usada pela casa 3D
+export function drawHauntedDoor(ctx, igloo, t) {
+  const n = igloo.count;
   const r = doorRect();
   if (n < RULES.iglooPieces) {
     ctx.save();

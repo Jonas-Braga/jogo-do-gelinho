@@ -2,7 +2,7 @@
 <!-- Ferramenta de desenvolvimento: mostra as fotos de um modelo 3D (src/m3d/).
      ?m=player|bear|goose|...|floe82|log36|rock82  modelo
      ?k=idleR,run0R,...                   só estas fotos (senão, todas)
-     ?z=1.5                               zoom -->
+     ?z=1.5                               zoom (a tela cresce para caber todas) -->
 <canvas id=c width=1600 height=900></canvas>
 <script type="module">
 import { model, want, SUBJECTS } from '../src/model3d.js';
@@ -10,12 +10,13 @@ import { floeSubject } from '../src/m3d/floes.js';
 import { logSubject } from '../src/m3d/forest.js';
 import { rockSubject } from '../src/m3d/space.js';
 import { boardSubject } from '../src/m3d/beach.js';
+import { pumpkinSubject } from '../src/m3d/halloween.js';
 const q = new URLSearchParams(location.search);
 const name = q.get('m') || 'player';
 const z = Number(q.get('z') || 1);
 want(name);
 const ctx = document.getElementById('c').getContext('2d');
-const S = SUBJECTS[name] || (name.startsWith('log') ? logSubject(Number(name.slice(3))) : name.startsWith('rock') ? rockSubject(Number(name.slice(4))) : name.startsWith('board') ? boardSubject(Number(name.slice(5))) : floeSubject(Number(name.slice(4))));
+const S = SUBJECTS[name] || (name.startsWith('log') ? logSubject(Number(name.slice(3))) : name.startsWith('rock') ? rockSubject(Number(name.slice(4))) : name.startsWith('board') ? boardSubject(Number(name.slice(5))) : name.startsWith('pumpkin') ? pumpkinSubject(Number(name.slice(7))) : floeSubject(Number(name.slice(4))));
 const keys = q.get('k')?.split(',') || S.poses().map((p) => p.key);
 const pre = name === 'player' ? '' : name + ':';
 const wait = () => {
@@ -24,6 +25,9 @@ const wait = () => {
   const b = S.box, res = 1.6 * z;
   const w = (b.right - b.left) * res, h = (b.top - b.bottom) * res;
   const cols = Math.max(1, Math.floor(1600 / (w + 8)));
+  // A tela cresce para caber todas as fotos (com zoom grande cabem poucas por linha)
+  ctx.canvas.height = Math.ceil(keys.length / cols) * (h + 16) + 8;
+  ctx.font = '14px sans-serif';
   keys.forEach((k, i) => {
     const x = (i % cols) * (w + 8), y = Math.floor(i / cols) * (h + 16);
     ctx.drawImage(model.sprites[pre + k], x, y + 12, w, h);
