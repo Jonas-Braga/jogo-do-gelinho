@@ -255,6 +255,8 @@ export const NEST = { x: 250, y: 248 };
 export const FERN_GREEN = '#4E8A2E';
 export const EGG_SHELL = '#F4EBD0';
 export const EGG_SPOT = '#7BBF4A';
+// Gancho do visual 3D (src/model3d.js): samambaias, ninho e as presas da caverna em 3D
+export const dinoArt = { on: false, fern: null, nest: null, tusks: null };
 
 export function drawDinoDecor(ctx, t) {
   drawVolcanoSmoke(ctx, t);
@@ -317,6 +319,10 @@ function drawTreeFern(ctx, x, base, s, t) {
   ctx.beginPath();
   ctx.ellipse(4, 2, 36, 5, 0, 0, TAU);
   ctx.fill();
+  if (dinoArt.on && dinoArt.fern?.(ctx, Math.sin(t * 1.3) * 0.08)) {
+    ctx.restore();
+    return;
+  }
   // Tronco com escamas
   ctx.fillStyle = '#5A3E26';
   ctx.beginPath();
@@ -372,6 +378,10 @@ function drawNest(ctx, t) {
   ctx.beginPath();
   ctx.ellipse(2, 1, 30, 5, 0, 0, TAU);
   ctx.fill();
+  if (dinoArt.on && dinoArt.nest?.(ctx, Math.max(0, Math.sin(t * 2.4)) ** 4 * Math.sin(t * 30) * 0.25)) {
+    ctx.restore();
+    return;
+  }
   for (const [ex, tilt] of [[-11, -0.2], [11, 0.25], [0, 0]]) {
     const wob = ex === 0 ? Math.max(0, Math.sin(t * 2.4)) ** 4 * Math.sin(t * 30) * 0.25 : 0;
     drawEgg(ctx, ex, -6, 8.5, tilt + wob);
@@ -1227,6 +1237,8 @@ const SKULL = { x: 0, y: -80 };
 const TORCH = { x: -126, y: 0 };
 
 export const CAVE_DOOR = { x: IGLOO.x, bottom: SHORE_Y + 1, w: IGLOO.doorRx, h: IGLOO.doorH };
+// Medidas da caverna (para o modelo 3D em src/m3d/dino.js)
+export const CAVE = { HW, ROWS, ROW_H, SLABS, VENT, SKULL, TORCH };
 const STONE_R = IGLOO.doorH / 2 + 5;
 
 export const CAVE_PIECES = [
@@ -1388,6 +1400,19 @@ function drawTorch(ctx, t) {
   ctx.stroke();
   ctx.fillStyle = '#4A3020';
   ctx.fillRect(-3, -58, 10, 8);
+  torchFlame(ctx, t);
+  ctx.restore();
+}
+
+// Chama da tocha com a luz em volta (também na caverna 3D)
+export function drawCaveTorchFlame(ctx, t) {
+  ctx.save();
+  ctx.translate(TORCH.x, 0);
+  torchFlame(ctx, t);
+  ctx.restore();
+}
+
+function torchFlame(ctx, t) {
   const gl = ctx.createRadialGradient(2, -66, 2, 2, -66, 40);
   gl.addColorStop(0, `rgba(255, 190, 80, ${0.45 + Math.sin(t * 9) * 0.07})`);
   gl.addColorStop(1, 'rgba(255, 190, 80, 0)');
@@ -1408,7 +1433,6 @@ function drawTorch(ctx, t) {
   ctx.quadraticCurveTo(6, -66, 5, -58);
   ctx.closePath();
   ctx.fill();
-  ctx.restore();
 }
 
 function doorRect() {
@@ -1513,8 +1537,20 @@ export function drawCave(ctx, igloo, t) {
     ctx.restore();
   }
   ctx.restore();
+  if (!drawCaveDoor(ctx, igloo, t)) return;
+  // Presas de osso por cima da pedra, emoldurando a entrada
+  ctx.save();
+  ctx.translate(IGLOO.x, IGLOO.baseY);
+  drawTusk(ctx, -1);
+  drawTusk(ctx, 1);
+  ctx.restore();
+}
 
-  // Porta (peça 16): entrada escura, luz da fogueira quando acesa e a pedra
+// Porta (peça 16): entrada escura, luz da fogueira quando acesa e a pedra (ou o
+// contorno tracejado enquanto não está pronta; devolve false nesse caso). Também
+// usada pela caverna 3D
+export function drawCaveDoor(ctx, igloo, t) {
+  const n = igloo.count;
   const r = doorRect();
   if (n < RULES.iglooPieces) {
     ctx.save();
@@ -1523,7 +1559,7 @@ export function drawCave(ctx, igloo, t) {
     ctx.lineWidth = 1.5;
     ctx.strokeRect(r.x - 4, r.y - 4, r.w + 8, r.h + 4);
     ctx.restore();
-    return;
+    return false;
   }
   const a = igloo.anim[RULES.iglooPieces - 1];
   ctx.save();
@@ -1541,12 +1577,7 @@ export function drawCave(ctx, igloo, t) {
   }
   drawDoorStone(ctx, igloo.curtain);
   ctx.restore();
-  // Presas de osso por cima da pedra, emoldurando a entrada
-  ctx.save();
-  ctx.translate(IGLOO.x, IGLOO.baseY);
-  drawTusk(ctx, -1);
-  drawTusk(ctx, 1);
-  ctx.restore();
+  return true;
 }
 
 // Desenhado POR CIMA do personagem enquanto ele entra
@@ -1564,7 +1595,9 @@ export function drawCaveDoorFront(ctx, igloo, t) {
   }
   drawDoorStone(ctx, igloo.curtain);
   ctx.translate(IGLOO.x, IGLOO.baseY);
-  drawTusk(ctx, -1);
-  drawTusk(ctx, 1);
+  if (!(dinoArt.on && dinoArt.tusks?.(ctx))) {
+    drawTusk(ctx, -1);
+    drawTusk(ctx, 1);
+  }
   ctx.restore();
 }

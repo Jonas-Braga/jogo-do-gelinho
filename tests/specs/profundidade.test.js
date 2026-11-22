@@ -29,6 +29,8 @@ import { boardSubject } from '../../src/m3d/beach.js';
 import { JUMP_YAW } from '../../src/m3d/player.js';
 import { pumpkinSprite3D, drawHaunted3D } from '../../src/model3d.js';
 import { HAUNTED_PIECES, halloweenArt, drawHalloweenDecor, SHORE_PUMPKINS } from '../../src/halloween.js';
+import { basaltSprite3D, drawCave3D } from '../../src/model3d.js';
+import { CAVE_PIECES, dinoArt, drawDinoDecor, drawCaveDoorFront, TREE_FERNS } from '../../src/dino.js';
 
 // Contexto 2D falso que registra as chamadas
 function recordingCtx() {
@@ -1182,6 +1184,134 @@ suite('Halloween em 3D', () => {
       expect(b.calls.length).toBeGreaterThan(a.calls.length + 40);
     } finally {
       Object.assign(halloweenArt, was);
+    }
+  });
+});
+
+suite('Dinossauros em 3D', () => {
+  const withFake = (fn) => {
+    const was = { ...model };
+    const asked = [];
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: (_, k) => (asked.push(String(k)), img) });
+      fn(asked, img);
+    } finally {
+      Object.assign(model, was);
+    }
+  };
+
+  test('os Dinossauros são uma fase convertida: homem das cavernas, T-rex, pedras, caverna, samambaias, ninho, bichos e ovo em 3D', () => {
+    expect(THEMES_3D.has(SPECIALS[30].id)).toBe(true);
+    withFake((asked) => {
+      const g = makeGame({ level: 30, quiet: false });
+      step(g, 6);
+      Object.assign(g.bear, { active: true, x: 400, dir: 1, chasing: true });
+      for (let i = 0; i < 8; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.critters.list.length = 0;
+      for (const [k, kind] of ['ptero', 'raptor', 'ammonite', 'fish'].entries()) {
+        g.critters.list.push({ kind, row: k, dir: 1, vx: 0, x: 300 + k * 200, w: 30, ph: 0 });
+      }
+      g.renderer.use3d = true;
+      const { ctx } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      const has = (pre) => asked.some((k) => k.startsWith(pre));
+      for (const pre of ['player-caveman:', 'trex:', 'basalt', 'cave:', 'fern:', 'nest:', 'ptero:', 'raptor:', 'ammonite:', 'egg:']) {
+        expect(has(pre)).toBe(true);
+      }
+      expect(FISH_3D.dino).toBe('egg');
+      expect(has('fish:')).toBe(false);
+    });
+  });
+
+  test('pterossauro, raptor, amonite e ovo: toda foto pedida existe; o T-rex anda, corre e ruge', () => {
+    for (const kind of ['ptero', 'raptor', 'ammonite', 'egg']) {
+      const S = SUBJECTS[kind];
+      const keys = new Set(S.poses().map((p) => p.key));
+      for (const dir of [1, -1]) for (let t = 0; t < 3; t += 0.011) expect(keys.has(S.pose({ dir, ph: 0.7 }, t))).toBe(true);
+    }
+    const R = SUBJECTS.trex;
+    const keys = new Set(R.poses().map((p) => p.key));
+    const seen = new Set();
+    for (const chasing of [false, true]) {
+      for (const dir of [1, -1]) {
+        for (let t = 0; t < 12; t += 0.05) {
+          const k = R.pose({ walk: t * 3, dir, chasing }, t);
+          expect(keys.has(k)).toBe(true);
+          seen.add(k.slice(0, 4));
+        }
+      }
+    }
+    // Parado ele ruge de tempos em tempos (como no 2D); perseguindo, nunca
+    expect(seen.has('roar')).toBe(true);
+    for (let t = 0; t < 12; t += 0.05) expect(R.pose({ walk: 1, dir: 1, chasing: true }, t).startsWith('roar')).toBe(false);
+  });
+
+  test('a foto das pedras de basalto tem as mesmas medidas do sprite 2D', () => {
+    withFake((asked, img) => {
+      for (const w of [36, 82]) {
+        const s = basaltSprite3D({ w, seed: 8, sprites: {} }, true);
+        expect(s.canvas).toBe(img);
+        expect([s.ox, s.oy, s.w, s.h]).toEqual([12, 26, w + 24, 62]);
+      }
+    });
+  });
+
+  test('caverna 3D: pedras assentadas numa foto, a que cai por cima, a chama 2D da tocha, a pedra 2D da porta e as presas por cima dela', () => {
+    const keys = new Set(SUBJECTS.cave.poses().map((p) => p.key));
+    for (let n = 1; n < CAVE_PIECES.length; n++) expect(keys.has(`n${n}`)).toBe(true);
+    for (let i = 0; i < CAVE_PIECES.length - 1; i++) expect(keys.has(`b${i}`)).toBe(true);
+    withFake((asked) => {
+      const g = makeGame({ level: 30 });
+      for (let i = 0; i < 5; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.igloo.add();
+      const { ctx } = recordingCtx();
+      expect(drawCave3D(ctx, g.igloo, 0)).toBe(true);
+      expect(asked.includes('cave:n5')).toBe(true);
+      expect(asked.includes('cave:b5')).toBe(true);
+      expect(asked.includes('caveTusks:t')).toBe(false);
+      for (let i = 0; i < 16; i++) g.igloo.add();
+      g.igloo.update(5);
+      asked.length = 0;
+      const r = recordingCtx();
+      drawCave3D(r.ctx, g.igloo, 0);
+      // Chama da tocha (brilho com gradiente), a pedra redonda e as presas 3D por cima
+      expect(r.calls.some((c) => c[0] === 'createRadialGradient')).toBe(true);
+      expect(r.calls.some((c) => c[0] === 'arc')).toBe(true);
+      expect(asked.includes('caveTusks:t')).toBe(true);
+    });
+  });
+
+  test('samambaias, ninho e presas da porta: 3D pelo gancho, e o 2D de sempre sem a foto', () => {
+    const was = { ...dinoArt };
+    try {
+      const calls = [];
+      Object.assign(dinoArt, {
+        on: true, fern: () => (calls.push('fern'), true), nest: () => (calls.push('nest'), true), tusks: () => (calls.push('tusks'), true),
+      });
+      const a = recordingCtx();
+      drawDinoDecor(a.ctx, 0);
+      expect(calls).toEqual([...TREE_FERNS.map(() => 'fern'), 'nest']);
+      // Entrando na caverna pronta: as presas por cima são as 3D
+      const g = makeGame({ level: 30 });
+      for (let i = 0; i < 16; i++) g.igloo.add();
+      g.igloo.update(5);
+      drawCaveDoorFront(recordingCtx().ctx, g.igloo, 0);
+      expect(calls.at(-1)).toBe('tusks');
+      Object.assign(dinoArt, { fern: () => false, nest: () => false });
+      const b = recordingCtx();
+      drawDinoDecor(b.ctx, 0);
+      dinoArt.on = false;
+      const c = recordingCtx();
+      drawDinoDecor(c.ctx, 0);
+      expect(b.calls.length).toBe(c.calls.length);
+      expect(b.calls.length).toBeGreaterThan(a.calls.length + 40);
+    } finally {
+      Object.assign(dinoArt, was);
     }
   });
 });

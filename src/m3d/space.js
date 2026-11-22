@@ -446,10 +446,23 @@ export const star = {
 // crateras; acesa, a rocha fica azulada com veios e cristais ciano brilhando. Em volta
 // da parte de baixo, o brilho roxo da poeira estelar.
 export const ROCK = { PAD: 12, TOP: 22, H: 66, VARIANTS: 3 };
+// Aparência das rochas do espaço (as pedras de basalto dos Dinossauros usam o mesmo
+// modelo com outra aparência: basaltSubject em src/m3d/dino.js)
+export const SPACE_ROCK = {
+  dims: ROCK, top: 0.9, bot: -15, ringY: -12.5,
+  off: ['#A9A5BA', '#7A7690', '#35304E'], on: ['#C9F6FF', '#8A92B8', '#3E3A62'], onGlow: '#1A5A80',
+  crystal: ['#7FF0FF', '#3FD8F0'], vein: ['#78F5FF', '#50E8FF'], ring: ['#B496FF', '#7A50E0', 0.22],
+  pebble: ['#6E6A84', '#7E86AC'],
+};
 const rocks = new Map();
 export function rockSubject(w) {
-  if (rocks.has(w)) return rocks.get(w);
-  const S = {
+  if (!rocks.has(w)) rocks.set(w, makeRockSubject(w, SPACE_ROCK));
+  return rocks.get(w);
+}
+
+export function makeRockSubject(w, look) {
+  const ROCK = look.dims;
+  return {
     box: { left: -ROCK.PAD, right: w + ROCK.PAD, top: ROCK.TOP, bottom: ROCK.TOP - ROCK.H },
     res: 2.2,
     elevation: 0.55,
@@ -459,7 +472,7 @@ export function rockSubject(w) {
       return out;
     },
     build(kit) {
-      return buildRocks(kit, w);
+      return buildRocks(kit, w, look);
     },
     apply(rig, p) {
       rig.variants.forEach((g, i) => (g.visible = i === p.v));
@@ -467,27 +480,26 @@ export function rockSubject(w) {
       for (const o of rig.ons) o.visible = !!p.on;
     },
   };
-  rocks.set(w, S);
-  return S;
 }
 
-function buildRocks(kit, w) {
+function buildRocks(kit, w, look) {
+  const ROCK = look.dims;
   const { THREE, group, mat, mesh } = kit;
   const root = group();
   const variants = [];
   const offs = [];
   const ons = [];
   const D = 10;    // meia profundidade
-  const top = 0.9; // altura do topo (bate com a linha de cima do sprite 2D)
-  const bot = -15;
+  const top = look.top; // altura do topo (bate com a linha de cima do sprite 2D)
+  const bot = look.bot;
   const rockM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
-  const rockOnM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0, emissive: '#1A5A80', emissiveIntensity: 0.35 });
-  const crystal = mat('#7FF0FF', 0.15, { emissive: '#3FD8F0', emissiveIntensity: 1, transparent: true, opacity: 0.92 });
-  const vein = mat('#78F5FF', 0.2, { emissive: '#50E8FF', emissiveIntensity: 1.2 });
-  const dust = mat('#B496FF', 0.9, { transparent: true, opacity: 0.22, depthWrite: false, emissive: '#7A50E0', emissiveIntensity: 0.4 });
+  const rockOnM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0, emissive: look.onGlow, emissiveIntensity: 0.35 });
+  const crystal = mat(look.crystal[0], 0.15, { emissive: look.crystal[1], emissiveIntensity: 1, transparent: true, opacity: 0.92 });
+  const vein = mat(look.vein[0], 0.2, { emissive: look.vein[1], emissiveIntensity: 1.2 });
+  const dust = mat(look.ring[0], 0.9, { transparent: true, opacity: look.ring[2], depthWrite: false, emissive: look.ring[1], emissiveIntensity: look.ring[3] ?? 0.4 });
   const COLORS = {
-    off: ['#A9A5BA', '#7A7690', '#35304E'],
-    on: ['#C9F6FF', '#8A92B8', '#3E3A62'],
+    off: look.off,
+    on: look.on,
   };
   const lerp = (a, b, k) => a.clone().lerp(b, k);
   for (let v = 0; v < ROCK.VARIANTS; v++) {
@@ -566,8 +578,8 @@ function buildRocks(kit, w) {
       const x = w * (0.1 + rnd() * 0.8);
       const geoB = new THREE.SphereGeometry(r, 10, 8);
       const p = [x, bot + 3 + rnd() * 6, (rnd() < 0.5 ? -1 : 1) * (D * 0.75)];
-      const b0 = mesh(geoB, mat('#6E6A84', 0.9), ...p);
-      const b1 = mesh(geoB, mat('#7E86AC', 0.7, { emissive: '#1A5A80', emissiveIntensity: 0.3 }), ...p);
+      const b0 = mesh(geoB, mat(look.pebble[0], 0.9), ...p);
+      const b1 = mesh(geoB, mat(look.pebble[1], 0.7, { emissive: look.onGlow, emissiveIntensity: 0.3 }), ...p);
       for (const b of [b0, b1]) b.scale.set(1.3, 0.8, 1);
       g.add(b0, b1);
       offs.push(b0);
@@ -596,7 +608,7 @@ function buildRocks(kit, w) {
       }
     }
     // Brilho roxo da poeira em volta da parte de baixo
-    const ring = mesh(new THREE.CircleGeometry(1, 40), dust, w / 2, -12.5, 0);
+    const ring = mesh(new THREE.CircleGeometry(1, 40), dust, w / 2, look.ringY ?? -12.5, 0);
     ring.rotation.x = -Math.PI / 2;
     ring.scale.set(w / 2 + 8, D + 7, 1);
     ring.castShadow = false;

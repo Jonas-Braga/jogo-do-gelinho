@@ -28,6 +28,10 @@ import {
   werewolf, ghost, spider, eyeball, candy, pumpkinSubject, PUMP, jack as jackModel, JACK_R, deadTree as deadTreeModel, haunted as hauntedModel,
 } from './m3d/halloween.js';
 import { HAUNTED, HAUNTED_PIECES, drawHauntedDoor, drawWindowSilhouette, drawWindowGlow, drawLanternGlow } from './halloween.js';
+import {
+  trex, ptero, raptor, ammonite, egg as eggModel, basaltSubject, BASALT, cave as caveModel, caveTusks, fern as fernModel, nest as nestModel,
+} from './m3d/dino.js';
+import { CAVE, CAVE_PIECES, drawCaveDoor, drawCaveTorchFlame } from './dino.js';
 import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
@@ -49,17 +53,19 @@ export const SUBJECTS = {
   ...Object.fromEntries(palmModels.map((m, k) => [`palm${k}`, m])),
   // Halloween
   'player-wizard': player.withOutfit('wizard'), werewolf, ghost, spider, eyeball, candy, jack: jackModel, deadTree: deadTreeModel, haunted: hauntedModel,
+  // Dinossauros
+  'player-caveman': player.withOutfit('caveman'), trex, ptero, raptor, ammonite, egg: eggModel, cave: caveModel, caveTusks, fern: fernModel, nest: nestModel,
   // Prêmios das fases especiais (iguais em todas)
   bag: bagModel, heart: heartModel,
 };
 // Fases especiais já convertidas ao 3D (as outras seguem inteiras em 2D)
-export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia', 'halloween']);
+export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia', 'halloween', 'dinossauros']);
 // Modelo do jogador por roupa e do urso por variante (null = sem modelo 3D: desenho 2D)
-const PLAYER_BY_OUTFIT = { parka: 'player', sweater: 'player-sweater', lumberjack: 'player-lumberjack', astronaut: 'player-astronaut', surfer: 'player-surfer', wizard: 'player-wizard' };
-const BEAR_BY_OUTFIT = { polar: 'bear', santaHat: 'bear-santa', brown: 'bear-brown', alien: 'alien', giantCrab: 'giantCrab', werewolf: 'werewolf' };
-export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish', 'snake', 'bat', 'piranha', 'ufo', 'crawler', 'comet', 'star', 'gull', 'siri', 'jellyfish', 'tfish', 'ghost', 'spider', 'eyeball', 'candy']);
+const PLAYER_BY_OUTFIT = { parka: 'player', sweater: 'player-sweater', lumberjack: 'player-lumberjack', astronaut: 'player-astronaut', surfer: 'player-surfer', wizard: 'player-wizard', caveman: 'player-caveman' };
+const BEAR_BY_OUTFIT = { polar: 'bear', santaHat: 'bear-santa', brown: 'bear-brown', alien: 'alien', giantCrab: 'giantCrab', werewolf: 'werewolf', trex: 'trex' };
+export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish', 'snake', 'bat', 'piranha', 'ufo', 'crawler', 'comet', 'star', 'gull', 'siri', 'jellyfish', 'tfish', 'ghost', 'spider', 'eyeball', 'candy', 'ptero', 'raptor', 'ammonite', 'egg']);
 // O que substitui o peixe em cada cenário convertido (sem entrada = o peixe 3D normal)
-export const FISH_3D = { space: 'star', beach: 'tfish', halloween: 'candy' };
+export const FISH_3D = { space: 'star', beach: 'tfish', halloween: 'candy', dino: 'egg' };
 export const BOX = player.box;
 export const playerPose = player.playerPose;
 export const poseList = player.poses;
@@ -97,6 +103,7 @@ function subjectOf(name) {
   if (name.startsWith('rock')) return rockSubject(Number(name.slice(4)));
   if (name.startsWith('board')) return boardSubject(Number(name.slice(5)));
   if (name.startsWith('pumpkin')) return pumpkinSubject(Number(name.slice(7)));
+  if (name.startsWith('basalt')) return basaltSubject(Number(name.slice(6)));
   return null;
 }
 
@@ -314,6 +321,43 @@ const ANCHOR = {
       ctx.stroke();
     },
   }),
+  // Dinossauros: o brilho do ovo e os anéis na lava são 2D
+  ptero: (c, y, t) => ({
+    y: y - 36 + Math.sin(t * 3 + c.ph) * 4 - Math.sin(t * 9 + c.ph * 3) * 2, shadow: [c.x, y + 13, 18, 3, 'rgba(30, 10, 5, 0.3)'],
+  }),
+  raptor: (c, y) => ({ y, shadow: [c.x, y + 2, 20, 3, 'rgba(30, 10, 5, 0.3)'] }),
+  ammonite: (c, y, t) => ({
+    y: y + 2 + Math.sin(t * 3 + c.ph) * 2,
+    after: (ctx) => {
+      ctx.strokeStyle = 'rgba(255, 220, 120, 0.55)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.ellipse(c.x, y + 8, 16, 3, 0, 0, TAU);
+      ctx.stroke();
+    },
+  }),
+  egg: (c, y, t) => {
+    const hop = Math.max(0, Math.sin(t * 3 + c.ph)) * 14;
+    const ey = y - 4 - hop;
+    return {
+      y: ey, tilt: Math.sin(t * 6 + c.ph) * 0.3 * c.dir,
+      before: (ctx) => {
+        const gl = ctx.createRadialGradient(c.x, ey, 2, c.x, ey, 18);
+        gl.addColorStop(0, 'rgba(255, 250, 200, 0.35)');
+        gl.addColorStop(1, 'rgba(255, 250, 200, 0)');
+        ctx.fillStyle = gl;
+        ctx.fillRect(c.x - 18, ey - 18, 36, 36);
+      },
+      after: (ctx) => {
+        if (hop >= 3) return;
+        ctx.strokeStyle = 'rgba(255, 220, 120, 0.55)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.ellipse(c.x, y + 9, 14, 3, 0, 0, TAU);
+        ctx.stroke();
+      },
+    };
+  },
   candy: (c, y, t) => {
     const hop = Math.max(0, Math.sin(t * 3 + c.ph)) * 14;
     return {
@@ -866,5 +910,109 @@ export function drawHaunted3D(ctx, igloo, t) {
   });
   ctx.restore();
   drawHauntedDoor(ctx, igloo, t);
+  return true;
+}
+
+// ---------------------------------------------------------------- Dinossauros
+// Pedras de basalto: mesmo formato do sprite 2D (rockSprite de src/dino.js)
+export function basaltSprite3D(piece, active) {
+  const cacheKey = active ? '3d-basalt-on' : '3d-basalt-off';
+  if (piece.sprites[cacheKey]) return piece.sprites[cacheKey];
+  const name = `basalt${piece.w}`;
+  want(name);
+  const D = BASALT.dims;
+  const img = sprite(name, `${piece.seed % D.VARIANTS}${active ? 1 : 0}`);
+  if (!img) return null;
+  const s = { canvas: img, ox: D.PAD, oy: D.TOP, w: piece.w + D.PAD * 2, h: D.H };
+  piece.sprites[cacheKey] = s;
+  return s;
+}
+
+// Ganchos de src/dino.js (dinoArt): samambaia (já na base e na escala dela, girando
+// com o vento), ninho (o ovo do meio balança por cima, quase chocando) e as presas
+// de osso da caverna (por cima da pedra da porta)
+export function drawFern3D(ctx, sway) {
+  want('fern');
+  const img = sprite('fern', 'f');
+  if (!img) return false;
+  ctx.save();
+  ctx.rotate(sway * 0.4);
+  blit(ctx, img, fernModel.box);
+  ctx.restore();
+  return true;
+}
+
+export function drawNest3D(ctx, wobble) {
+  want('nest');
+  want('egg');
+  const img = sprite('nest', 'n');
+  const eg = sprite('egg', 'e');
+  if (!img || !eg) return false;
+  ctx.save();
+  ctx.translate(0, -6);
+  ctx.rotate(wobble);
+  ctx.scale(8.5 / 8, 8.5 / 8);
+  blit(ctx, eg, eggModel.box);
+  ctx.restore();
+  blit(ctx, img, nestModel.box);
+  return true;
+}
+
+export function drawCaveTusks3D(ctx) {
+  want('caveTusks');
+  const img = sprite('caveTusks', 't');
+  if (!img) return false;
+  blit(ctx, img, caveTusks.box);
+  return true;
+}
+
+// Caverna 3D: mesmo comportamento da drawCave 2D (sombra, contorno-guia, pedras
+// caindo com o quique, chama da tocha, a entrada escura e a pedra 2D e as presas por
+// cima da pedra quando pronta)
+export function drawCave3D(ctx, igloo, t) {
+  want('cave');
+  want('caveTusks');
+  const N = CAVE_PIECES.length - 1; // a última peça é a porta
+  const blocks = Math.min(igloo.count, N);
+  let settled = 0;
+  while (settled < blocks && igloo.anim[settled] >= 1) settled++;
+  if (blocks > 0 && !sprite('cave', `b${blocks - 1}`)) return false;
+  if (settled > 0 && !sprite('cave', `n${settled}`)) return false;
+  if (igloo.count >= CAVE_PIECES.length && !sprite('caveTusks', 't')) return false;
+  ctx.save();
+  ctx.translate(IGLOO.x, IGLOO.baseY);
+  ctx.fillStyle = 'rgba(20, 10, 5, 0.4)';
+  ctx.beginPath();
+  ctx.ellipse(6, 3, CAVE.HW + 30, 9, 0, 0, TAU);
+  ctx.fill();
+  if (igloo.count < CAVE_PIECES.length) {
+    ctx.save();
+    ctx.setLineDash([5, 6]);
+    ctx.strokeStyle = 'rgba(255, 220, 170, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, CAVE.HW + 4, 136, 0, Math.PI, 0);
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (settled > 0) blit(ctx, sprite('cave', `n${settled}`), caveModel.box);
+  for (let i = settled; i < blocks; i++) {
+    const a = igloo.anim[i];
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 3);
+    ctx.translate(0, -(1 - easeOutBack(a)) * 46);
+    blit(ctx, sprite('cave', `b${i}`), caveModel.box);
+    ctx.restore();
+  }
+  CAVE_PIECES.forEach((p, i) => {
+    if (p.kind === 'torch' && i < settled) drawCaveTorchFlame(ctx, t);
+  });
+  ctx.restore();
+  if (drawCaveDoor(ctx, igloo, t)) {
+    ctx.save();
+    ctx.translate(IGLOO.x, IGLOO.baseY);
+    drawCaveTusks3D(ctx);
+    ctx.restore();
+  }
   return true;
 }

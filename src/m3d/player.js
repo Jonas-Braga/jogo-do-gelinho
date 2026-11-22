@@ -284,6 +284,109 @@ function buildSurfHead(kit, head, skin) {
   return glasses;
 }
 
+// ---- Homem das cavernas (Dinossauros): túnica de pele de onça presa num ombro só,
+// barra em pontas de pele e cinto de cipó, braços e canelas de fora, pés enrolados
+// em pele e a cabeleira desgrenhada com um ossinho espetado
+function leopardTexture(THREE) {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = S;
+  c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = '#E09A3A';
+  g.fillRect(0, 0, S, S);
+  let seed = 61;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 40; i++) {
+    const x = rnd() * S;
+    const y = rnd() * S;
+    g.fillStyle = '#5A3410';
+    g.beginPath();
+    g.ellipse(x, y, 7 + rnd() * 3, 5 + rnd() * 2, rnd() * 3, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#F7C070';
+    g.beginPath();
+    g.ellipse(x + 0.5, y, 3, 2.2, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 1);
+  return tex;
+}
+
+function buildTunic(kit, body, skin, leopard) {
+  const { THREE, mat, mesh, sphere } = kit;
+  // Ombro direito de fora (pele por cima da túnica nesse lado)
+  const bare = sphere(7.4, skin, 7.2, 46, 0.6, 16);
+  bare.scale.set(1, 0.7, 1.05);
+  body.add(bare);
+  // Alça da túnica passando pelo ombro esquerdo
+  const strap = kit.bone(2.8, [-8, 49, 6], [-8.5, 49, -6], leopard);
+  body.add(strap);
+  // Barra em pontas de pele e cinto de cipó com nó
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    const tip = mesh(new THREE.ConeGeometry(3.4, 6, 4), mat('#9A5A18', 0.95), Math.cos(a) * 16.6, 12, Math.sin(a) * 13.6);
+    tip.rotation.x = Math.PI;
+    body.add(tip);
+  }
+  const belt = mesh(new THREE.TorusGeometry(14.2, 1.3, 8, 36), mat('#5A7A2A', 0.8), 0, 27, 0);
+  belt.rotation.x = Math.PI / 2;
+  belt.scale.set(1, 0.84, 1);
+  body.add(belt);
+  body.add(sphere(2.2, mat('#4A6A22', 0.8), 4, 27, 11.4, 10));
+}
+
+function buildCaveHead(kit, head, skin) {
+  const { THREE, mat, mesh, group, sphere } = kit;
+  head.add(faceSkull(kit, skin));
+  for (const s of [-1, 1]) {
+    const ear = sphere(2.4, skin, s * 11.9, 0, 1.6, 12);
+    ear.scale.set(0.5, 1, 0.8);
+    head.add(ear);
+  }
+  const hairM = mat('#3A2414', 0.9, { side: THREE.DoubleSide });
+  // Cabeleira: calota no alto e atrás (até as orelhas), mechas caindo na nuca e a
+  // franja grossa na testa; os tufos de cima ficam num grupo que se ergue no susto
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(13, 32, 16, Math.PI + 0.15, Math.PI - 0.3, 0, 0.62 * Math.PI), hairM);
+  cap.position.set(0, -0.5, 1.3);
+  cap.castShadow = cap.receiveShadow = true;
+  head.add(cap);
+  const top = new THREE.Mesh(new THREE.SphereGeometry(13, 32, 10, 0, Math.PI * 2, 0, 0.28 * Math.PI), hairM);
+  top.position.set(0, -0.5, 1.3);
+  top.castShadow = true;
+  head.add(top);
+  for (let i = 0; i < 12; i++) {
+    const a = Math.PI * (1.08 + (i / 11) * 0.84);
+    const tuft = mesh(new THREE.ConeGeometry(2.6, 8, 6), hairM, -Math.cos(a) * 12.6, -6 - (i % 3), Math.sin(a) * 12.6 + 1.3);
+    tuft.rotation.set(Math.PI - Math.sin(a) * 0.3, 0, -Math.cos(a) * 0.3);
+    head.add(tuft);
+  }
+  // Franja grossa caindo de lado na testa
+  const fringe = sphere(6, hairM, 2.5, 9.8, 10.2, 14);
+  fringe.scale.set(1.5, 0.55, 0.55);
+  fringe.rotation.z = -0.25;
+  head.add(fringe);
+  const spikes = group();
+  head.add(spikes);
+  const tufts = [[-8, 10, 2, 0.5, 0.2], [-3, 12.5, 4, 0.15, 0.4], [2, 13, 1, -0.1, 0.1], [7, 11, 3, -0.5, 0.25], [-5, 11, -5, 0.35, -0.4], [4, 11.5, -6, -0.3, -0.45], [0, 9, -10, 0, -0.9]];
+  for (const [i, [x, y, z, rz, rx]] of tufts.entries()) {
+    const t = mesh(new THREE.ConeGeometry(3.4, 10, 6), i % 2 ? hairM : mat('#2A180C', 0.9), x, y, z);
+    t.rotation.set(rx, 0, rz);
+    spikes.add(t);
+  }
+  // Ossinho espetado no cabelo
+  const bone = group(-2, 14, 0);
+  bone.rotation.z = 0.5;
+  spikes.add(bone);
+  const boneM = mat('#F2E8D0', 0.5);
+  bone.add(kit.bone(1.4, [-6, 0, 0], [6, 0, 0], boneM));
+  for (const s of [-1, 1]) for (const k of [-1, 1]) bone.add(sphere(2, boneM, s * 7, k * 1.4, 0, 10));
+  return spikes;
+}
+
 // ---- Bruxinho (Halloween): manto roxo com estrelinhas e luas douradas, meias
 // listradas de laranja e preto, chapéu pontudo de aba larga com a ponta dobrada
 function robeTexture(THREE) {
@@ -522,6 +625,8 @@ export function build(kit, outfit = 'parka') {
   const astro = outfit === 'astronaut';
   const surf = outfit === 'surfer';
   const wiz = outfit === 'wizard';
+  const cave = outfit === 'caveman';
+  const leopard = cave ? new THREE.MeshStandardMaterial({ map: leopardTexture(THREE), roughness: 0.9, metalness: 0 }) : null;
   const robe = wiz ? new THREE.MeshStandardMaterial({ map: robeTexture(THREE), roughness: 0.8, metalness: 0 }) : null;
   const stockings = wiz ? new THREE.MeshStandardMaterial({ map: stripeTexture(THREE), roughness: 0.85, metalness: 0 }) : null;
   const floral = surf ? new THREE.MeshStandardMaterial({ map: floralTexture(THREE), roughness: 0.8, metalness: 0 }) : null;
@@ -535,9 +640,9 @@ export function build(kit, outfit = 'parka') {
   const furShade = mat(C.furShade, 1);
   const skin = mat('#E3A87E', 0.7);
   // Surfista: pés descalços (de chinelo), bermuda laranja e mãos de fora
-  const boots = surf ? skin : mat(astro ? '#8A90A0' : wiz ? '#1E1A24' : C.boots, wiz ? 0.4 : 0.6);
-  const pants = wiz ? stockings : mat(lumber ? '#33507A' : astro ? '#E1E6EE' : surf ? '#FF8A3D' : C.pants, astro ? 0.6 : 0.9);
-  const mitten = surf || wiz ? skin : mat(astro ? '#7C8294' : '#5A3E2A', astro ? 0.6 : 0.9);
+  const boots = surf ? skin : mat(astro ? '#8A90A0' : wiz ? '#1E1A24' : cave ? '#8A5A2E' : C.boots, wiz ? 0.4 : cave ? 1 : 0.6);
+  const pants = wiz ? stockings : cave ? leopard : mat(lumber ? '#33507A' : astro ? '#E1E6EE' : surf ? '#FF8A3D' : C.pants, astro ? 0.6 : 0.9);
+  const mitten = surf || wiz || cave ? skin : mat(astro ? '#7C8294' : '#5A3E2A', astro ? 0.6 : 0.9);
   const ink = mat(C.ink, 0.3);
   const white = mat('#FFFFFF', 0.3);
   const cheek = mat('#E07A68', 0.8, { transparent: true, opacity: 0.55 });
@@ -563,7 +668,16 @@ export function build(kit, outfit = 'parka') {
     boot.position.set(0, -6.5, 1.8);
     boot.scale.set(1, 1.15, 0.95);
     knee.add(boot);
-    if (wiz) {
+    if (cave) {
+      // Pé enrolado em pele, amarrado com cipó, e a canela de fora
+      const fur2 = furRing(5.4, 2.1, 10, mat('#B07A44', 1), mat('#8A5A2E', 1));
+      fur2.position.y = -2;
+      knee.add(fur2);
+      knee.add(capsule(3.6, 3, skin, 0, -1.5, 0));
+      const tie = mesh(new THREE.TorusGeometry(5.2, 0.6, 6, 18), mat('#5A7A2A', 0.8), 0, -5.5, 1);
+      tie.rotation.x = Math.PI / 2;
+      knee.add(tie);
+    } else if (wiz) {
       // Sapato preto de bico curvado e o punho roxo da meia
       const toe = mesh(new THREE.ConeGeometry(2.4, 7, 10), boots, 0, -6.2, 9.5);
       toe.rotation.x = Math.PI / 2 + 0.5;
@@ -605,7 +719,7 @@ export function build(kit, outfit = 'parka') {
   const knit = sweater ? new THREE.MeshStandardMaterial({ map: knitTexture(THREE), roughness: 0.95, metalness: 0 }) : null;
   const knitGreen = mat(KNIT_GREEN, 0.95);
   const knitWhite = mat(KNIT_WHITE, 0.95);
-  const coat = lathe(COAT, sweater ? knit : lumber ? plaid : surf ? floral : wiz ? robe : parka, 48);
+  const coat = lathe(COAT, sweater ? knit : lumber ? plaid : surf ? floral : wiz ? robe : cave ? leopard : parka, 48);
   coat.scale.set(1, 1, 0.82);
   body.add(coat);
   if (sweater) {
@@ -615,6 +729,8 @@ export function build(kit, outfit = 'parka') {
     body.add(rib);
   } else if (astro) {
     buildSuit(kit, body, suitTrim);
+  } else if (cave) {
+    buildTunic(kit, body, skin, leopard);
   } else if (wiz) {
     // Barra laranja do manto e o fecho no peito
     const hem = mesh(new THREE.TorusGeometry(16.6, 2.4, 8, 40), mat('#F28C28', 0.6), 0, 14.4, 0);
@@ -661,7 +777,7 @@ export function build(kit, outfit = 'parka') {
 
   // Braços (ombro em y = 42): manga do braço, cotovelo, antebraço, punho de pelo e luva
   const arm = (side) => {
-    const m = sweater ? mat(side < 0 ? '#E0403F' : '#A52528', 0.95) : lumber ? plaid : surf ? skin : wiz ? robe : side < 0 ? parka : parkaDark;
+    const m = sweater ? mat(side < 0 ? '#E0403F' : '#A52528', 0.95) : lumber ? plaid : surf || cave ? skin : wiz ? robe : side < 0 ? parka : parkaDark;
     const sh = group(side * 11, 42, 0);
     const upper = capsule(4.5, 4.5, m);
     upper.position.y = -4.6;
@@ -683,6 +799,13 @@ export function build(kit, outfit = 'parka') {
       const line = mesh(new THREE.TorusGeometry(4.6, 0.45, 6, 18), knitWhite, 0, -7, 0);
       line.rotation.x = Math.PI / 2;
       elbow.add(line);
+    } else if (cave) {
+      // Braço de fora; só no ombro da alça a pele da onça cobre o alto do braço
+      if (side < 0) {
+        const cap = sphere(5.6, leopard, 0, 0.4, 0, 14);
+        cap.scale.set(1.05, 0.9, 1.05);
+        sh.add(cap);
+      }
     } else if (wiz) {
       // Manga larga com a barra laranja
       const cuff = mesh(new THREE.CylinderGeometry(5.6, 6.6, 3.4, 18, 1, true), mat('#F28C28', 0.6, { side: THREE.DoubleSide }), 0, -7.2, 0);
@@ -724,7 +847,10 @@ export function build(kit, outfit = 'parka') {
   body.add(head);
   let glasses = null;
   let hat = null;
-  if (surf) {
+  let caveHair = null;
+  if (cave) {
+    caveHair = buildCaveHead(kit, head, skin);
+  } else if (surf) {
     glasses = buildSurfHead(kit, head, skin);
   } else if (wiz) {
     hat = buildWizardHead(kit, head, skin);
@@ -768,7 +894,7 @@ export function build(kit, outfit = 'parka') {
   }
   // Rosto em esfera separada só onde há capuz ou capacete em volta (parka, suéter,
   // astronauta); nas cabeças de fora ele já faz parte do crânio (faceSkull)
-  if (!wiz && !lumber && !surf) {
+  if (!wiz && !lumber && !surf && !cave) {
     const face = sphere(8, skin, 0, 1.5, 10.6, 24);
     face.scale.set(1, 1.05, 0.62);
     head.add(face);
@@ -810,7 +936,7 @@ export function build(kit, outfit = 'parka') {
   for (const g of [calm, cold, scared]) head.add(g);
   if (astro) buildHelmet(kit, head);
 
-  return { root, body, legs, arms, head, glasses, hat, faces: { calm, cold, scared } };
+  return { root, body, legs, arms, head, glasses, hat, caveHair, faces: { calm, cold, scared } };
 }
 
 export function apply(rig, p) {
@@ -856,6 +982,12 @@ export function apply(rig, p) {
     rig.glasses.position.set(0, up ? 8.6 : 3.4, up ? 12.6 : 15.2);
     rig.glasses.rotation.x = up ? -0.55 : 0;
   }
+  // Cabeleira do homem das cavernas: no susto fica em pé (os tufos e o ossinho sobem)
+  if (rig.caveHair) {
+    const up = p.face === 'scared';
+    rig.caveHair.position.y = up ? 3 : 0;
+    rig.caveHair.scale.y = up ? 1.35 : 1;
+  }
   // Chapéu do bruxinho: no susto pula da cabeça (sobe e entorta), como no 2D
   if (rig.hat) {
     const up = p.face === 'scared';
@@ -866,7 +998,7 @@ export function apply(rig, p) {
 
 // Modelo do personagem com uma roupa ('parka' ou 'sweater')
 const outfits = new Map();
-export const OUTFITS_3D = ['parka', 'sweater', 'lumberjack', 'astronaut', 'surfer', 'wizard'];
+export const OUTFITS_3D = ['parka', 'sweater', 'lumberjack', 'astronaut', 'surfer', 'wizard', 'caveman'];
 export function withOutfit(outfit = 'parka') {
   if (!outfits.has(outfit)) outfits.set(outfit, { box, poses, apply, playerPose, build: (kit) => build(kit, outfit) });
   return outfits.get(outfit);
