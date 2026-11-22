@@ -4,8 +4,9 @@
 // y_tela = z·sen(e) − y·cos(e). Assim a beira da costa, a linha onde o jogador pisa e a
 // água caem exatamente onde o jogo espera, e o resto ganha relevo, luz e sombra de verdade.
 import { W, SHORE_TOP, WATER_TOP, IGLOO } from '../config.js';
-import { TAU } from './kit.js';
+import { TAU, sweepGeometry } from './kit.js';
 import { GRAVES } from '../halloween.js';
+import { VOLCANOES, NEST, TREE_FERNS } from '../dino.js';
 
 export const BG_H = WATER_TOP + 12;
 const IGLOO_X = IGLOO.x; // a casa de cada fase fica aqui (nada de pedras ou buracos embaixo dela) // mesma altura do fundo 2D
@@ -998,6 +999,253 @@ export const halloweenScenery = {
       lip.push({ p: [x, 0.4 + k * 0.7, zEdge + 1], w: 2.2 + k, h: 1.4 + k * 0.5 });
     }
     root.add(kit.sweep(lip, mat('#2E3A32', 0.9), { radial: 10, cap: 0.5, steps: lip.length * 6 }));
+    return { root };
+  },
+  apply() {},
+};
+
+// ---------------------------------------------------------------- Dinossauros
+// Fase 30 (Dinossauros): os dois vulcões do 2D (cone de flancos côncavos com sulcos de
+// erosão, cratera com lava brilhando e os escorridos de lava descendo pela frente; as
+// crateras caem onde o 2D solta a fumaça), morros de mata com cicas e moitas, chão de
+// terra vulcânica com musgo, pedrinhas e brotos de samambaia (longe do ninho, das
+// samambaias gigantes e da caverna) e o barranco de colunas de basalto com rachaduras
+// de lava acesas. Sol quente e baixo da esquerda (onde fica o sol do céu).
+export const VOLCANO_BASE = SHORE_TOP + 6; // pé dos vulcões no 2D
+export const VOLCANO_Z = [120, 180]; // profundidade de cada vulcão (o maior mais ao fundo)
+export const VOLCANO_RIM = 0.24; // raio da cratera (fração do raio do cone), como no 2D
+export const DINO_HILLS = [
+  { zc: 330, depth: 150, top: [SHORE_TOP - 44, SHORE_TOP - 16], base: SHORE_TOP + 4, seed: 31, freq: 0.006, tint: '#3E5030' },
+];
+export const CYCADS_FAR = [[90, 0.7], [330, 0.6], [470, 0.8], [720, 0.55], [990, 0.7], [1210, 0.65]];
+// Lugares da costa sem pedras nem brotos (ninho, samambaias gigantes e a caverna)
+const DINO_CLEAR = [[NEST.x, 50], ...TREE_FERNS.map((f) => [f.x, 40]), [IGLOO_X, 190]];
+export const dinoClear = (x) => DINO_CLEAR.every(([cx, r]) => Math.abs(x - cx) > r);
+
+// Cone do vulcão v (i = índice): altura do terreno no ponto (x, z)
+export function volcanoAt(v, i) {
+  const zc = VOLCANO_Z[i];
+  const R = v.w * 0.66;
+  const Rz = R * 0.7;
+  const yb = yAt(VOLCANO_BASE, zc);
+  const yp = yAt(VOLCANO_BASE - v.h, zc);
+  const dip = 7;
+  const h = (x, z) => {
+    const dx = (x - v.x) / R;
+    const dz = (z - zc) / Rz;
+    const d = Math.hypot(dx, dz);
+    const a = Math.atan2(dz, dx);
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    // Borda da cratera irregular (dentes e quebras)
+    const jag = (noise2(ca * 4 + i * 3, sa * 4, 61 + i) - 0.5) * 9;
+    if (d < VOLCANO_RIM) return yp - dip * (1 - (d / VOLCANO_RIM) ** 2) + jag * (d / VOLCANO_RIM) ** 4;
+    const t = (d - VOLCANO_RIM) / (1 - VOLCANO_RIM);
+    if (t > 1) return yb - (t - 1) * 60;
+    // Cristas e sulcos de erosão descendo da borda (ruído em volta, sem emenda no
+    // ângulo; mais fundos no meio da encosta), calombos de lava velha e a borda quebrada
+    const env = Math.min(1, t * 4) * Math.pow(1 - t, 0.6);
+    const ridges = (ridged(ca * 9 + i * 7, sa * 9 + d * 2.2, 41 + i, 4) - 0.45) * 26 * env;
+    const lumps = (fbm(x * 0.05, z * 0.05, 71 + i, 3) - 0.5) * 8 * (1 - t * 0.5);
+    return yb + (yp - yb) * Math.pow(1 - t, 2.1) + ridges + lumps + jag * Math.max(0, 1 - t * 5);
+  };
+  return { h, zc, R, Rz, yp, dip };
+}
+
+// Folha de cica / samambaia: arqueada para fora e para baixo, comprimento 1, em +x
+function frondGeometry(THREE) {
+  return sweepGeometry(THREE, [
+    { p: [0, 0, 0], w: 0.04, h: 0.012 },
+    { p: [0.35, 0.22, 0], w: 0.11, h: 0.014 },
+    { p: [0.7, 0.2, 0], w: 0.09, h: 0.012 },
+    { p: [1, 0.02, 0], w: 0.02, h: 0.01 },
+  ], { radial: 6, cap: 0.3, steps: 14 });
+}
+
+export const dinoScenery = {
+  box: { left: 0, right: W, top: 0, bottom: -BG_H },
+  res: 2,
+  elevation: SCENE_EL,
+  distance: 1300,
+  poses: () => [{ key: 'main' }],
+  stage: (studio) => studio.stageScenery({
+    target: [640, 0, 480], size: 950, fog: { color: '#8A4A3A', near: 1300, far: 2900 },
+    sky: 0.5, skyColor: '#E0A080', ground: '#3A2420', keyIntensity: 3.6, keyColor: '#FFD0A0',
+    // Sol baixo bem de lado: um lado dos vulcões aceso e o outro na sombra
+    sun: [-0.86, 0.42, 0.05], exposure: 1.0,
+  }),
+  build(kit) {
+    const { THREE, group, mat } = kit;
+    const root = group();
+    const vcol = (extra = {}) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0, ...extra });
+    let seed = 1;
+    const rnd = () => hash(seed++, 17, 307);
+    const rockTex = grainTexture(THREE, 47);
+    rockTex.repeat.set(6, 6);
+    const lava = new THREE.MeshStandardMaterial({ color: '#E8601C', emissive: '#FF4A08', emissiveIntensity: 1.3, roughness: 0.5 });
+    // Vulcões
+    VOLCANOES.forEach((v, i) => {
+      const V = volcanoAt(v, i);
+      const cRock = new THREE.Color('#6A4A44');
+      const cDark = new THREE.Color('#2E2224');
+      const cAsh = new THREE.Color('#9A8478');
+      const cHot = new THREE.Color('#C0482A');
+      root.add(kit.mesh(heightField(THREE, {
+        x0: v.x - V.R * 1.5, x1: v.x + V.R * 1.5, z0: V.zc - V.Rz * 1.5, z1: V.zc + V.Rz * 1.5, dx: 2, dz: 2,
+        h: V.h,
+        colorAt: (c, x, y, z, ny) => {
+          const d = Math.hypot((x - v.x) / V.R, (z - V.zc) / V.Rz);
+          // Rocha escura nos sulcos e paredes íngremes, cinza de cinzas no alto das
+          // cristas e na parte de cima do cone, brasa na boca
+          c.copy(cRock).lerp(cDark, Math.min(1, Math.max(0, 0.85 - ny) * 2.2));
+          c.lerp(cAsh, Math.min(0.7, Math.max(0, fbm(x * 0.05, z * 0.05, 51 + i, 3) - 0.5) * 1.6 + Math.max(0, 0.6 - d) * 0.6));
+          if (d < VOLCANO_RIM * 1.5) c.lerp(cHot, Math.max(0, 1 - d / (VOLCANO_RIM * 1.5)) * 0.85);
+        },
+      }), vcol({ bumpMap: rockTex, bumpScale: 1.6 })));
+      // Pedregulhos de lava velha nas encostas
+      const boulders = [];
+      for (let k = 0; k < 40; k++) {
+        // Só na frente da encosta (atrás, apareceriam como bolotas no contorno)
+        const a = 0.35 + rnd() * (Math.PI - 0.7);
+        const d = VOLCANO_RIM + 0.15 + rnd() * 0.6;
+        const x = v.x + Math.cos(a) * d * V.R;
+        const z = V.zc + Math.sin(a) * d * V.Rz;
+        const sz = 1.5 + rnd() * 2.5;
+        boulders.push({ x, y: V.h(x, z), z, s: sz, sy: 0.7, rx: rnd() * 3, ry: rnd() * 3, color: rnd() < 0.5 ? '#3A2C2C' : '#56403A' });
+      }
+      root.add(instanced(THREE, new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.9, flatShading: true }), boulders));
+      // Lava na cratera
+      const pool = kit.mesh(new THREE.CircleGeometry(1, 24), lava, v.x, V.yp - V.dip * 0.55, V.zc);
+      pool.rotation.x = -Math.PI / 2;
+      pool.scale.set(V.R * VOLCANO_RIM * 0.85, V.Rz * VOLCANO_RIM * 0.85, 1);
+      root.add(pool);
+      // Escorridos de lava descendo pela frente (os mesmos 3 do 2D)
+      for (const [dx, len, bend] of [[-0.5, 0.55, -10], [0.3, 0.4, 8], [0.8, 0.3, 6]]) {
+        const pts = [];
+        const d1 = VOLCANO_RIM + len * 0.6 * (1 - VOLCANO_RIM) * (i ? 0.8 : 1);
+        for (let k = 0; k <= 8; k++) {
+          const d = VOLCANO_RIM * 0.95 + (d1 - VOLCANO_RIM * 0.95) * (k / 8);
+          const a = dx * 0.4 + bend * 0.018 * (k / 8) + Math.sin(k * 1.4 + dx * 5) * 0.05;
+          const x = v.x + Math.sin(a) * d * V.R;
+          const z = V.zc + Math.cos(a) * d * V.Rz;
+          pts.push({ p: [x, V.h(x, z) + 0.4, z], w: 2.4 * (1 - (k / 8) * 0.75), h: 0.6 });
+        }
+        root.add(kit.sweep(pts, lava, { radial: 8, cap: 0.5 }));
+      }
+    });
+    // Morros de mata
+    const r = DINO_HILLS[0];
+    const tint = new THREE.Color(r.tint);
+    const dark = new THREE.Color('#26341E');
+    root.add(kit.mesh(heightField(THREE, {
+      x0: -140, x1: W + 140, z0: r.zc - r.depth / 2, z1: r.zc + r.depth / 2, dx: 6, dz: 5,
+      h: (x, z) => hillHeight(r, x, z),
+      colorAt: (c, x, y, z) => c.copy(tint).lerp(dark, fbm(x * 0.03, z * 0.04, 311, 3) * 0.8),
+    }), vcol()));
+    // Cicas (tronco e coroa de folhas) e moitas nos morros
+    const cycads = CYCADS_FAR.map(([x, s]) => ({ x, s: s * 1.25 }));
+    for (let i = 0; i < 46; i++) cycads.push({ x: rnd() * W, s: 0.35 + rnd() * 0.4 });
+    const trunks = [];
+    const crowns = [];
+    for (const cy of cycads) {
+      const z = r.zc + (rnd() - 0.3) * 40;
+      const y = hillHeight(r, cy.x, z) - 1;
+      const H = (46 * cy.s) / C;
+      trunks.push({ x: cy.x, y: y + H / 2, z, s: 1, sx: 3.2 * cy.s, sy: H, sz: 3.2 * cy.s, rz: (rnd() - 0.5) * 0.12 });
+      crowns.push({ x: cy.x + 1, y: y + H, z, s: 30 * cy.s, ry: rnd() * TAU, hue: rnd() });
+    }
+    root.add(instanced(THREE, new THREE.CylinderGeometry(0.4, 0.5, 1, 7), mat('#4A3A28', 0.9), trunks));
+    const frond = frondGeometry(THREE);
+    const leafM = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.8, side: THREE.DoubleSide });
+    for (let k = 0; k < 9; k++) {
+      root.add(instanced(THREE, frond, leafM, crowns.map((c) => ({
+        ...c, ry: c.ry + (k / 9) * TAU, rz: k % 2 ? 0.25 : 0, color: new THREE.Color('#4E7A2E').offsetHSL((c.hue - 0.5) * 0.05, 0, (k % 3) * 0.03),
+      }))));
+    }
+    const bushes = [];
+    for (let i = 0; i < 160; i++) {
+      const x = rnd() * (W + 200) - 100;
+      const z = r.zc + (rnd() - 0.5) * r.depth * 0.6;
+      const s = 5 + rnd() * 7;
+      bushes.push({ x, y: hillHeight(r, x, z) + s * 0.2, z, s, sy: 0.7, color: rnd() < 0.5 ? '#3E5A2A' : '#2E4622' });
+    }
+    root.add(instanced(THREE, new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.9, flatShading: true }), bushes));
+    // Chão de terra vulcânica com musgo
+    const zBack = zAt(SNOW_BACK - 2);
+    const zEdge = zAt(EDGE_TOP);
+    const cSoil = new THREE.Color('#8A7048');
+    const cSoilD = new THREE.Color('#5A4630');
+    const cMoss = new THREE.Color('#5A7034');
+    const soilH = (x, z) => {
+      const k = (z - zBack) / (zEdge - zBack);
+      return (fbm(x * 0.011, z * 0.03, 313, 4) - 0.45) * (9 - k * 6) * Math.min(1, (1 - k) * 6);
+    };
+    root.add(kit.mesh(heightField(THREE, {
+      x0: -40, x1: W + 40, z0: zBack, z1: zEdge, dx: 5, dz: 4,
+      h: soilH,
+      colorAt: (c, x, y, z) => {
+        c.copy(cSoil).lerp(cSoilD, Math.min(1, ((z - zBack) / (zEdge - zBack)) * 0.8 + fbm(x * 0.04, z * 0.08, 315, 2) * 0.3));
+        const m = fbm(x * 0.02, z * 0.05, 317, 3);
+        if (m > 0.58) c.lerp(cMoss, Math.min(0.5, (m - 0.58) * 3));
+      },
+    }), vcol({ bumpMap: grainTexture(THREE, 31), bumpScale: 0.7 })));
+    // Pedrinhas, pedras de basalto e brotos de samambaia (longe do ninho e da caverna)
+    const stones = [];
+    const sprouts = [];
+    for (let i = 0; i < 220; i++) {
+      const x = rnd() * W;
+      if (!dinoClear(x)) continue;
+      const z = zBack + 6 + rnd() * (zEdge - zBack - 12);
+      if (rnd() < 0.7) {
+        const big = rnd() < 0.12;
+        const s = big ? 4 + rnd() * 4 : 1 + rnd() * 1.8;
+        stones.push({ x, y: soilH(x, z) + s * 0.2, z, s, sy: 0.6 + rnd() * 0.3, rx: rnd() * 3, ry: rnd() * 3, color: rnd() < 0.5 ? '#4E4440' : '#6A5A50' });
+      } else {
+        sprouts.push({ x, y: soilH(x, z), z, s: 7 + rnd() * 5, ry: rnd() * TAU });
+      }
+    }
+    root.add(instanced(THREE, new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.85, flatShading: true }), stones));
+    for (let k = 0; k < 5; k++) {
+      root.add(instanced(THREE, frond, leafM, sprouts.map((sp) => ({ ...sp, ry: sp.ry + (k / 5) * TAU, rz: 0.35, color: k % 2 ? '#6E9A36' : '#5A8A2E' })), { shadow: false }));
+    }
+    // Barranco de colunas de basalto, com rachaduras de lava acesas
+    const cTop = new THREE.Color('#7A6660');
+    const cMid = new THREE.Color('#544644');
+    const cLow = new THREE.Color('#2A2020');
+    const col = (x) => Math.floor((x + 400) / 11);
+    const bank = bankWall(THREE, {
+      zEdge, step: 2.75,
+      bulge: (x, v) => (hash(col(x), 1, 319) - 0.5) * 5 + (noise2(x * 0.05, v * 3, 321) - 0.5) * 3 + v * 9,
+      color: (c, x, v) => {
+        if (v < 0.4) c.copy(cTop).lerp(cMid, v / 0.4);
+        else c.copy(cMid).lerp(cLow, (v - 0.4) / 0.6);
+        c.multiplyScalar(0.82 + hash(col(x), 2, 323) * 0.3);
+      },
+    });
+    root.add(kit.mesh(bank.geo, vcol({ flatShading: true })));
+    const cracks = [];
+    const depthB = -bank.bottom;
+    for (let i = 0; i < 34; i++) {
+      let x = rnd() * W;
+      let v = 1;
+      for (let k = 0; k < 3; k++) {
+        const v2 = v - 0.2 - rnd() * 0.15;
+        const x2 = x + (rnd() - 0.5) * 8;
+        const len = Math.hypot(x2 - x, (v - v2) * depthB);
+        const vm = (v + v2) / 2;
+        cracks.push({ x: (x + x2) / 2, y: bank.bottom * vm, z: zEdge + vm * 9 + 0.8, s: 1, sx: 0.9, sy: len, sz: 0.6, rz: -Math.atan2(x2 - x, (v - v2) * depthB) });
+        x = x2;
+        v = v2;
+      }
+    }
+    root.add(instanced(THREE, new THREE.BoxGeometry(1, 1, 1), lava, cracks, { shadow: false }));
+    // Borda da terra por cima do barranco
+    const lip = [];
+    for (let x = -60; x <= W + 60; x += 30) {
+      const k = noise2(x * 0.05, 11, 325);
+      lip.push({ p: [x, 0.4 + k * 0.7, zEdge + 1], w: 2.2 + k, h: 1.4 + k * 0.5 });
+    }
+    root.add(kit.sweep(lip, mat('#5A4632', 0.9), { radial: 10, cap: 0.5, steps: lip.length * 6 }));
     return { root };
   },
   apply() {},

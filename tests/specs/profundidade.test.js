@@ -1917,3 +1917,91 @@ suite('"Ursos" 3D no tamanho certo', () => {
     }
   });
 });
+
+suite('Cenários de fundo em 3D: Dinossauros', () => {
+  test('as crateras dos vulcões caem onde o 2D solta a fumaça; pedras e brotos ficam longe do ninho, das samambaias gigantes e da caverna', async () => {
+    const sc = await import('../../src/m3d/scenery.js');
+    const { VOLCANOES, NEST, TREE_FERNS } = await import('../../src/dino.js');
+    const { SUBJECTS } = await import('../../src/model3d.js');
+    expect(SCENERY_3D.dino).toBe('bg-dino');
+    const S = SUBJECTS['bg-dino'];
+    expect([S.box.left, S.box.right, S.box.top, S.box.bottom]).toEqual([0, W, 0, -(WATER_TOP + 12)]);
+    expect(S.elevation).toBe(sc.SCENE_EL);
+    expect(sc.VOLCANO_BASE).toBe(SHORE_TOP + 6);
+    VOLCANOES.forEach((v, i) => {
+      const V = sc.volcanoAt(v, i);
+      // Centro da boca da cratera no topo do 2D (de onde sai a fumaça), no mesmo x;
+      // a borda da frente fica logo abaixo (vista de cima)
+      const rimZ = V.zc + V.Rz * sc.VOLCANO_RIM;
+      const top2d = SHORE_TOP + 6 - v.h;
+      expect(Math.abs(sc.screenOf(V.yp, V.zc) - top2d)).toBeLessThan(1);
+      expect(Math.abs(sc.screenOf(V.h(v.x, rimZ), rimZ) - top2d)).toBeLessThan(12);
+      // A cratera é funda (a lava fica dentro) e o cone desce para os lados
+      expect(V.h(v.x, V.zc)).toBeLessThan(V.h(v.x, rimZ));
+      expect(V.h(v.x + V.R * 0.7, V.zc)).toBeLessThan(V.h(v.x, rimZ) - 40);
+      // Atrás do chão da costa
+      expect(V.zc + V.Rz).toBeLessThan(sc.zAt(sc.SNOW_BACK));
+      // Aparência 3D: em volta do cone, na mesma distância, a encosta tem cristas e
+      // sulcos de verdade (não é um cone liso)
+      const ring = [];
+      for (let k = 0; k < 72; k++) {
+        const ang = (k / 72) * Math.PI * 2;
+        ring.push(V.h(v.x + Math.cos(ang) * V.R * 0.55, V.zc + Math.sin(ang) * V.Rz * 0.55));
+      }
+      expect(Math.max(...ring) - Math.min(...ring)).toBeGreaterThan(10);
+    });
+    // O vulcão maior é o mais alto, como no 2D
+    expect(VOLCANOES[0].h).toBeGreaterThan(VOLCANOES[1].h);
+    for (const x of [NEST.x, IGLOO.x, ...TREE_FERNS.map((f) => f.x)]) expect(sc.dinoClear(x), `x ${x}`).toBe(false);
+    expect(sc.dinoClear(450)).toBe(true);
+    expect(sc.CYCADS_FAR.length).toBe(6);
+  });
+
+  test('nos Dinossauros, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)', () => {
+    const was = { ...model };
+    const img = { fake3d: true };
+    const bgDrawn = (use3d) => {
+      const g = makeGame({ level: 30 });
+      g.renderer.use3d = use3d;
+      const { ctx, calls } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      return calls.some((c) => c[0] === 'drawImage' && c[1] === img && c[2] === 0 && c[3] === 0 && c[4] === W && c[5] === WATER_TOP + 12);
+    };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      expect(bgDrawn(true)).toBe(true);
+      expect(bgDrawn(false)).toBe(false);
+    } finally {
+      Object.assign(model, was);
+    }
+  });
+
+  if (!isNode) {
+    test('no navegador: a foto dos Dinossauros sai com céu transparente, lava acesa na cratera e chão de terra', async () => {
+      const { VOLCANOES } = await import('../../src/dino.js');
+      const { background3D } = await import('../../src/model3d.js');
+      const t0 = Date.now();
+      let bg = null;
+      while (!(bg = background3D('dino')) && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 100));
+      expect(!!bg).toBe(true);
+      const g = bg.canvas.getContext('2d');
+      const k = bg.canvas.width / W;
+      const px = (x, y) => g.getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data;
+      expect(px(10, 10)[3]).toBe(0);
+      // Lava brilhando em volta da boca de cada vulcão
+      for (const v of VOLCANOES) {
+        const top = SHORE_TOP + 6 - v.h;
+        let hot = 0;
+        const d = g.getImageData(Math.round((v.x - 20) * k), Math.round((top - 6) * k), Math.round(40 * k), Math.round(20 * k)).data;
+        for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i] > d[i + 2] + 100) hot++;
+        expect(hot).toBeGreaterThan(10);
+      }
+      // Chão de terra (marrom: mais vermelho que azul) onde o jogador anda
+      const p = px(450, SHORE_Y - 6);
+      expect(p[3]).toBe(255);
+      expect(p[0]).toBeGreaterThan(p[2] + 20);
+    });
+  }
+});
