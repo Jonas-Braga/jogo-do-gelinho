@@ -35,25 +35,52 @@ export const alien = {
   poses: bearPoses,
   pose: bearPose,
   build(kit) {
-    const { THREE, mat, group, sphere, capsule, mesh, bone } = kit;
-    const skinTex = canvasTex(THREE, 256, 128, (g, w, h) => {
+    const { THREE, mat, group, sphere, mesh, bone } = kit;
+    // Pele para o corpo contínuo: u dá a volta (dorso em u = 0,25, barriga em u = 0,75),
+    // v corre ao longo; dorso claro com pintas roxas, lados verdes, barriga verde-clara
+    const skinTex = canvasTex(THREE, 256, 256, (g, w, h) => {
+      const grd = g.createLinearGradient(0, 0, w, 0);
+      grd.addColorStop(0, '#6CC13E');
+      grd.addColorStop(0.25, '#B4EE72');
+      grd.addColorStop(0.5, '#4E9A2E');
+      grd.addColorStop(0.75, '#A8E86A');
+      grd.addColorStop(1, '#6CC13E');
+      g.fillStyle = grd;
+      g.fillRect(0, 0, w, h);
+      const rnd = rng(77);
+      for (let i = 0; i < 34; i++) {
+        g.fillStyle = `rgba(123, 75, 200, ${0.55 + rnd() * 0.3})`;
+        g.beginPath();
+        g.ellipse(w * (0.04 + rnd() * 0.42), rnd() * h, 3 + rnd() * 5, 5 + rnd() * 8, 0, 0, TAU);
+        g.fill();
+      }
+      for (let i = 0; i < 500; i++) {
+        g.fillStyle = rnd() < 0.5 ? 'rgba(20, 60, 10, 0.18)' : 'rgba(255, 255, 220, 0.14)';
+        g.beginPath();
+        g.arc(rnd() * w, rnd() * h, 0.8 + rnd() * 1.2, 0, TAU);
+        g.fill();
+      }
+    });
+    skinTex.wrapS = skinTex.wrapT = THREE.RepeatWrapping;
+    const headTex = canvasTex(THREE, 256, 128, (g, w, h) => {
       const grd = g.createLinearGradient(0, 0, 0, h);
       grd.addColorStop(0, '#C4F57E');
       grd.addColorStop(0.45, '#6CC13E');
       grd.addColorStop(1, '#2F6E22');
       g.fillStyle = grd;
       g.fillRect(0, 0, w, h);
-      const rnd = rng(77);
-      for (let i = 0; i < 26; i++) {
+      const rnd = rng(78);
+      for (let i = 0; i < 16; i++) {
         g.fillStyle = `rgba(123, 75, 200, ${0.55 + rnd() * 0.3})`;
         g.beginPath();
-        g.ellipse(rnd() * w, h * (0.18 + rnd() * 0.4), 4 + rnd() * 7, 3 + rnd() * 5, 0, 0, TAU);
+        g.ellipse(rnd() * w, h * (0.18 + rnd() * 0.4), 4 + rnd() * 6, 3 + rnd() * 4, 0, 0, TAU);
         g.fill();
       }
     });
+    const headSkin = new THREE.MeshStandardMaterial({ map: headTex, roughness: 0.45, metalness: 0 });
     const skin = new THREE.MeshStandardMaterial({ map: skinTex, roughness: 0.45, metalness: 0 });
+    skinTex.repeat.set(1, 2);
     const green = mat('#6CC13E', 0.45);
-    const light = mat('#A8E86A', 0.45);
     const dark = mat('#2F6E22', 0.5);
     const legNear = mat('#5BAE36', 0.5);
     const legFar = mat('#3F8A2A', 0.5);
@@ -69,13 +96,16 @@ export const alien = {
     root.rotation.order = 'YXZ';
     const body = group();
     root.add(body);
-    // Corpo comprido (frente = +z) e barriga mais clara
-    const trunk = sphere(22, skin, 0, 40, -16, 30);
-    trunk.scale.set(0.78, 0.82, 1.75);
-    body.add(trunk);
-    const belly = sphere(19, light, 0, 33, -14, 22);
-    belly.scale.set(0.7, 0.45, 1.6);
-    body.add(belly);
+    // Corpo de lesma, pescoço e o começo da cabeça numa peça só (frente = +z)
+    body.add(kit.sweep([
+      { p: [0, 43, -52], w: 9, h: 9 },
+      { p: [0, 41, -40], w: 16, h: 17, hb: 15 },
+      { p: [0, 40, -18], w: 17.5, h: 18, hb: 16 },
+      { p: [0, 41, 2], w: 15, h: 16, hb: 14 },
+      { p: [0, 45, 18], w: 9.5, h: 9.5 },
+      { p: [0, 52, 32], w: 7.5, h: 7.5 },
+      { p: [0, 56, 42], w: 8, h: 8 },
+    ], skin, { radial: 24, cap: 0.7 }));
     // Espinhos nas costas (o brilho pulsa conforme o passo)
     const spines = [];
     for (let i = 0; i < 5; i++) {
@@ -90,19 +120,13 @@ export const alien = {
     // Rabinho em espiral (bolinhas cada vez menores)
     const tail = group(0, 42, -52);
     body.add(tail);
-    const tailBalls = [];
-    for (let i = 0; i < 9; i++) {
-      const b = sphere(4.4 - i * 0.35, green, 0, 0, 0, 12);
-      tail.add(b);
-      tailBalls.push(b);
-    }
-    // Pescoço e cabeça
-    const neck = bone(8, [0, 46, 18], [0, 54, 34], green);
-    body.add(neck);
+    const tailCurl = kit.sweep(alienTail(0), green, { radial: 12, cap: 0.8 });
+    tail.add(tailCurl);
+    // Cabeça
     const head = group(0, 57, 44);
     head.scale.setScalar(1.15);
     body.add(head);
-    const skull = sphere(15, skin, 0, 0, 0, 28);
+    const skull = sphere(15, headSkin, 0, 0, 0, 28);
     skull.scale.set(0.95, 0.85, 1.15);
     head.add(skull);
     // Três olhos em fila no alto da cabeça, de trás para a frente (o do meio é o maior);
@@ -155,15 +179,13 @@ export const alien = {
       const m = x < 0 ? legNear : legFar;
       const L1 = front ? 14 : 15;
       const L2 = front ? 13 : 12;
-      const upper = capsule(front ? 5.6 : 6.4, L1, m);
-      const lowerLeg = capsule(4.6, L2, m);
+      const limb = kit.sweep(alienLeg(front, [x, 40, 0], [x, 25, 0], [x, 10, 0]), m, { radial: 14, cap: 0.6 });
       const foot = sphere(7, cup, 0, 0, 0, 16);
       foot.scale.set(1.1, 0.38, 1.3);
-      const knee = sphere(front ? 5 : 5.6, m, 0, 0, 0, 12);
-      for (const o of [upper, lowerLeg, foot, knee]) root.add(o);
-      legs.push({ x, front, phase, near: x < 0, L1, L2, upper, lower: lowerLeg, foot, knee, hip: { y: front ? 32 : 31, z: front ? 8 : -36 } });
+      root.add(limb, foot);
+      legs.push({ x, front, phase, near: x < 0, L1, L2, limb, spine: alienLeg, foot, hip: { y: front ? 32 : 31, z: front ? 8 : -36 } });
     }
-    return { root, body, legs, head, jaw, fangs, smile, pupils, spines, tailBalls, antennas, ink, red, THREE };
+    return { root, body, legs, head, jaw, fangs, smile, pupils, spines, tailCurl, antennas, ink, red, kit, THREE };
   },
   apply(rig, p) {
     rig.root.rotation.y = (p.facing === 'L' ? -1 : 1) * (Math.PI / 2 - 0.42);
@@ -174,13 +196,7 @@ export const alien = {
     for (const l of rig.legs) solveLeg(rig, l, (u + l.phase) % 1, bob);
     rig.head.rotation.x = Math.sin(u * TAU * 2 + 0.6) * 0.06;
     // Rabinho enrolando para cima e balançando
-    const sw = Math.sin(u * TAU) * 0.5;
-    rig.tailBalls.forEach((b, i) => {
-      // Espiral: sai para trás e vai enrolando para cima (o raio diminui na ponta)
-      const a = i * 0.5 + sw * (i / 16);
-      const r = 9 - i * 0.55;
-      b.position.set(Math.sin(sw) * i * 0.5, r - Math.cos(a) * r, -Math.sin(a) * r);
-    });
+    rig.kit.resweep(rig.tailCurl, alienTail(Math.sin(u * TAU) * 0.5), { radial: 12, cap: 0.8 });
     for (const s of rig.spines) s.m.emissiveIntensity = 0.45 + 0.4 * (0.5 + 0.5 * Math.sin(u * TAU * 2 + s.i));
     for (const a of rig.antennas) {
       a.a.rotation.z = Math.sin(u * TAU * 2 + a.s) * 0.12;
@@ -194,6 +210,30 @@ export const alien = {
     for (const pu of rig.pupils) pu.material = open ? rig.red : rig.ink;
   },
 };
+
+// Rabinho em espiral: sai para trás e vai enrolando para cima, afinando na ponta
+export function alienTail(sw) {
+  return [0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => {
+    const a = i * 0.5 + sw * (i / 16);
+    const r = 9 - i * 0.55;
+    const t = 4.4 - i * 0.36;
+    return { p: [Math.sin(sw) * i * 0.5, r - Math.cos(a) * r, -Math.sin(a) * r], w: t, h: t };
+  });
+}
+
+// Pata do alienígena: sai de dentro do corpo, coxa, joelho, canela até a ventosa
+export function alienLeg(front, hip, knee, ankle) {
+  const [x, hy, hz] = hip;
+  const mid = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  const r = front ? 5.6 : 6.4;
+  return [
+    { p: [x * 0.6, hy + 8, hz], w: r + 1, h: r + 2 },
+    { p: hip, w: r, h: r + 0.5 },
+    { p: knee, w: 4.6, h: 4.8 },
+    { p: mid(knee, ankle, 0.5), w: 4, h: 4.2 },
+    { p: ankle, w: 4.4, h: 4.4 },
+  ];
+}
 
 // ---------------------------------------------------------------- Disco voador
 // Apoio: centro do disco (c.x, by). Cúpula de vidro com o tripulante (de perfil,

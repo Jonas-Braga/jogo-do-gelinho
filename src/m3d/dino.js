@@ -131,10 +131,15 @@ export const trex = {
     return out;
   },
   build(kit) {
-    const { THREE, mat, group, sphere, mesh } = kit;
-    const skin = new THREE.MeshStandardMaterial({ map: scaleTexture(THREE, ['#8CBF58', '#5E8C38', '#3E6424'], 'rgba(46, 74, 30, 0.7)', 3), roughness: 0.7 });
-    const skinDark = new THREE.MeshStandardMaterial({ map: scaleTexture(THREE, ['#6E9E44', '#4A7A2C', '#30521C'], null, 7), roughness: 0.75 });
-    const belly = mat('#D2D89A', 0.7);
+    const { THREE, mat, group, sphere, mesh, sweep } = kit;
+    // Pele contínua: dorso escuro com listras, barriga clara (em volta do corpo) e escamas
+    const skin = new THREE.MeshStandardMaterial({ map: reptileTexture(THREE, '#5E8C38', '#D2D89A', 'rgba(40, 66, 24, 0.75)', 3), roughness: 0.62 });
+    skin.map.repeat.set(1, 5);
+    const skinDark = new THREE.MeshStandardMaterial({ map: reptileTexture(THREE, '#4A7A2C', '#7E9A50', null, 7), roughness: 0.66 });
+    const legNear = new THREE.MeshStandardMaterial({ map: reptileTexture(THREE, '#5E8C38', '#8EAE5E', null, 9), roughness: 0.64 });
+    const limbM = mat('#5A8A36', 0.62);
+    const limbDark = mat('#466E2A', 0.66);
+    const skinHead = new THREE.MeshStandardMaterial({ map: reptileTexture(THREE, '#62923A', '#D2D89A', null, 5), roughness: 0.6 });
     const claw = mat('#E8DFC4', 0.35);
     const mouthM = mat('#7A1E22', 0.6);
     const tooth = mat('#FFF8E6', 0.3);
@@ -142,50 +147,47 @@ export const trex = {
     root.rotation.order = 'YXZ';
     const body = group();
     root.add(body);
-    // Tronco (frente = +z), barriga clara
-    const torso = sphere(1, skin, 0, 66, 2, 30);
-    torso.scale.set(17, 19, 34);
-    body.add(torso);
-    const tummy = sphere(1, belly, 0, 58, 6, 24);
-    tummy.scale.set(14, 12, 28);
-    body.add(tummy);
-    // Rabo em cadeia (reposicionado a cada pose)
-    const tail = [];
-    for (let i = 0; i < 10; i++) {
-      const r = 14 - i * 1.25;
-      const s = sphere(r, i % 2 ? skin : skinDark, 0, 0, 0, 16);
-      s.scale.set(0.9, 0.85, 1.4);
-      body.add(s);
-      tail.push(s);
-    }
+    // Do rabo ao peito numa peça só (frente = +z), refeita a cada pose porque o rabo balança
+    const trunk = sweep(trexSpine(0), skin, { radial: 24, cap: 0.6 });
+    body.add(trunk);
     // Pescoço grosso e a cabeça (gira no pescoço; a mandíbula, na articulação)
     const neck = group(0, 74, 28);
     body.add(neck);
-    const neckM = sphere(1, skin, 0, 6, 6, 20);
-    neckM.scale.set(11, 13, 13);
-    neck.add(neckM);
+    neck.add(sweep([
+      { p: [0, -10, -10], w: 13, h: 14 },
+      { p: [0, -2, -1], w: 11.5, h: 12.5, hb: 13 },
+      { p: [0, 7, 7], w: 10, h: 11, hb: 11.5 },
+      { p: [0, 14, 15], w: 9, h: 10 },
+    ], skin, { radial: 20, cap: 0.6 }));
     const head = group(0, 14, 15);
     head.scale.setScalar(1.22);
     neck.add(head);
-    const skull = sphere(1, skin, 0, 2, 14, 26);
-    skull.scale.set(10, 10, 22);
-    head.add(skull);
-    const snoutTop = sphere(1, skin, 0, 1, 26, 20);
-    snoutTop.scale.set(8, 6.5, 12);
-    head.add(snoutTop);
+    // Crânio alto atrás, focinho comprido e quadrado
+    head.add(sweep([
+      { p: [0, 1, -3], w: 8.5, h: 9 },
+      { p: [0, 3, 7], w: 10.5, h: 10, hb: 8.5 },
+      { p: [0, 2.5, 17], w: 8.8, h: 8, hb: 6.5 },
+      { p: [0, 1, 27], w: 7.4, h: 6.4, hb: 5.4 },
+      { p: [0, 0, 34], w: 6.2, h: 5.2, hb: 4.6 },
+    ], skinHead, { radial: 22, cap: 0.5 }));
     for (const s of [-1, 1]) {
-      // Olho amarelo com a pupila e a crista óssea por cima
-      head.add(sphere(2.6, mat('#FFC21A', 0.2, { emissive: '#A07000', emissiveIntensity: 0.4 }), s * 8, 6, 9, 12));
-      head.add(sphere(1.3, mat('#1A1006', 0.2), s * 9.3, 6, 10.5, 8));
-      const crest = mesh(new THREE.ConeGeometry(2.6, 7, 8), skinDark, s * 7.5, 10.5, 7);
+      // Olho amarelo com a pupila, a sobrancelha óssea e o chifrinho por cima
+      head.add(sphere(2.6, mat('#FFC21A', 0.2, { emissive: '#A07000', emissiveIntensity: 0.4 }), s * 8.4, 6, 9, 12));
+      head.add(sphere(1.3, mat('#1A1006', 0.2), s * 9.8, 6.2, 10.4, 8));
+      head.add(sweep([
+        { p: [s * 7.4, 8.6, 5], w: 2.4, h: 1.6 },
+        { p: [s * 7.8, 9.6, 9.5], w: 2.8, h: 2 },
+        { p: [s * 7, 8.6, 13], w: 2, h: 1.4 },
+      ], skinDark, { radial: 12, cap: 0.6 }));
+      const crest = mesh(new THREE.ConeGeometry(2.2, 6, 8), skinDark, s * 7, 10.5, 5);
       crest.rotation.set(-0.6, 0, -s * 0.3);
       head.add(crest);
-      head.add(sphere(0.9, mat('#1A1006', 0.3), s * 3.6, 4, 36, 8));
+      head.add(sphere(0.9, mat('#1A1006', 0.3), s * 3.6, 3.6, 33.6, 8)); // narina
     }
     // Dentes de cima
     for (let i = 0; i < 7; i++) {
       for (const s of [-1, 1]) {
-        const tb = mesh(new THREE.ConeGeometry(0.9, 3.4 + (i % 2) * 1.2, 6), tooth, s * (6.4 - i * 0.35), -4.6, 12 + i * 3.6);
+        const tb = mesh(new THREE.ConeGeometry(0.9, 3.4 + (i % 2) * 1.2, 6), tooth, s * (6.2 - i * 0.3), -4.2 + i * 0.1, 12 + i * 3.4);
         tb.rotation.x = Math.PI;
         head.add(tb);
       }
@@ -193,26 +195,29 @@ export const trex = {
     // Mandíbula
     const jaw = group(0, -3, 4);
     head.add(jaw);
-    const lower = sphere(1, skin, 0, -4, 16, 20);
-    lower.scale.set(8.5, 4.2, 18);
-    jaw.add(lower);
-    const inside = sphere(1, mouthM, 0, -1, 17, 16);
-    inside.scale.set(6.5, 2.4, 15);
+    jaw.add(sweep([
+      { p: [0, -3, -2], w: 8, h: 4.2 },
+      { p: [0, -4.6, 12], w: 7.6, h: 3.6, hb: 4 },
+      { p: [0, -4.4, 24], w: 6.4, h: 3, hb: 3.2 },
+      { p: [0, -3.6, 31], w: 5, h: 2.6 },
+    ], skinHead, { radial: 18, cap: 0.5 }));
+    const inside = sphere(1, mouthM, 0, -1.2, 15, 16);
+    inside.scale.set(6.2, 2.2, 15);
     jaw.add(inside);
-    const tongue = sphere(1, mat('#C8505A', 0.5), 0, -0.4, 14, 12);
+    const tongue = sphere(1, mat('#C8505A', 0.5), 0, -0.6, 13, 12);
     tongue.scale.set(4, 1.4, 10);
     jaw.add(tongue);
     for (let i = 0; i < 6; i++) {
-      for (const s of [-1, 1]) jaw.add(mesh(new THREE.ConeGeometry(0.8, 3 + (i % 2), 6), tooth, s * (6 - i * 0.4), 0.6, 13 + i * 3.6));
+      for (const s of [-1, 1]) jaw.add(mesh(new THREE.ConeGeometry(0.8, 3 + (i % 2), 6), tooth, s * (5.8 - i * 0.35), 0.4, 12 + i * 3.4));
     }
     // Bracinhos curtos (ombro, cotovelo, mão com duas garras)
     const arms = [-1, 1].map((s) => {
       const sh = group(s * 11, 60, 26);
       body.add(sh);
-      sh.add(kit.bone(3.2, [0, 0, 0], [0, -5, 6], s < 0 ? skin : skinDark));
+      sh.add(kit.bone(3.2, [0, 0, 0], [0, -5, 6], s < 0 ? limbM : limbDark));
       const el = group(0, -5, 6);
       sh.add(el);
-      el.add(kit.bone(2.6, [0, 0, 0], [0, 2, 7], s < 0 ? skin : skinDark));
+      el.add(kit.bone(2.6, [0, 0, 0], [0, 2, 7], s < 0 ? limbM : limbDark));
       for (const k of [-1, 1]) {
         const c = mesh(new THREE.ConeGeometry(0.7, 3.4, 6), claw, k * 1.2, 2, 9);
         c.rotation.x = Math.PI / 2 + 0.6;
@@ -220,20 +225,19 @@ export const trex = {
       }
       return { sh, el, s };
     });
-    // Pernas: coxa grossa, joelho, canela, metatarso e pé de três dedos
+    // Pernas: uma peça só da coxa musculosa (dentro do corpo) ao metatarso, refeita a
+    // cada pose, e o pé de três dedos com garras
     const legs = [-1, 1].map((s) => {
-      const m = s < 0 ? skin : skinDark;
+      const m = s < 0 ? legNear : skinDark;
       const o = {
-        s, thighBulk: sphere(1, m, 0, 0, 0, 20), thigh: rod(THREE, 10, 7, m), shin: rod(THREE, 6.5, 4.5, m),
-        meta: rod(THREE, 4.5, 3.6, m), knee: sphere(7, m, 0, 0, 0, 14), ankle: sphere(4.4, m, 0, 0, 0, 12),
+        s, limb: sweep(trexLeg([s * 11, 56, -4], [s * 12, 34, 6], [s * 12, 12, 0], [s * 12, 3, 8]), m, { radial: 18, cap: 0.5 }),
         toes: [0, 1, 2].map(() => ({ t: rod(THREE, 2.6, 1.6, m), c: mesh(new THREE.ConeGeometry(1.4, 4, 6), claw) })),
       };
-      o.thighBulk.scale.set(10, 15, 13);
-      root.add(o.thighBulk, o.thigh, o.shin, o.meta, o.knee, o.ankle);
+      root.add(o.limb);
       for (const tt of o.toes) root.add(tt.t, tt.c);
       return o;
     });
-    return { root, body, torso, neck, head, jaw, tail, arms, legs, THREE };
+    return { root, body, trunk, neck, head, jaw, arms, legs, kit, THREE };
   },
   apply(rig, p) {
     const { THREE } = rig;
@@ -249,10 +253,7 @@ export const trex = {
     rig.jaw.rotation.x = p.jaw;
     // Rabo esticado para trás, balançando de lado
     const sway = Math.sin(p.run ? ph : ph * 0.5) * (p.run ? 5 : 3);
-    rig.tail.forEach((s, i) => {
-      const k = i / 9;
-      s.position.set(Math.sin(k * 2.2) * sway * k, 64 - i * 1.6 - k * k * 4, -26 - i * 7.4);
-    });
+    rig.kit.resweep(rig.trunk, trexSpine(sway), { radial: 24, cap: 0.6 });
     for (const a of rig.arms) {
       const w = Math.sin(ph * 2 + (a.s > 0 ? 1 : 0)) * (p.run ? 0.35 : 0.15);
       a.sh.rotation.x = w - (p.roar ? 0.4 : 0);
@@ -266,14 +267,7 @@ export const trex = {
       const ankle = [toe[0], toe[1] + 9, toe[2] - 10];
       const knee = ik2(hip, ankle, 26, 25, -1);
       knee[0] = l.s * 12;
-      // Coxa musculosa entre o quadril e o joelho
-      l.thighBulk.position.set((hip[0] + knee[0]) / 2, hip[1] * 0.6 + knee[1] * 0.4, hip[2] * 0.6 + knee[2] * 0.4);
-      l.thighBulk.rotation.x = Math.atan2(knee[2] - hip[2], hip[1] - knee[1]);
-      placeBetween(THREE, l.thigh, hip, knee);
-      placeBetween(THREE, l.shin, knee, ankle);
-      placeBetween(THREE, l.meta, ankle, [toe[0], toe[1] + 1.5, toe[2] - 3]);
-      l.knee.position.set(...knee);
-      l.ankle.position.set(...ankle);
+      rig.kit.resweep(l.limb, trexLeg(hip, knee, ankle, [toe[0], toe[1] + 1.5, toe[2] - 3]), { radial: 18, cap: 0.5 });
       l.toes.forEach((tt, i) => {
         const a = (i - 1) * 0.45;
         const base = [toe[0], toe[1] + 1, toe[2] - 3];
@@ -285,6 +279,77 @@ export const trex = {
     }
   },
 };
+
+// Coluna do T-rex do rabo ao peito; o rabo balança de lado (sway), mais na ponta
+export function trexSpine(sway) {
+  const tail = [9, 7, 5, 3, 1.5, 0].map((i) => {
+    const k = i / 9;
+    const r = 14 - i * 1.3;
+    return { p: [Math.sin(k * 2.2) * sway * k, 64 - i * 1.6 - k * k * 4, -26 - i * 7.6], w: Math.max(1.6, r * 0.88), h: Math.max(1.6, r * 0.9), hb: Math.max(1.4, r * 0.8) };
+  });
+  return [
+    ...tail,
+    { p: [0, 65, -8], w: 16, h: 18, hb: 17 },
+    { p: [0, 66, 12], w: 16.5, h: 18, hb: 20 },
+    { p: [0, 71, 26], w: 13, h: 14, hb: 14 },
+  ];
+}
+
+// Perna do T-rex: coxa de tambor que começa dentro do corpo, joelho, canela fina e o
+// metatarso comprido até a base dos dedos
+export function trexLeg(hip, knee, ankle, ball) {
+  const mid = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  return [
+    { p: [hip[0] * 0.7, hip[1] + 8, hip[2] - 2], w: 10, h: 14 },
+    { p: hip, w: 11, h: 15 },
+    { p: mid(hip, knee, 0.55), w: 10, h: 11.5 },
+    { p: knee, w: 6.8, h: 7 },
+    { p: mid(knee, ankle, 0.5), w: 5, h: 5.2 },
+    { p: ankle, w: 4.4, h: 4.4 },
+    { p: ball, w: 3.8, h: 3.4 },
+  ];
+}
+
+// Pele de réptil para os corpos contínuos: u dá a volta (dorso em u = 0,25, barriga em
+// u = 0,75), v corre ao longo. Dorso escuro com listras atravessadas, barriga clara e escamas
+function reptileTexture(THREE, back, bellyC, stripe, seed) {
+  const t = canvasTex(THREE, 256, 256, (g, w, h) => {
+    const grd = g.createLinearGradient(0, 0, w, 0);
+    grd.addColorStop(0, back);
+    grd.addColorStop(0.5, back);
+    grd.addColorStop(0.62, bellyC);
+    grd.addColorStop(0.88, bellyC);
+    grd.addColorStop(1, back);
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    // Dorso um pouco mais escuro no alto
+    const top = g.createLinearGradient(0, 0, w, 0);
+    top.addColorStop(0.05, 'rgba(0,0,0,0)');
+    top.addColorStop(0.25, 'rgba(20,30,10,0.28)');
+    top.addColorStop(0.45, 'rgba(0,0,0,0)');
+    g.fillStyle = top;
+    g.fillRect(0, 0, w, h);
+    if (stripe) {
+      g.fillStyle = stripe;
+      for (let y = 0; y < h; y += 42) {
+        g.beginPath();
+        g.moveTo(w * 0.06, y + 4);
+        g.quadraticCurveTo(w * 0.25, y + 26, w * 0.44, y + 4);
+        g.quadraticCurveTo(w * 0.25, y + 12, w * 0.06, y + 4);
+        g.fill();
+      }
+    }
+    const rnd = rng(seed);
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = rnd() < 0.5 ? 'rgba(20, 40, 10, 0.22)' : 'rgba(255, 255, 220, 0.12)';
+      g.beginPath();
+      g.arc(rnd() * w, rnd() * h, 1 + rnd() * 1.5, 0, TAU);
+      g.fill();
+    }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
 
 // ---------------------------------------------------------------- Pterossauro
 // Apoio: centro do corpo (c.x, by). Asas de pele presas no braço comprido (ombro,

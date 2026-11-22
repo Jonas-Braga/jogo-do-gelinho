@@ -80,7 +80,7 @@ export const giantCrab = {
     root.add(body);
     // Carapaça (frente = +z), barriga clara e a borda serrilhada
     const cara = sphere(30, shell, 0, 44, 0, 36);
-    cara.scale.set(0.95, 0.78, 1.55);
+    cara.scale.set(1, 0.66, 1.55);
     body.add(cara);
     const belly = sphere(26, mat('#F2B894', 0.6), 0, 36, 0, 24);
     belly.scale.set(0.98, 0.4, 1.5);
@@ -115,50 +115,71 @@ export const giantCrab = {
     const mouth = sphere(7, dark, 0, 41, 46.5, 16);
     mouth.scale.set(1, 0.45, 0.35);
     body.add(mouth);
-    // Patas: quatro de cada lado; de perto da câmera = lado −x
+    // Patas: quatro de cada lado; de perto da câmera = lado −x. Cada pata é uma peça
+    // contínua achatada (coxa, joelho alto, segunda dobra e a ponta escura), refeita a cada pose
     const legs = [];
+    const tipM = mat('#5A1A0E', 0.4);
     for (const s of [-1, 1]) {
       for (let i = 0; i < 4; i++) {
         const m = s < 0 ? leg : legFar;
-        const o = { s, i, hip: [s * 22, 36, -24 + i * 14], thigh: rod(THREE, 4.6, m, 3.8), shin: rod(THREE, 3.6, m, 1.4), knee: sphere(4.4, m, 0, 0, 0, 12) };
-        for (const k of [o.thigh, o.shin, o.knee]) root.add(k);
+        const o = { s, i, hip: [s * 22, 36, -24 + i * 14], limb: kit.sweep(crabLeg([0, 0, 0], [1, 1, 0], [2, 0, 0], [3, -1, 0]), m, { radial: 14, cap: 0.5 }) };
+        o.tip = mesh(new THREE.ConeGeometry(2, 7, 8), tipM);
+        o.rings = [0, 1].map(() => sphere(4, m, 0, 0, 0, 10));
+        root.add(o.limb, o.tip, ...o.rings);
         legs.push(o);
       }
     }
-    // Pinças: ombro, braço, cotovelo, antebraço, mão e o dedo que abre
+    // Pinças: ombro, braço, cotovelo, antebraço e a mão grande (palma estufada, dedo de
+    // baixo fixo e o de cima, que abre na articulação, com dentes por dentro)
     const claws = [];
     for (const s of [-1, 1]) {
       const m = s < 0 ? claw : mat('#D85A34', 0.45);
       const sh = group(s * 20, 44, 36);
       body.add(sh);
-      sh.add(kit.bone(4.4, [0, 0, 0], [s * 10, 8, 14], m));
-      sh.add(sphere(4.8, m, s * 10, 8, 14, 12));
-      sh.add(kit.bone(4, [s * 10, 8, 14], [s * 6, 12, 30], m));
+      sh.add(kit.sweep([
+        { p: [0, 0, -2], w: 5.4, h: 5.4 },
+        { p: [s * 5, 4, 7], w: 5, h: 5.6 },
+        { p: [s * 10, 8, 14], w: 4.6, h: 5 },
+        { p: [s * 8, 10, 22], w: 4.8, h: 5.4 },
+        { p: [s * 6, 12, 30], w: 5.4, h: 6 },
+      ], m, { radial: 16, cap: 0.6 }));
       const hand = group(s * 6, 12, 30);
       sh.add(hand);
-      const palm = sphere(10, m, 0, 0, 6, 20);
-      palm.scale.set(0.75, 0.85, 1.25);
-      hand.add(palm);
-      // Dedo de baixo (fixo) e o de cima (abre na articulação)
-      const lower = sphere(6, m, 0, -4, 18, 14);
-      lower.scale.set(0.55, 0.45, 1.3);
-      hand.add(lower);
-      hand.add(sphere(2.2, tip, 0, -3.4, 25, 10));
+      hand.add(kit.sweep([
+        { p: [0, 0, -2], w: 6, h: 7 },
+        { p: [0, 0.5, 6], w: 8.4, h: 11 },
+        { p: [0, -0.5, 13], w: 7.4, h: 9.4 },
+        { p: [0, -2, 17], w: 5, h: 6 },
+      ], m, { radial: 22, cap: 0.6 }));
+      // Dedo de baixo (fixo), curvo, com dentinhos e a ponta clara
+      hand.add(kit.sweep([
+        { p: [0, -4, 15], w: 3.6, h: 4.4 },
+        { p: [0, -4.6, 22], w: 2.8, h: 3.2 },
+        { p: [0, -3.4, 28], w: 1.8, h: 2 },
+        { p: [0, -1.4, 31], w: 0.9, h: 0.9 },
+      ], m, { radial: 12, cap: 0.6 }));
+      hand.add(sphere(1.4, tip, 0, -1.2, 31.6, 8));
+      for (let k = 0; k < 3; k++) hand.add(sphere(1.1, tip, 0, -1.4 - k * 0.3, 19 + k * 3.6, 6));
       const finger = group(0, 3, 13);
       hand.add(finger);
-      const up = sphere(6, m, 0, 1, 7, 14);
-      up.scale.set(0.5, 0.45, 1.35);
-      finger.add(up);
-      finger.add(sphere(2.2, tip, 0, 0.4, 14.6, 10));
+      finger.add(kit.sweep([
+        { p: [0, 0, 0], w: 3.4, h: 4 },
+        { p: [0, 1.6, 7], w: 2.8, h: 3.4 },
+        { p: [0, 0.8, 14], w: 1.8, h: 2 },
+        { p: [0, -1.8, 18], w: 0.9, h: 0.9 },
+      ], m, { radial: 12, cap: 0.6 }));
+      finger.add(sphere(1.4, tip, 0, -2, 18.6, 8));
+      for (let k = 0; k < 3; k++) finger.add(sphere(1, tip, 0, -1.8 + k * 0.2, 5 + k * 3.6, 6));
       claws.push({ sh, hand, finger, s });
     }
-    return { root, body, legs, claws, brows, smile, mouth, THREE };
+    return { root, body, legs, claws, brows, smile, mouth, kit, THREE };
   },
   apply(rig, p) {
     const { THREE } = rig;
     rig.root.rotation.y = (p.facing === 'L' ? -1 : 1) * (Math.PI / 2 - 0.42);
     const u = p.u;
-    const bob = Math.cos(u * TAU * 2) * 1.2;
+    // Corpo baixo, perto do chão, com as patas dobradas para os lados
+    const bob = Math.cos(u * TAU * 2) * 1.2 - 8;
     rig.body.position.y = bob;
     rig.body.rotation.z = Math.sin(u * TAU * 2) * 0.03;
     // Patas em onda: cada uma meio ciclo atrás da vizinha, lados alternados
@@ -169,10 +190,16 @@ export const giantCrab = {
       const hip = [l.hip[0], l.hip[1] + bob, l.hip[2]];
       // Em leque: as da frente apontam para a frente e as de trás para trás
       const knee = [l.s * 38, 50 + bob + lift * 0.5, l.hip[2] * 1.45 + swing * 0.5];
-      const foot = [l.s * 46, 1 + lift, l.hip[2] * 2 + swing];
-      placeBetween(THREE, l.thigh, hip, knee);
-      placeBetween(THREE, l.shin, knee, foot);
-      l.knee.position.set(...knee);
+      const wrist = [l.s * 48, 24 + lift * 0.8, l.hip[2] * 1.85 + swing * 0.8];
+      const foot = [l.s * 51, 4 + lift, l.hip[2] * 2.1 + swing];
+      rig.kit.resweep(l.limb, crabLeg(hip, knee, wrist, foot), { radial: 14, cap: 0.5 });
+      // Ponta escura e afiada, apontando para o chão
+      const d = new THREE.Vector3(foot[0] - wrist[0], foot[1] - wrist[1], foot[2] - wrist[2]).normalize();
+      l.tip.position.set(foot[0] + d.x * 3, foot[1] + d.y * 3, foot[2] + d.z * 3);
+      l.tip.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
+      l.rings[0].position.set(...knee);
+      l.rings[1].position.set(...wrist);
+      l.rings[1].scale.setScalar(0.75);
     }
     const chasing = p.mouth > 0;
     // Estala as pinças perseguindo (as duas bocas da foto = dois momentos da pinça)
@@ -187,6 +214,22 @@ export const giantCrab = {
     rig.mouth.scale.y = p.mouth > 0.4 ? 0.65 : 0.4;
   },
 };
+
+// Pata do caranguejo: achatada (mais alta que grossa), da coxa ao joelho alto, a
+// segunda dobra e a ponta fina
+export function crabLeg(hip, knee, wrist, foot) {
+  const mid = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  return [
+    { p: mid(knee, hip, 1.15), w: 4.4, h: 5.6 },
+    { p: hip, w: 4.4, h: 6 },
+    { p: mid(hip, knee, 0.5), w: 4.2, h: 6.6 },
+    { p: knee, w: 3.6, h: 4.6 },
+    { p: mid(knee, wrist, 0.5), w: 3.4, h: 5.2 },
+    { p: wrist, w: 2.8, h: 3.6 },
+    { p: mid(wrist, foot, 0.6), w: 2.4, h: 3.4 },
+    { p: foot, w: 1.8, h: 2.2 },
+  ];
+}
 
 // ---------------------------------------------------------------- Gaivota
 // Apoio: centro do corpo (c.x, y − 32 + balanço). Corpo branco, asas cinza em duas

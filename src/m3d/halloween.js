@@ -58,26 +58,6 @@ function ik2(a, c, L1, L2, bend) {
   return [a[0], a[1] + Math.sin(ang) * L1, a[2] + Math.cos(ang) * L1];
 }
 
-// Pelo cinza-azulado em mechas (textura do lobisomem)
-function furTexture(THREE, base, seed) {
-  return canvasTex(THREE, 256, 128, (g, w, h) => {
-    g.fillStyle = base;
-    g.fillRect(0, 0, w, h);
-    const rnd = rng(seed);
-    g.lineCap = 'round';
-    for (let i = 0; i < 420; i++) {
-      const x = rnd() * w;
-      const y = rnd() * h;
-      g.strokeStyle = i % 3 ? 'rgba(30, 24, 44, 0.35)' : 'rgba(210, 204, 230, 0.35)';
-      g.lineWidth = 1.2;
-      g.beginPath();
-      g.moveTo(x, y);
-      g.lineTo(x + (rnd() - 0.5) * 3, y + 5 + rnd() * 6);
-      g.stroke();
-    }
-  });
-}
-
 // ---------------------------------------------------------------- Lobisomem
 // No lugar do urso. Fotos: walk{quadro}{lado}{boca} (anda; perseguindo, corre com os
 // braços esticados e a boca abrindo) e howl{lado} (parado, uivando para a lua)
@@ -104,10 +84,14 @@ export const werewolf = {
     return out;
   },
   build(kit) {
-    const { THREE, mat, group, sphere, mesh } = kit;
-    const furM = new THREE.MeshStandardMaterial({ map: furTexture(THREE, '#7A7490', 5), roughness: 0.95 });
-    const furDark = new THREE.MeshStandardMaterial({ map: furTexture(THREE, '#5E5874', 9), roughness: 0.95 });
-    const belly = mat('#A69EB4', 0.95);
+    const { THREE, mat, group, sphere, mesh, sweep, furMaterial } = kit;
+    const furOpts = { base: '#7A7490', light: '#ABA4C4', dark: '#45405A', seed: 5, len: 11, strands: 1000 };
+    const furM = furMaterial({ ...furOpts, repeat: [3, 2] });
+    const furDark = furMaterial({ ...furOpts, base: '#5E5874', seed: 9, repeat: [3, 2] });
+    const furLimb = furMaterial({ ...furOpts, repeat: [2, 2] });
+    const furLimbDark = furMaterial({ ...furOpts, base: '#5E5874', seed: 9, repeat: [2, 2] });
+    const furHead = furMaterial({ ...furOpts, len: 7, repeat: [2, 1.5] });
+    const belly = furMaterial({ base: '#A69EB4', light: '#C8C0D6', dark: '#7E7690', seed: 13, len: 8, repeat: [1, 1] });
     const pants = mat('#6A3A8C', 0.85);
     const pantsDark = mat('#3E1E58', 0.85);
     const claw = mat('#F1EADA', 0.35);
@@ -119,122 +103,134 @@ export const werewolf = {
     root.rotation.order = 'YXZ';
     const body = group();
     root.add(body);
-    // Tronco curvado para a frente (corcunda), peito e barriga clara
+    // Tronco em V (cintura fina, peito e ombros largos), curvado para a frente
+    // (corcunda); a coluna sobe e o "para cima" da seção aponta para a frente (+z)
     const torso = group(0, 64, -2);
     body.add(torso);
-    const chest = sphere(19, furM, 0, 14, 4, 28);
-    chest.scale.set(1.05, 1.25, 0.9);
-    torso.add(chest);
-    const tummy = sphere(14, belly, 0, 6, 10, 22);
-    tummy.scale.set(0.9, 1.1, 0.7);
+    torso.add(sweep([
+      { p: [0, -16, -2], w: 12.5, h: 10, hb: 11 },
+      { p: [0, -2, 0], w: 13.5, h: 11, hb: 11 },
+      { p: [0, 12, 1], w: 17.5, h: 13, hb: 13 },
+      { p: [0, 24, 0], w: 19, h: 11, hb: 14 },
+      { p: [0, 33, 5], w: 10, h: 9, hb: 9 },
+    ], furM, { up: [0, 0, 1], radial: 24, cap: 0.5 }));
+    // Peito e barriga claros
+    const tummy = sphere(12, belly, 0, 6, 7.5, 22);
+    tummy.scale.set(0.95, 1.5, 0.55);
     torso.add(tummy);
     // Tufos nas costas (corcunda) e a juba em volta do pescoço
     for (let i = 0; i < 9; i++) {
       const a = -0.3 + i * 0.22;
-      const tf = mesh(new THREE.ConeGeometry(3.2, 11, 6), furDark, 0, 14 + Math.sin(a) * 22, Math.cos(a) * -17);
+      const tf = mesh(new THREE.ConeGeometry(3, 10, 6), furDark, 0, 12 + Math.sin(a) * 20, Math.cos(a) * -13);
       tf.rotation.x = -Math.PI / 2 - a + 0.5;
       torso.add(tf);
     }
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * TAU;
-      const tf = mesh(new THREE.ConeGeometry(3.4, 12, 6), i % 2 ? furM : furDark, Math.cos(a) * 13, 34, 10 + Math.sin(a) * 10);
-      tf.rotation.set(Math.sin(a) * 1.1, 0, -Math.cos(a) * 1.1);
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * TAU;
+      const tf = mesh(new THREE.ConeGeometry(3, 10, 6), i % 2 ? furM : furDark, Math.cos(a) * 11, 30, 3 + Math.sin(a) * 9);
+      tf.rotation.set(Math.sin(a) * 1.25, 0, -Math.cos(a) * 1.25);
       torso.add(tf);
     }
     // Calça roxa rasgada no quadril (com franjas)
-    const hips = sphere(15, pants, 0, 48, -4, 22);
-    hips.scale.set(1.15, 0.75, 0.95);
-    body.add(hips);
+    body.add(sweep([
+      { p: [0, 57, -3], w: 13.5, h: 11, hb: 12 },
+      { p: [0, 48, -4], w: 15.5, h: 12, hb: 13.5 },
+      { p: [0, 41, -4], w: 15, h: 11, hb: 12.5 },
+    ], pants, { up: [0, 0, 1], radial: 22, cap: 0.4 }));
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * TAU;
-      const fr = mesh(new THREE.ConeGeometry(2.6, 7, 4), i % 2 ? pants : pantsDark, Math.cos(a) * 15.5, 39, -4 + Math.sin(a) * 12.5);
+      const fr = mesh(new THREE.ConeGeometry(2.6, 7, 4), i % 2 ? pants : pantsDark, Math.cos(a) * 14.5, 38, -4 + Math.sin(a) * 12);
       fr.rotation.x = Math.PI;
       body.add(fr);
     }
-    // Rabo em cadeia (sobe e desce com o passo)
-    const tail = [];
-    for (let i = 0; i < 7; i++) {
-      const t = sphere(7 - i * 0.7, i % 2 ? furM : furDark, 0, 0, 0, 14);
-      body.add(t);
-      tail.push(t);
-    }
-    // Cabeça: crânio, focinho comprido, nariz, olhos brilhando, orelhas pontudas
+    // Rabo peludo (refeito a cada pose: sai de trás do quadril, desce e balança)
+    const tail = sweep(wolfTail(0), furDark, { radial: 14, cap: 0.7 });
+    body.add(tail);
+    // Pescoço e cabeça: crânio largo e focinho comprido numa peça só
     const neck = group(0, 34, 12);
     torso.add(neck);
+    neck.add(sweep([
+      { p: [0, -6, -8], w: 10, h: 9 },
+      { p: [0, 1, -1], w: 8.5, h: 8 },
+      { p: [0, 6, 5], w: 8, h: 8 },
+    ], furM, { radial: 18, cap: 0.6 }));
     const head = group(0, 6, 6);
     neck.add(head);
-    const skull = sphere(11, furM, 0, 0, 0, 24);
-    skull.scale.set(1, 0.95, 1.05);
-    head.add(skull);
-    const snout = kit.capsule(5.4, 9, furM);
-    snout.rotation.x = Math.PI / 2;
-    snout.position.set(0, -2, 13);
-    head.add(snout);
-    const nose = sphere(2.8, black, 0, -0.5, 21, 12);
+    head.add(sweep([
+      { p: [0, 0, -7], w: 8, h: 8 },
+      { p: [0, 1.5, 0], w: 11, h: 10, hb: 9 },
+      { p: [0, 0.5, 7], w: 8.6, h: 7, hb: 7 },
+      { p: [0, -1.4, 14], w: 5.6, h: 4.8, hb: 5 },
+      { p: [0, -2, 20], w: 4.4, h: 3.8, hb: 4 },
+    ], furHead, { radial: 22, cap: 0.5 }));
+    const nose = sphere(2.8, black, 0, -0.6, 21.5, 12);
     nose.scale.set(1.2, 0.85, 0.9);
     head.add(nose);
     for (const s of [-1, 1]) {
-      head.add(sphere(2.2, eyeM, s * 5, 3.4, 8.6, 12));
-      const brow = mesh(new THREE.CapsuleGeometry(1, 5, 4, 8), furDark, s * 5, 6.6, 8.4);
+      head.add(sphere(2.2, eyeM, s * 5.6, 3.6, 7.4, 12));
+      head.add(sphere(0.9, black, s * 6.3, 3.6, 8.9, 8));
+      const brow = mesh(new THREE.CapsuleGeometry(1.1, 5, 4, 8), furDark, s * 5.4, 6.8, 7.6);
       brow.rotation.z = Math.PI / 2 + s * 0.45;
       head.add(brow);
-      const ear = mesh(new THREE.ConeGeometry(3.6, 11, 8), furDark, s * 7, 12, -2);
-      ear.rotation.set(-0.3, 0, -s * 0.35);
+      // Orelhas pontudas com o miolo escuro
+      const ear = mesh(new THREE.ConeGeometry(3.8, 11, 4), furDark, s * 7, 12, -3);
+      ear.rotation.set(-0.3, Math.PI / 4, -s * 0.35);
       head.add(ear);
     }
     // Dentes de cima e a mandíbula (gira para baixo)
     for (const x of [-3, -1, 1, 3]) {
-      const tb = mesh(new THREE.ConeGeometry(0.7, 2.6, 6), tooth, x, -6.6, 16 + (Math.abs(x) < 2 ? 1 : 0));
+      const tb = mesh(new THREE.ConeGeometry(0.7, Math.abs(x) > 2 ? 3.6 : 2.4, 6), tooth, x * 0.9, -5.4, 16 + (Math.abs(x) < 2 ? 1 : 0));
       tb.rotation.x = Math.PI;
       head.add(tb);
     }
-    const jaw = group(0, -5, 6);
+    const jaw = group(0, -4.5, 4);
     head.add(jaw);
-    const lower = kit.capsule(4, 8, furM);
-    lower.rotation.x = Math.PI / 2;
-    lower.position.set(0, -1.5, 8);
-    jaw.add(lower);
-    const inside = sphere(4, mouthM, 0, 1.2, 9, 12);
-    inside.scale.set(0.8, 0.4, 1.4);
+    jaw.add(sweep([
+      { p: [0, -1, -1], w: 6, h: 3.2 },
+      { p: [0, -1.8, 8], w: 4.8, h: 2.8 },
+      { p: [0, -1.6, 15], w: 3.6, h: 2.2 },
+    ], furHead, { radial: 16, cap: 0.6 }));
+    const inside = sphere(4, mouthM, 0, 0.6, 8, 12);
+    inside.scale.set(0.8, 0.4, 1.5);
     jaw.add(inside);
-    for (const x of [-2.6, 2.6]) {
-      const tl = mesh(new THREE.ConeGeometry(0.7, 2.6, 6), tooth, x, 1.4, 12.5);
+    for (const x of [-2.4, 2.4]) {
+      const tl = mesh(new THREE.ConeGeometry(0.7, 3, 6), tooth, x, 1, 13);
       jaw.add(tl);
     }
-    // Braços e pernas: cilindros reposicionados a cada pose (com esferas nas juntas)
-    const limb = (r0, r1, m) => {
-      const o = rod(THREE, r0, r1, m);
-      root.add(o);
-      return o;
-    };
-    const joint = (r, m) => {
-      const o = sphere(r, m, 0, 0, 0, 12);
-      root.add(o);
-      return o;
-    };
-    const arms = [-1, 1].map((s) => ({
-      s, upper: limb(5.6, 4.6, s < 0 ? furM : furDark), fore: limb(4.6, 3.6, s < 0 ? furM : furDark),
-      elbow: joint(4.8, s < 0 ? furM : furDark), hand: joint(4.6, s < 0 ? furM : furDark),
-      claws: [0, 1, 2].map(() => {
-        const c = mesh(new THREE.ConeGeometry(0.9, 5, 6), claw, 0, 0, 0);
-        root.add(c);
-        return c;
-      }),
-    }));
-    const legs = [-1, 1].map((s) => ({
-      s, thigh: limb(7.4, 5.4, s < 0 ? pants : pantsDark), shin: limb(4.8, 3.6, s < 0 ? furM : furDark),
-      foot: limb(3.6, 3.2, s < 0 ? furM : furDark), knee: joint(5.4, s < 0 ? pants : pantsDark),
-      hock: joint(3.8, s < 0 ? furM : furDark), toes: joint(4.4, s < 0 ? furM : furDark),
-      claws: [0, 1, 2].map(() => {
-        const c = mesh(new THREE.ConeGeometry(0.8, 4, 6), claw, 0, 0, 0);
-        root.add(c);
-        return c;
-      }),
-    }));
-    return { root, body, torso, neck, head, jaw, tail, arms, legs, THREE };
+    // Braços e pernas: peças contínuas refeitas a cada pose, mãos e patas com garras
+    const arms = [-1, 1].map((s) => {
+      const a = {
+        s, limb: sweep(wolfArm([s * 15, 90, 4], [s * 18, 75, 4], [s * 18, 60, 8]), s < 0 ? furLimb : furLimbDark, { radial: 16, cap: 0.6 }),
+        hand: sphere(4.6, s < 0 ? furLimb : furLimbDark, 0, 0, 0, 14),
+        claws: [0, 1, 2].map(() => {
+          const c = mesh(new THREE.ConeGeometry(0.9, 5, 6), claw, 0, 0, 0);
+          root.add(c);
+          return c;
+        }),
+      };
+      a.hand.scale.set(0.9, 1.1, 1);
+      root.add(a.limb, a.hand);
+      return a;
+    });
+    const legs = [-1, 1].map((s) => {
+      const l = {
+        s,
+        pantLeg: sweep(pantSpine([s * 8, 46, -4], [s * 9, 30, 4]), s < 0 ? pants : pantsDark, { radial: 16, cap: 0.4 }),
+        lower: sweep(wolfShin([s * 9, 30, 4], [s * 9, 14, -2], [s * 9, 2, 6]), s < 0 ? furLimb : furLimbDark, { radial: 14, cap: 0.6 }),
+        toes: sphere(4.4, s < 0 ? furLimb : furLimbDark, 0, 0, 0, 14),
+        claws: [0, 1, 2].map(() => {
+          const c = mesh(new THREE.ConeGeometry(0.8, 4, 6), claw, 0, 0, 0);
+          root.add(c);
+          return c;
+        }),
+      };
+      root.add(l.pantLeg, l.lower, l.toes);
+      return l;
+    });
+    return { root, body, torso, neck, head, jaw, tail, arms, legs, kit, THREE };
   },
   apply(rig, p) {
-    const { THREE } = rig;
+    const { THREE, kit } = rig;
     // De perfil, um pouco virado para a câmera (frente = +z)
     rig.root.rotation.y = side(p.f) * (Math.PI / 2 - 0.42);
     const ph = p.u * TAU;
@@ -257,11 +253,8 @@ export const werewolf = {
       const hock = [toe[0], toe[1] + 12, toe[2] - 8];
       const knee = ik2(hip, hock, 21, 19, -1);
       knee[0] = l.s * 9;
-      placeBetween(THREE, l.thigh, hip, knee);
-      placeBetween(THREE, l.shin, knee, hock);
-      placeBetween(THREE, l.foot, hock, toe);
-      l.knee.position.set(...knee);
-      l.hock.position.set(...hock);
+      kit.resweep(l.pantLeg, pantSpine(hip, knee), { radial: 16, cap: 0.4 });
+      kit.resweep(l.lower, wolfShin(knee, hock, toe), { radial: 14, cap: 0.6 });
       l.toes.position.set(toe[0], toe[1] - 0.5, toe[2] + 1.5);
       l.toes.scale.set(1, 0.6, 1.3);
       l.claws.forEach((c, i) => {
@@ -275,7 +268,7 @@ export const werewolf = {
     for (const a of rig.arms) {
       const aph = ph + (a.s > 0 ? 0 : Math.PI);
       const swing = Math.sin(aph);
-      sh.set(a.s * 17, 30, 6).applyMatrix4(rig.torso.matrix);
+      sh.set(a.s * 15, 27, 2).applyMatrix4(rig.torso.matrix);
       const S = [sh.x, sh.y + bob, sh.z];
       let E;
       let H;
@@ -289,9 +282,7 @@ export const werewolf = {
         E = [S[0] + a.s * 4, S[1] - 17, S[2] + swing * 9];
         H = [S[0] + a.s * 4, S[1] - 31, S[2] + swing * 15 + 6];
       }
-      placeBetween(THREE, a.upper, S, E);
-      placeBetween(THREE, a.fore, E, H);
-      a.elbow.position.set(...E);
+      kit.resweep(a.limb, wolfArm(S, E, H), { radial: 16, cap: 0.6 });
       a.hand.position.set(...H);
       const dir = new THREE.Vector3(H[0] - E[0], H[1] - E[1], H[2] - E[2]).normalize();
       a.claws.forEach((c, i) => {
@@ -301,13 +292,48 @@ export const werewolf = {
       });
     }
     // Rabo: sai de trás do quadril, desce e balança
-    rig.tail.forEach((t, i) => {
-      const k = i / 6;
-      t.position.set(Math.sin(ph + i * 0.5) * 3 * k, 46 - i * 2.6 + Math.sin(k * 2) * 4, -16 - i * 4);
-      t.scale.set(1, 0.85, 1.25);
-    });
+    kit.resweep(rig.tail, wolfTail(ph), { radial: 14, cap: 0.7 });
   },
 };
+
+const lerp3 = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+// Braço do lobisomem: ombro musculoso (começa dentro do tronco), cotovelo, antebraço
+export function wolfArm(S, E, H) {
+  return [
+    { p: lerp3(E, S, 1.25), w: 6.5, h: 7.5 },
+    { p: S, w: 6.6, h: 7.2 },
+    { p: lerp3(S, E, 0.5), w: 5.4, h: 5.8 },
+    { p: E, w: 4.6, h: 4.8 },
+    { p: lerp3(E, H, 0.45), w: 4.6, h: 5 },
+    { p: H, w: 3.8, h: 4 },
+  ];
+}
+// Perna da calça, do quadril a um pouco abaixo do joelho (barra larga)
+export function pantSpine(hip, knee) {
+  return [
+    { p: [hip[0] * 0.6, hip[1] + 6, hip[2]], w: 8.5, h: 9 },
+    { p: hip, w: 8.6, h: 9 },
+    { p: lerp3(hip, knee, 0.6), w: 7.4, h: 7.6 },
+    { p: lerp3(hip, knee, 1.12), w: 6.6, h: 6.8 },
+  ];
+}
+// Canela de lobo: joelho → jarrete alto → pata
+export function wolfShin(knee, hock, toe) {
+  return [
+    { p: knee, w: 4.8, h: 5 },
+    { p: lerp3(knee, hock, 0.5), w: 4.2, h: 4.4 },
+    { p: hock, w: 3.6, h: 3.8 },
+    { p: lerp3(hock, toe, 0.85), w: 3.2, h: 3.2 },
+  ];
+}
+// Rabo: grosso e peludo no meio, afina na ponta; balança de lado com o passo
+export function wolfTail(ph) {
+  return [0, 1, 2, 3, 4, 5, 6].map((i) => {
+    const k = i / 6;
+    const r = [5, 6.5, 7.2, 7, 6.2, 4.8, 2.6][i];
+    return { p: [Math.sin(ph + i * 0.5) * 3 * k, 46 - i * 2.6 + Math.sin(k * 2) * 4, -14 - i * 4.2], w: r * 0.9, h: r * 0.85 };
+  });
+}
 
 // ---------------------------------------------------------------- Fantasminha
 // Apoio: centro do corpo (c.x, by). Lençol translúcido com a barra ondulando, dois

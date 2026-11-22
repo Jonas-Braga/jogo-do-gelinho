@@ -1315,3 +1315,111 @@ suite('Dinossauros em 3D', () => {
     }
   });
 });
+
+suite('"Ursos" 3D revisados: corpo contínuo', () => {
+  // Peças de coluna (sweep): pontos { p, w, h, hb? } — meia largura e meias alturas
+  const reach = (s) => Math.max(s.w, s.h, s.hb ?? s.h);
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  // Sem buraco: cada ponto fica a menos da soma dos raios do vizinho (as seções se emendam)
+  const joined = (spine) => spine.every((s, i) => i === 0 || dist(s.p, spine[i - 1].p) < reach(s) + reach(spine[i - 1]));
+
+  test('urso: tronco e pescoço numa peça só, da cauda até dentro da cabeça; o polar com a garupa alta, o marrom com a corcova no ombro', async () => {
+    const top = (sp, z) => {
+      const s = sp.reduce((a, b) => (Math.abs(b.p[2] - z) < Math.abs(a.p[2] - z) ? b : a));
+      return s.p[1] + s.h;
+    };
+    for (const v of ['polar', 'brown']) {
+      const sp = bear3d.bearSpine(v);
+      expect(joined(sp), v).toBe(true);
+      expect(sp[0].p[2], v).toBeLessThanOrEqual(-45);
+      // A cabeça fica em z = 40: o pescoço entra nela
+      expect(sp[sp.length - 1].p[2], v).toBeGreaterThan(40);
+      // Barriga mais funda que o dorso em algum ponto (pende um pouco)
+      expect(sp.some((s) => (s.hb ?? s.h) > s.h), v).toBe(true);
+    }
+    expect(top(bear3d.bearSpine('polar'), -32)).toBeGreaterThan(top(bear3d.bearSpine('polar'), 12));
+    expect(top(bear3d.bearSpine('brown'), 12)).toBeGreaterThan(top(bear3d.bearSpine('brown'), -32));
+  });
+
+  test('patas contínuas (urso, T-rex, lobisomem, caranguejo, alienígena): começam dentro do corpo, passam pelas juntas e afinam', async () => {
+    const { trexLeg } = await import('../../src/m3d/dino.js');
+    const { wolfArm, pantSpine, wolfShin } = await import('../../src/m3d/halloween.js');
+    const { crabLeg } = await import('../../src/m3d/beach.js');
+    const { alienLeg } = await import('../../src/m3d/space.js');
+    const hip = [-8, 42, 0], knee = [-8, 25, 6], ankle = [-8, 9, 2], ball = [-8, 3, 9];
+    const cases = {
+      'urso (dianteira)': bear3d.legSpine(true, hip, knee, ankle),
+      'urso (traseira)': bear3d.legSpine(false, hip, knee, ankle),
+      'T-rex': trexLeg(hip, knee, ankle, ball),
+      'lobisomem (braço)': wolfArm(hip, knee, ankle),
+      'lobisomem (calça)': pantSpine(hip, knee),
+      'lobisomem (canela)': wolfShin(knee, ankle, ball),
+      caranguejo: crabLeg(hip, knee, ankle, ball),
+      'alienígena': alienLeg(true, hip, knee, ankle),
+    };
+    for (const [name, sp] of Object.entries(cases)) {
+      // Passa pelas juntas pedidas (nenhuma fica de fora)
+      for (const j of name.includes('canela') ? [knee, ankle] : name.includes('calça') ? [hip] : [hip, knee]) {
+        expect(sp.some((s) => dist(s.p, j) < 0.01), `${name}: junta`).toBe(true);
+      }
+      // Mais grossa em cima que na ponta
+      expect(reach(sp[0]) + reach(sp[1]), name).toBeGreaterThan(reach(sp[sp.length - 1]) * 2);
+    }
+    // As que saem do corpo começam acima do quadril (dentro do corpo, sem "manga" colada)
+    for (const name of ['urso (dianteira)', 'urso (traseira)', 'T-rex', 'alienígena']) expect(cases[name][0].p[1], name).toBeGreaterThan(hip[1]);
+  });
+
+  test('rabos do T-rex, do lobisomem e do alienígena: peça contínua que afina na ponta e balança mais na ponta que na base', async () => {
+    const { trexSpine } = await import('../../src/m3d/dino.js');
+    const { wolfTail } = await import('../../src/m3d/halloween.js');
+    const { alienTail } = await import('../../src/m3d/space.js');
+    // T-rex: do rabo ao peito; a ponta do rabo é a mais fina
+    const still = trexSpine(0);
+    const swung = trexSpine(5);
+    expect(reach(still[0])).toBeLessThan(reach(still[still.length - 2]) / 4);
+    expect(Math.abs(swung[0].p[0])).toBeGreaterThan(Math.abs(swung[4].p[0]));
+    expect(swung[swung.length - 1].p[0]).toBe(0); // o peito não balança
+    for (const [name, a, b] of [['lobisomem', wolfTail(0), wolfTail(1.5)], ['alienígena', alienTail(0), alienTail(0.5)]]) {
+      expect(reach(a[a.length - 1]), name).toBeLessThan(reach(a[1]));
+      const moved = (i) => dist(a[i].p, b[i].p);
+      expect(moved(a.length - 1), name).toBeGreaterThan(moved(0));
+    }
+  });
+
+  if (!isNode) {
+    test('forma contínua (sweep) no Three.js: fechada nas pontas, faces para fora e do tamanho pedido', async () => {
+      const THREE = await import(DEPTH.model3d.url);
+      const { sweepGeometry } = await import('../../src/m3d/kit.js');
+      const g = sweepGeometry(THREE, bear3d.bearSpine('polar'), { radial: 24, cap: 0.8 });
+      const pos = g.getAttribute('position');
+      const idx = g.getIndex().array;
+      // Volume com sinal (teorema da divergência): positivo = triângulos virados para fora
+      let vol = 0;
+      const v = (i) => [pos.getX(i), pos.getY(i), pos.getZ(i)];
+      for (let i = 0; i < idx.length; i += 3) {
+        const [a, b, c] = [v(idx[i]), v(idx[i + 1]), v(idx[i + 2])];
+        vol += (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6;
+      }
+      expect(vol).toBeGreaterThan(0);
+      // Fechada: juntando vértices na mesma posição, toda aresta tem exatamente dois triângulos
+      const key = (i) => v(i).map((x) => x.toFixed(3)).join(',');
+      const edges = new Map();
+      for (let i = 0; i < idx.length; i += 3) {
+        for (const [a, b] of [[0, 1], [1, 2], [2, 0]]) {
+          const ka = key(idx[i + a]), kb = key(idx[i + b]);
+          if (ka === kb) continue;
+          const k = ka < kb ? ka + '|' + kb : kb + '|' + ka;
+          edges.set(k, (edges.get(k) || 0) + 1);
+        }
+      }
+      expect([...edges.values()].every((n) => n === 2)).toBe(true);
+      // Tamanho: do fim da garupa à ponta do pescoço, e a altura do dorso
+      g.computeBoundingBox();
+      const bb = g.boundingBox;
+      expect(bb.min.z).toBeLessThan(-46);
+      expect(bb.max.z).toBeGreaterThan(44);
+      expect(bb.max.y).toBeGreaterThan(64);
+      expect(bb.max.y).toBeLessThan(70);
+    });
+  }
+});

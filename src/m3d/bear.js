@@ -34,104 +34,143 @@ export function poses() {
 }
 
 export function build(kit, variant = 'polar') {
-  const { mat, group, sphere, bone, capsule } = kit;
+  const { mat, group, sphere, sweep, furMaterial } = kit;
   // Pelagem: urso polar (fase normal e Natal) ou urso marrom (Floresta)
   const brown = variant === 'brown';
-  const fur = mat(brown ? '#7A4E2A' : '#F2EDE1', 1);
-  const furShade = mat(brown ? '#5A3820' : '#DCD3BF', 1);
-  const furLight = mat(brown ? '#8E5E34' : '#FBF8EF', 1);
+  const furOpts = brown
+    ? { base: '#7A4E2A', light: '#9A6A3E', dark: '#4E3018', seed: 7 }
+    : { base: '#EFE9DC', light: '#FFFFFF', dark: '#C8BEA6', seed: 3 };
+  const fur = furMaterial({ ...furOpts, repeat: [4, 3] });
+  const furShade = furMaterial({ ...furOpts, base: brown ? '#5E3C20' : '#D9D0BC', repeat: [3, 2], seed: furOpts.seed + 1 });
+  const furHead = furMaterial({ ...furOpts, repeat: [3, 1.5], len: 6, strands: 700 });
   const paw = mat(brown ? '#3E2616' : '#CFC6B0', 0.95);
-  const snoutM = brown ? mat('#B88C60', 0.95) : furLight;
-  const claw = mat('#E8DCC0', 0.4);
-  const black = mat('#26282B', 0.35);
+  const pad = mat('#2E2A28', 0.7);
+  const snoutM = brown ? furMaterial({ base: '#B88C60', light: '#D0A878', dark: '#8E6640', seed: 11, repeat: [2, 1], len: 5 }) : furHead;
+  const claw = mat(brown ? '#E8DCC0' : '#3A3430', 0.4);
+  const black = mat('#1E2023', 0.25);
   const mouthIn = mat('#6B2A2A', 0.7);
   const tooth = mat('#FFFFFF', 0.4);
+  const eyeShine = mat('#FFFFFF', 0.1, { emissive: '#FFFFFF', emissiveIntensity: 0.5 });
 
   const root = group();
   root.rotation.order = 'YXZ';
   const body = group();
   root.add(body);
-  // Tronco: barriga longa, corcova no ombro e garupa (frente do urso = +z)
-  const trunk = sphere(22, fur, 0, 40, -2, 28);
-  trunk.scale.set(0.82, 0.9, 1.75);
-  body.add(trunk);
-  const hump = sphere(19, furLight, 0, 47, 18, 24);
-  hump.scale.set(0.95, 0.95, 1.1);
-  body.add(hump);
-  const rump = sphere(19, fur, 0, 43, -26, 24);
-  body.add(rump);
-  body.add(sphere(5, furShade, 0, 46, -45, 12)); // cauda
-  // Tufos de pelo no dorso
-  for (let i = 0; i < 14; i++) {
-    const z = -34 + i * 4.6;
-    const y = 51 + Math.sin((i / 13) * Math.PI) * 7;
-    const t = sphere(3 + (i % 3) * 0.6, i % 2 ? furLight : fur, (i % 2 ? 1 : -1) * 4, y, z, 10);
-    body.add(t);
-  }
+  // Tronco e pescoço numa peça só (bearSpine)
+  const spine = bearSpine(variant);
+  body.add(sweep(spine, fur, { radial: 24, cap: 0.8 }));
+  // Cauda curtinha
+  const tail = sphere(5, furShade, 0, 50, -50, 12);
+  tail.scale.set(1, 0.9, 0.8);
+  body.add(tail);
 
-  // Patas: coxa grossa (ombro/quadril), canela mais fina e pata achatada.
+  // Patas: uma peça contínua do quadril (dentro do corpo) até o tornozelo, refeita a
+  // cada pose (dobra no joelho sem emenda), e a pata achatada com almofada e garras.
   // Ficam fora do corpo (no root) porque o pé se apoia no chão enquanto o corpo sobe e desce.
-  // Fase de cada pata no ciclo: traseira de perto, dianteira de perto, traseira de longe,
-  // dianteira de longe (de perto da câmera = lado −x)
   const legs = [];
-  for (const [x, front, phase] of LEGS) {
+  for (const [lx, front, phase] of LEGS) {
+    // Um pouco para dentro: a coxa sai de dentro do corpo, sem sobrar pelos lados
+    const x = lx * 0.7;
     const m = x < 0 ? fur : furShade;
     const L1 = front ? 17 : 18;
     const L2 = front ? 15 : 14;
-    const upper = capsule(front ? 8.6 : 10, L1, m);
-    const lower = capsule(front ? 6.4 : 6.8, L2, m);
-    const foot = sphere(7.6, paw, 0, 0, 0, 14);
-    foot.scale.set(1, 0.48, 1.3);
-    // Garras (três por pata), saindo da frente da pata
-    if (brown) {
-      for (const cx of [-3.2, 0, 3.2]) {
-        const c = kit.mesh(new kit.THREE.ConeGeometry(1.1, 4.2, 8), claw, cx, -0.6, 7.6);
-        c.rotation.x = Math.PI / 2 + 0.5;
-        foot.add(c);
-      }
+    const limb = sweep(legSpine(front, [x, 40, 0], [x, 25, 0], [x, 10, 0]), m, { radial: 16, cap: 0.6 });
+    const foot = group();
+    const sole = sphere(8, x < 0 ? paw : furShade, 0, 0, 0, 16);
+    sole.scale.set(1, 0.5, 1.35);
+    foot.add(sole);
+    const padM = sphere(6.4, pad, 0, -2.6, 0.6, 12);
+    padM.scale.set(0.95, 0.3, 1.2);
+    foot.add(padM);
+    // Garras (quatro por pata), saindo da frente da pata
+    for (const cx of [-4.5, -1.5, 1.5, 4.5]) {
+      const c = kit.mesh(new kit.THREE.ConeGeometry(brown ? 1.1 : 0.8, brown ? 4.2 : 2.6, 8), claw, cx, -1.2, 9.6);
+      c.rotation.x = Math.PI / 2 + 0.5;
+      foot.add(c);
     }
-    // Pelo do joelho (deixa a articulação arredondada)
-    const knee = sphere(front ? 6.8 : 7.6, m, 0, 0, 0, 12);
-    for (const o of [upper, lower, foot, knee]) root.add(o);
+    root.add(limb, foot);
     legs.push({
-      x, front, phase, near: x < 0, L1, L2, upper, lower, foot, knee,
+      x, front, phase, near: x < 0, L1, L2, limb, foot,
       hip: { y: front ? 41 : 42, z: front ? 22 : -25 },
     });
   }
 
-  // Pescoço e cabeça
+  // Cabeça: crânio e focinho numa peça só (o polar tem o focinho comprido e reto)
   const head = group(0, 46, 40);
   body.add(head);
-  head.add(bone(12, [0, 0, -8], [0, -1, 8], fur));
-  const skull = sphere(13, furLight, 0, 0, 14, 22);
-  skull.scale.set(0.95, 0.92, 1.1);
-  head.add(skull);
+  const skull = brown
+    ? [
+        { p: [0, 1, 0], w: 9, h: 9 },
+        { p: [0, 3, 9], w: 13, h: 12, hb: 11 },
+        { p: [0, 2, 17], w: 11.5, h: 10, hb: 10 },
+      ]
+    : [
+        { p: [0, 1, 0], w: 8.5, h: 8.5 },
+        { p: [0, 2.5, 9], w: 11.5, h: 10.5, hb: 10 },
+        { p: [0, 1.5, 18], w: 10, h: 8.8, hb: 9.5 },
+      ];
+  head.add(sweep(skull, furHead, { radial: 22, cap: 0.7 }));
+  // Focinho: sai da testa e afina até o nariz (no marrom, mais curto e mais claro)
+  const muzzle = brown
+    ? [
+        { p: [0, 0.5, 16], w: 8.8, h: 8, hb: 8.5 },
+        { p: [0, -2, 25], w: 7.2, h: 6.2, hb: 6.5 },
+        { p: [0, -3, 33], w: 6, h: 5.2, hb: 5.2 },
+      ]
+    : [
+        { p: [0, 0.5, 16], w: 8.2, h: 7.6, hb: 8.2 },
+        { p: [0, -1.5, 26], w: 6.6, h: 6.2, hb: 6.4 },
+        { p: [0, -3, 34], w: 5.6, h: 5, hb: 5 },
+      ];
+  head.add(sweep(muzzle, snoutM, { radial: 20, cap: 0.6 }));
   for (const s of [-1, 1]) {
-    head.add(sphere(4.2, furShade, s * 8, 10, 10, 12)); // orelhas
-    head.add(sphere(1.9, black, s * 6.2, 4, 24.2, 10)); // olhos
+    // Orelhas: pequenas e redondas, com o miolo escuro
+    const ear = sphere(brown ? 4.4 : 3.6, furShade, s * (brown ? 8.5 : 7.5), brown ? 12 : 10.5, brown ? 7 : 6, 12);
+    ear.scale.set(1, 1, 0.6);
+    head.add(ear);
+    const earIn = sphere(brown ? 2.6 : 2, mat(brown ? '#3A2414' : '#B8AE98', 0.9), s * (brown ? 8.5 : 7.5), brown ? 12 : 10.5, (brown ? 7 : 6) + 1.6, 10);
+    earIn.scale.set(1, 1, 0.4);
+    head.add(earIn);
+    // Olhos pequenos e brilhantes, de lado no rosto
+    const ex = brown ? 9.9 : 8.3;
+    head.add(sphere(2.1, black, s * ex, 5.5, 18.5, 12));
+    head.add(sphere(0.6, eyeShine, s * (ex + 0.9), 6.4, 19.6, 6));
   }
-  // Focinho e nariz
-  const snout = capsule(7.2, 9, snoutM);
-  snout.rotation.x = Math.PI / 2;
-  snout.position.set(0, -3, 28);
-  head.add(snout);
-  const nose = sphere(3.6, black, 0, -0.5, 37.5, 12);
-  nose.scale.set(1.2, 0.85, 0.8);
+  const nose = sphere(3.4, black, 0, -0.8, 36.6, 14);
+  nose.scale.set(1.25, 0.85, 0.8);
   head.add(nose);
+  head.add(sphere(0.9, eyeShine, -1.2, 0.6, 38.4, 6));
   // Mandíbula (gira para baixo ao rugir), com boca escura e dentinhos
   const jaw = group(0, -7, 18);
-  const lower = capsule(5.4, 10, fur);
-  lower.rotation.x = Math.PI / 2;
-  lower.position.set(0, -1.5, 10);
+  const lower = sweep(
+    [
+      { p: [0, 0, 0], w: 6.5, h: 3.4 },
+      { p: [0, -0.8, 9], w: 5.4, h: 3 },
+      { p: [0, -1, 15], w: 4.2, h: 2.6 },
+    ],
+    brown ? snoutM : furHead,
+    { radial: 16, cap: 0.6 }
+  );
   jaw.add(lower);
-  const inside = sphere(5.2, mouthIn, 0, 1.6, 12, 12);
-  inside.scale.set(0.9, 0.5, 1.6);
+  const inside = sphere(5.2, mouthIn, 0, 1.8, 10, 12);
+  inside.scale.set(0.85, 0.45, 1.5);
   jaw.add(inside);
-  for (const s of [-1, 1]) jaw.add(sphere(1.1, tooth, s * 3.2, 3.2, 19, 8));
+  for (const s of [-1, 1]) {
+    const fang = kit.mesh(new kit.THREE.ConeGeometry(0.9, 3, 8), tooth, s * 3, 4, 15);
+    jaw.add(fang);
+  }
   head.add(jaw);
   const lip = sphere(5, mouthIn, 0, -6.2, 26, 12);
   lip.scale.set(0.85, 0.35, 1.3);
   head.add(lip);
+  // Presas de cima: só aparecem com a boca aberta (junto com o céu da boca)
+  const fangs = [];
+  for (const s of [-1, 1]) {
+    const fang = kit.mesh(new kit.THREE.ConeGeometry(0.9, 3, 8), tooth, s * 3, -7.4, 31);
+    fang.rotation.x = Math.PI;
+    head.add(fang);
+    fangs.push(fang);
+  }
 
   // Gorro de Papai Noel (Natal): copa vermelha, barra de pelo, ponta articulada
   // que cai para trás e balança com o passo, e o pompom
@@ -155,7 +194,30 @@ export function build(kit, variant = 'polar') {
     hatTip.add(tip);
     hatTip.add(sphere(3.4, white, 0, -3.2, -10.5, 12));
   }
-  return { root, body, legs, head, jaw, lip, hatTip, THREE: kit.THREE };
+  return { root, body, legs, head, jaw, lip, fangs, hatTip, kit, THREE: kit.THREE };
+}
+
+// Tronco e pescoço numa peça só (frente do urso = +z): garupa, barriga que pende um
+// pouco, ombros e o pescoço que entra na cabeça (em z = 40). O polar tem a garupa mais
+// alta e o pescoço comprido; o marrom, a corcova no ombro.
+export function bearSpine(variant = 'polar') {
+  return variant === 'brown'
+    ? [
+        { p: [0, 45, -46], w: 9, h: 8 },
+        { p: [0, 46, -32], w: 17, h: 17, hb: 19 },
+        { p: [0, 43, -10], w: 18.5, h: 18, hb: 21 },
+        { p: [0, 47, 12], w: 18, h: 23, hb: 19 },
+        { p: [0, 47, 28], w: 13, h: 15, hb: 13 },
+        { p: [0, 46, 42], w: 9.5, h: 10 },
+      ]
+    : [
+        { p: [0, 47, -46], w: 9, h: 8 },
+        { p: [0, 48, -32], w: 17, h: 18, hb: 19 },
+        { p: [0, 44, -10], w: 18, h: 17, hb: 21 },
+        { p: [0, 45, 12], w: 17, h: 19, hb: 19 },
+        { p: [0, 46, 30], w: 11.5, h: 12.5, hb: 12 },
+        { p: [0, 45, 44], w: 9, h: 9.5 },
+      ];
 }
 
 // Modelo do urso com uma variante ('polar' ou 'santa', com o gorro do Natal)
@@ -221,12 +283,31 @@ export function solveLeg(rig, leg, u, bob) {
   const hip = [leg.x, hy, hz];
   const knee = [leg.x, ky, kz];
   const ankle = [leg.x, hy + dy, hz + dz];
-  place(THREE, leg.upper, hip, knee);
-  place(THREE, leg.lower, knee, ankle);
-  leg.knee.position.set(...knee);
+  if (leg.limb) rig.kit.resweep(leg.limb, (leg.spine || legSpine)(leg.front, hip, knee, ankle), { radial: 16, cap: 0.6 });
+  else {
+    place(THREE, leg.upper, hip, knee);
+    place(THREE, leg.lower, knee, ankle);
+    leg.knee.position.set(...knee);
+  }
   leg.foot.position.set(leg.x, ankle[1] - 3.2, ankle[2] + 3);
   // Na passada a pata se inclina (dedos para baixo) e no chão fica plana
   leg.foot.rotation.set(f.lift * 0.7, 0, 0);
+}
+
+// Coluna de uma pata: começa dentro do corpo (acima do quadril), coxa grossa que
+// afina no joelho, canela e o tornozelo peludo logo acima da pata
+export function legSpine(front, hip, knee, ankle) {
+  const [x, hy, hz] = hip;
+  const top = [x * 0.6, hy + 6, hz + (front ? 1 : -3)];
+  const mid = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  return [
+    { p: top, w: front ? 10 : 12, h: front ? 9 : 11 },
+    { p: hip, w: front ? 10 : 11.5, h: front ? 11 : 13.5 },
+    { p: mid(hip, knee, 0.6), w: front ? 8 : 9, h: front ? 8.5 : 9.5 },
+    { p: knee, w: front ? 6.6 : 6.8, h: front ? 6.8 : 7 },
+    { p: mid(knee, ankle, 0.55), w: front ? 6 : 5.8, h: front ? 6.2 : 6 },
+    { p: ankle, w: front ? 6.4 : 6.2, h: front ? 6.4 : 6.2 },
+  ];
 }
 
 export function apply(rig, p) {
@@ -244,4 +325,5 @@ export function apply(rig, p) {
   // Ponta do gorro balançando (mais forte rugindo, quando ele corre)
   if (rig.hatTip) rig.hatTip.rotation.set(Math.sin(u * TAU * 2) * 0.18 - p.mouth * 0.4, 0, Math.sin(u * TAU) * 0.25);
   rig.lip.visible = p.mouth > 0;
+  for (const f of rig.fangs) f.visible = p.mouth > 0;
 }
