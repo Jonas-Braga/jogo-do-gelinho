@@ -2147,7 +2147,8 @@ suite('Água com aspecto de líquido', () => {
         if (d[i] > 220 && d[i + 1] > 110) bright++; // fenda acesa (amarelada)
         if (d[i] < 120) dark++;
       }
-      expect(bright).toBeGreaterThan(200);
+      // (limite ajustado de 200 para 50 com aprovação do usuário, que pediu as fendas menos brilhantes)
+      expect(bright).toBeGreaterThan(50);
       expect(dark).toBeGreaterThan(2000);
     });
   }

@@ -27,7 +27,7 @@ export const SURFACE = {
     space: { recipe: 'water', loop: 6, scale: 2, stretch: 3, relief: 0.5, glint: [225, 205, 255], spec: 0.35, drift: 4, reflect: 0.55 },
     beach: { recipe: 'water', loop: 5, scale: 2, stretch: 3, relief: 0.5, glint: [255, 255, 245], spec: 0.4, drift: 6, reflect: 0.55 },
     halloween: { recipe: 'water', loop: 6, scale: 2, stretch: 3, relief: 0.5, glint: [215, 200, 255], spec: 0.25, drift: 4, reflect: 0.6 },
-    dino: { recipe: 'lava', loop: 10, scale: 3.4, stretch: 1, relief: 1, glint: [255, 210, 110], spec: 0.6, drift: 3, reflect: 0 },
+    dino: { recipe: 'lava', loop: 10, scale: 3.4, stretch: 1, relief: 1, glint: [255, 200, 100], spec: 0.35, drift: 3, reflect: 0 },
   },
   // Reflexo do cenário: comprimento (px abaixo da linha d'água) e achatamento do espelho
   mirror: { len: 220, squash: 0.7 },
@@ -111,7 +111,8 @@ function* bake(kind) {
         rd[k] = rd[k + 1] = rd[k + 2] = g;
         rd[k + 3] = 255;
         [gd[k], gd[k + 1], gd[k + 2]] = cfg.glint;
-        gd[k + 3] = Math.min(255, seam * 255);
+        // Brilho só no miolo das fendas (halo estreito: a lava não fica brilhando demais)
+        gd[k + 3] = Math.min(255, seam ** 2.5 * 255);
       } else {
         const nx = (-hx * S * 2 * Math.PI) / N;
         const nz = (-hy * S * 2 * Math.PI) / N;

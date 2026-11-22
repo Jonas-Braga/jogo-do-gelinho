@@ -395,7 +395,7 @@ export class Renderer {
     // do cenário, senão ele some numa névoa clara)
     const mirror = volume.enabled && reflects(kind);
     const r = ctx.createLinearGradient(0, top, 0, top + 140);
-    r.addColorStop(0, rgb(sky.hor, mirror ? 0.12 : 0.35));
+    r.addColorStop(0, rgb(sky.hor, mirror ? 0.12 : kind === 'dino' ? 0.14 : 0.35));
     r.addColorStop(1, rgb(sky.hor, 0));
     ctx.fillStyle = r;
     ctx.fillRect(0, top, W, 140);
