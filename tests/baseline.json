@@ -554,5 +554,11 @@
   "Cenários de fundo em 3D: Halloween › no Halloween, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)",
   "\"Ursos\" 3D no tamanho certo › cada \"urso\" 3D é desenhado na caixa em que foi fotografado (o lobisomem e o T-rex não ficam espremidos na caixa do urso polar)",
   "Cenários de fundo em 3D: Dinossauros › as crateras dos vulcões caem onde o 2D solta a fumaça; pedras e brotos ficam longe do ninho, das samambaias gigantes e da caverna",
-  "Cenários de fundo em 3D: Dinossauros › nos Dinossauros, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)"
+  "Cenários de fundo em 3D: Dinossauros › nos Dinossauros, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)",
+  "Áudio · motor do jet ski na Praia › o som segue o jet ski: lado da tela, mais alto perto do meio, mudo fora da tela, mais agudo chegando que indo embora",
+  "Áudio · motor do jet ski na Praia › na fase 20 o motor liga quando o jet ski passa e desliga quando ele some; nas outras fases nunca; no fim de jogo e na pausa fica mudo",
+  "Áudio · motor do jet ski na Praia › voz contínua no Web Audio simulado: liga uma vez só, acompanha o volume e silencia com null",
+  "Água com aspecto de líquido › toda fase tem a sua superfície (água em todas, lava nos Dinossauros) e sem canvas de verdade continua a ondulação antiga",
+  "Água com aspecto de líquido › reflexo do cenário na água (como nos exemplos do usuário) em todas as fases com água; a lava não reflete; sem canvas de verdade não faz nada",
+  "Água com aspecto de líquido › num aparelho lento (volume desligado pelo fps baixo) volta para a ondulação de traços"
 ]

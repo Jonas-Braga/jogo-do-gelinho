@@ -5,6 +5,7 @@ import {
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
+import { drawLiquidSurface, drawReflection, reflects } from './water.js';
 import {
   atDepth, floeTilt, visibleRange, withVolume, volume, sceneLight, camera, followCamera, swayLayer, Foreground, foregroundKind, contactShadow, drawHaze, drawWaterDepth, drawSunPath,
   drawLighting, drawVignette, Bokeh,
@@ -268,10 +269,10 @@ export class Renderer {
     // No espaço e no Halloween o "reflexo do céu" na água é a cor do horizonte noturno
     const reflect = space ? { hor: [120, 80, 220] } : halloween ? { hor: HAUNT.sky } : dino ? { hor: LAVA.sky } : sky;
     swayLayer(ctx, (shore + 1) / 2, () => {
-      this.drawWater(ctx, t, reflect, WATERS[scenery] || ICE_WATER);
+      this.drawWater(ctx, t, reflect, WATERS[scenery] || ICE_WATER, scenery || 'ice');
       if (dino) drawLavaBubbles(ctx, t);
     });
-    drawWaterDepth(ctx, horizon, lt.glow ?? 1);
+    drawWaterDepth(ctx, horizon, (lt.glow ?? 1) * (volume.enabled && reflects(scenery || 'ice') ? 0.35 : 1));
     // O caminho de luz acompanha o sol (camada do céu)
     swayLayer(ctx, far, () => drawSunPath(ctx, t, 300, lt.path, lt.strength * (0.45 + 0.55 * clamp01(this.skyF + (sp ? 0.4 : 0)))));
     game.particles.drawRipples(ctx);
@@ -380,7 +381,7 @@ export class Renderer {
   }
 
   // Água gelada, o rio esverdeado da floresta ou a poeira estelar do espaço
-  drawWater(ctx, t, sky, pal = ICE_WATER) {
+  drawWater(ctx, t, sky, pal = ICE_WATER, kind = 'ice') {
     const top = WATER_TOP + 10;
     const g = ctx.createLinearGradient(0, top, 0, H);
     const c = pal.water;
@@ -390,20 +391,27 @@ export class Renderer {
     ctx.fillStyle = g;
     ctx.fillRect(0, top, W, H - top);
 
-    // Reflexo do céu perto da superfície
+    // Reflexo do céu perto da superfície (bem mais fraco quando há o reflexo de verdade
+    // do cenário, senão ele some numa névoa clara)
+    const mirror = volume.enabled && reflects(kind);
     const r = ctx.createLinearGradient(0, top, 0, top + 140);
-    r.addColorStop(0, rgb(sky.hor, 0.35));
+    r.addColorStop(0, rgb(sky.hor, mirror ? 0.12 : 0.35));
     r.addColorStop(1, rgb(sky.hor, 0));
     ctx.fillStyle = r;
     ctx.fillRect(0, top, W, 140);
+    // Reflexo do cenário na água (montanhas, costa e barranco espelhados), antes das ondas
+    if (volume.enabled) drawReflection(ctx, t, kind);
     // Sombra do paredão de gelo (ou do barranco) na água
     ctx.fillStyle = pal.bank;
     ctx.fillRect(0, top, W, 6);
 
-    // Ondulação
+    // Superfície de líquido realista (src/water.js); enquanto não fica pronta (ou sem
+    // canvas de verdade), a ondulação de traços; num aparelho lento (fps baixo, que já
+    // desliga o volume dos personagens) volta para os traços, que pesam menos
+    const liquid = volume.enabled && drawLiquidSurface(ctx, t, kind);
     ctx.save();
     ctx.lineCap = 'round';
-    for (let j = 0, y = top + 10; y < H; j++, y += 12 + j * 0.9) {
+    for (let j = 0, y = top + 10; !liquid && y < H; j++, y += 12 + j * 0.9) {
       const depth = (y - top) / (H - top);
       const rc = pal.ripple.join(', ');
       ctx.strokeStyle = `rgba(${rc}, ${0.2 * (1 - depth) + 0.04})`;

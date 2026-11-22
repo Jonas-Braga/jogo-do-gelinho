@@ -1282,3 +1282,21 @@ function drawJetski2D(ctx, t) {
   ctx.lineTo(5, -9 + Math.sin(t * 14) * 0.4);
   ctx.stroke();
 }
+
+// Som do motor do jet ski (tocado em contínuo pelo Sfx.setEngine): sai do lado da tela
+// onde ele está, cresce quando ele chega perto do meio (e some fora da tela), fica um
+// pouco mais agudo chegando e mais grave indo embora (Doppler) e acelera a cada pulo
+// na marola. null quando não há jet ski passando.
+export const JETSKI_SOUND = { pan: 0.85, fadeIn: 120, doppler: 0.06, rev: 0.06 };
+export function engineSound(traffic) {
+  const v = traffic.list.find((o) => o.kind === 'jetski');
+  if (!v) return null;
+  const S = JETSKI_SOUND;
+  const off = (v.x - W / 2) / (W / 2);
+  const clampU = (k) => Math.max(0, Math.min(1, k));
+  const edge = clampU(Math.min(v.x + BOATS.margin, W + BOATS.margin - v.x) / (BOATS.margin + S.fadeIn));
+  const vol = edge * (0.55 + 0.45 * (1 - clampU(Math.abs(off))));
+  const approach = -off * v.dir; // > 0: vindo para o meio
+  const pitch = 1 + S.doppler * Math.tanh(approach * 3) + Math.max(0, Math.sin(v.t * 14)) * S.rev;
+  return { pan: Math.max(-1, Math.min(1, off)) * S.pan, vol, pitch };
+}

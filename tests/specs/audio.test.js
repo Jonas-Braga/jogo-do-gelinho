@@ -21,6 +21,10 @@ class FakeParam {
   exponentialRampToValueAtTime(v) {
     if (!(v > 0)) throw new Error(`rampa exponencial precisa de valor > 0 (recebeu ${v})`);
   }
+  setTargetAtTime(v) {
+    if (!Number.isFinite(v)) throw new Error(`alvo inválido: ${v}`);
+    this.target = v;
+  }
 }
 class FakeNode {
   connect(n) {
@@ -53,6 +57,9 @@ class FakeAudioContext {
   createBuffer(_ch, len) {
     const d = new Float32Array(len);
     return { getChannelData: () => d };
+  }
+  createStereoPanner() {
+    return Object.assign(new FakeNode(), { pan: new FakeParam() });
   }
   createBufferSource() {
     return Object.assign(new FakeNode(), { start: () => this.voices++, stop() {} });
@@ -223,5 +230,60 @@ suite('Áudio · efeitos sonoros e mudo', () => {
     g.player.fall();
     step(g, 2);
     expect(played(g)).toContain('gameover');
+  });
+});
+
+suite('Áudio · motor do jet ski na Praia', () => {
+  test('o som segue o jet ski: lado da tela, mais alto perto do meio, mudo fora da tela, mais agudo chegando que indo embora', async () => {
+    const { engineSound, BOATS } = await import('../../src/beach.js');
+    expect(engineSound({ list: [] })).toBe(null);
+    expect(engineSound({ list: [{ kind: 'sail', dir: 1, x: 640, t: 0 }] })).toBe(null);
+    const at = (x, dir = 1, t = 0.3) => engineSound({ list: [{ kind: 'jetski', dir, x, t }] });
+    // Entrando pela esquerda: começa sem som (fora da tela) e cresce
+    expect(at(-BOATS.margin).vol).toBe(0);
+    expect(at(100).vol).toBeGreaterThan(at(0).vol);
+    expect(at(W / 2).vol).toBeGreaterThan(at(150).vol);
+    // Lado: esquerda negativo, direita positivo
+    expect(at(200).pan).toBeLessThan(0);
+    expect(at(1100).pan).toBeGreaterThan(0);
+    // Doppler: chegando (antes do meio) mais agudo que indo embora (depois do meio)
+    expect(at(400, 1).pitch).toBeGreaterThan(at(880, 1).pitch);
+    expect(at(880, -1).pitch).toBeGreaterThan(at(400, -1).pitch);
+  });
+
+  test('na fase 20 o motor liga quando o jet ski passa e desliga quando ele some; nas outras fases nunca; no fim de jogo e na pausa fica mudo', () => {
+    const g = makeGame({ level: 20 });
+    stepUntil(g, () => g.boats.list.some((v) => v.kind === 'jetski'), 200);
+    step(g, 1);
+    expect(g.sfx.engine).not.toBe(null);
+    expect(g.sfx.history).toContain('jetski');
+    stepUntil(g, () => !g.boats.list.some((v) => v.kind === 'jetski'), 30);
+    step(g, 0.05);
+    expect(g.sfx.engine).toBe(null);
+    g.state = 'gameOver';
+    g.boats.list.push({ kind: 'jetski', dir: 1, x: 600, y: 179, t: 0 });
+    step(g, 0.05);
+    expect(g.sfx.engine).toBe(null);
+    const o = makeGame({ level: 15 });
+    step(o, 60);
+    expect(o.sfx.engine).toBe(null);
+    expect(o.sfx.history.includes('jetski')).toBe(false);
+  });
+
+  test('voz contínua no Web Audio simulado: liga uma vez só, acompanha o volume e silencia com null', () => {
+    const s = new Sfx();
+    s.setMuted(false);
+    s.unlock(FakeAudioContext);
+    const st = { pan: -0.5, vol: 0.8, pitch: 1.05 };
+    s.setEngine(st);
+    const voices = s.ctx.voices;
+    expect(voices).toBeGreaterThan(0);
+    s.ctx.currentTime = 1;
+    s.setEngine({ pan: 0.3, vol: 0.5, pitch: 0.95 });
+    expect(s.ctx.voices).toBe(voices); // não cria vozes novas a cada passo
+    expect(s.engineVoice.out.gain.target).toBeGreaterThan(0);
+    expect(s.engineVoice.pan.pan.target).toBe(0.3);
+    s.setEngine(null);
+    expect(s.engineVoice.out.gain.target).toBe(0);
   });
 });

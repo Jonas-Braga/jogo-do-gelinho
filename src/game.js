@@ -8,7 +8,7 @@ import { Renderer } from './renderer.js';
 import { Critters } from './enemies.js';
 import { Bear } from './bear.js';
 import { Sleigh } from './christmas.js';
-import { SeaTraffic } from './beach.js';
+import { SeaTraffic, engineSound } from './beach.js';
 import { Sfx } from './audio.js';
 import { levelParams, levelIntro } from './levels.js';
 import { loadHighScore, saveHighScore, loadTrophies, saveTrophies } from './storage.js';
@@ -286,7 +286,8 @@ export class Game {
     if (raw > 0) this.fps += (1 / raw - this.fps) * 0.05;
     this.input.pollGamepads(); // também na pausa: o Start do joystick continua o jogo
 
-    if (!this.paused) {
+    if (this.paused) this.sfx.setEngine(null);
+    else {
       this.acc += dt;
       while (this.acc >= STEP) {
         this.update(STEP);
@@ -314,6 +315,10 @@ export class Game {
       this.banner.t += dt;
       if (this.banner.t >= this.banner.life) this.banner = null;
     }
+
+    // Motor do jet ski passando ao fundo da Praia (silêncio fora da partida)
+    const playing = this.state !== 'title' && this.state !== 'gameOver' && this.state !== 'trophy';
+    this.sfx.setEngine(playing && this.special?.boats ? engineSound(this.boats) : null);
 
     if (this.state === 'title') {
       // Só o cenário vive: personagem respirando na costa e fumaça do iglu

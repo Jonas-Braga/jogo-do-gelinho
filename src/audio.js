@@ -718,7 +718,66 @@ export const MUSIC = {
   // 16 compassos (64 batidas), cerca de 26 s por volta
   dino: buildDinoTrack({ beat: 0.4 }),
 };
-const LOOKAHEAD = 0.12; // agenda as notas um pouco antes da hora
+const LOOKAHEAD = 0.12;
+
+// Motor do jet ski: ronco serrilhado + sub-grave, "pipoco" do motor (o volume pulsa) e o
+// chiado da água espirrando; tudo passa por um filtro e pelo pan estéreo.
+export const ENGINE = { f: 74, putter: 23, lp: 720, vol: 0.09 };
+function makeEngineVoice(s) {
+  const ctx = s.ctx;
+  const out = ctx.createGain();
+  out.gain.value = 0;
+  let dest = s.master;
+  let pan = null;
+  if (ctx.createStereoPanner) {
+    pan = ctx.createStereoPanner();
+    pan.connect(dest);
+    dest = pan;
+  }
+  out.connect(dest);
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = ENGINE.lp;
+  lp.Q.value = 2.5;
+  // O pipoco: o volume do ronco pulsa na frequência do motor
+  const body = ctx.createGain();
+  body.gain.value = 0.7;
+  lp.connect(body);
+  body.connect(out);
+  const lfo = ctx.createOscillator();
+  lfo.type = 'square';
+  lfo.frequency.value = ENGINE.putter;
+  const depth = ctx.createGain();
+  depth.gain.value = 0.3;
+  lfo.connect(depth);
+  depth.connect(body.gain);
+  const saw = ctx.createOscillator();
+  saw.type = 'sawtooth';
+  saw.frequency.value = ENGINE.f;
+  saw.connect(lp);
+  const sub = ctx.createOscillator();
+  sub.type = 'square';
+  sub.frequency.value = ENGINE.f / 2;
+  const subG = ctx.createGain();
+  subG.gain.value = 0.5;
+  sub.connect(subG);
+  subG.connect(lp);
+  // Chiado da água
+  const spray = ctx.createBufferSource();
+  spray.buffer = s.noiseBuf;
+  spray.loop = true;
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 2600;
+  bp.Q.value = 0.8;
+  const sprayG = ctx.createGain();
+  sprayG.gain.value = 0.18;
+  spray.connect(bp);
+  bp.connect(sprayG);
+  sprayG.connect(out);
+  for (const n of [lfo, saw, sub, spray]) n.start();
+  return { out, pan, lp, saw, sub, lfo, on: false, last: -1 };
+} // agenda as notas um pouco antes da hora
 
 export class Sfx {
   constructor() {
@@ -786,6 +845,37 @@ export class Sfx {
   toggleMute() {
     this.setMuted(!this.muted);
     if (!this.muted) this.play('pause');
+  }
+
+  // Motor do jet ski (Praia): voz contínua controlada a cada passo do jogo por
+  // { pan, vol, pitch } (engineSound em src/beach.js), ou null para silenciar
+  // (sem jet ski, na pausa, no fim de jogo). Sem áudio só guarda o estado.
+  setEngine(st) {
+    if (st && !this.engine) {
+      this.history.push('jetski');
+      if (this.history.length > 100) this.history.shift();
+    }
+    this.engine = st || null;
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (!this.engineVoice) {
+      if (!st) return;
+      this.engineVoice = makeEngineVoice(this);
+    }
+    const e = this.engineVoice;
+    const now = ctx.currentTime;
+    // Atualiza no máximo ~30 vezes por segundo (e sempre ao ligar/desligar)
+    const on = !!st;
+    if (on === e.on && now - e.last < 0.033) return;
+    e.on = on;
+    e.last = now;
+    e.out.gain.setTargetAtTime(on ? st.vol * ENGINE.vol : 0, now, on ? 0.08 : 0.05);
+    if (!on) return;
+    e.saw.frequency.setTargetAtTime(ENGINE.f * st.pitch, now, 0.06);
+    e.sub.frequency.setTargetAtTime((ENGINE.f / 2) * st.pitch, now, 0.06);
+    e.lfo.frequency.setTargetAtTime(ENGINE.putter * st.pitch, now, 0.06);
+    e.lp.frequency.setTargetAtTime(ENGINE.lp * st.pitch, now, 0.06);
+    if (e.pan) e.pan.pan.setTargetAtTime(st.pan, now, 0.08);
   }
 
   play(name, opts) {

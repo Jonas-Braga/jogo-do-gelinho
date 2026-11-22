@@ -4,7 +4,7 @@
 import { suite, test, expect } from '../harness.js';
 import { isNode } from '../env.js';
 import { makeGame, step } from '../helpers.js';
-import { W, SHORE_Y, ROW_Y, DEPTH, WATER_TOP, SHORE_TOP, IGLOO } from '../../src/config.js';
+import { W, H, SHORE_Y, ROW_Y, DEPTH, WATER_TOP, SHORE_TOP, IGLOO } from '../../src/config.js';
 import {
   depthScale, projectX, visibleRange, floeTilt, withVolume, volume, contactShadow, atDepth,
   camera, followCamera, swayAt, maxSway, sceneLight, foregroundKind,
@@ -2002,6 +2002,153 @@ suite('Cenários de fundo em 3D: Dinossauros', () => {
       const p = px(450, SHORE_Y - 6);
       expect(p[3]).toBe(255);
       expect(p[0]).toBeGreaterThan(p[2] + 20);
+    });
+  }
+});
+
+suite('Água com aspecto de líquido', () => {
+  test('toda fase tem a sua superfície (água em todas, lava nos Dinossauros) e sem canvas de verdade continua a ondulação antiga', async () => {
+    const { SURFACE, drawLiquidSurface } = await import('../../src/water.js');
+    const sceneries = new Set(['ice', ...Object.values(SPECIALS).map((sp) => sp.scenery).filter(Boolean)]);
+    for (const k of sceneries) expect(!!SURFACE.kinds[k], `cenário ${k}`).toBe(true);
+    for (const [k, c] of Object.entries(SURFACE.kinds)) expect(c.recipe, k).toBe(k === 'dino' ? 'lava' : 'water');
+    if (isNode) {
+      const { ctx, calls } = recordingCtx();
+      expect(drawLiquidSurface(ctx, 1, 'ice')).toBe(false);
+      expect(calls.length).toBe(0);
+      // O renderizador desenha os traços da ondulação no lugar
+      const g = makeGame({ level: 1 });
+      const r = recordingCtx();
+      g.renderer.drawWater(r.ctx, 1, { hor: [200, 220, 240] });
+      expect(r.calls.filter((c) => c[0] === 'quadraticCurveTo').length).toBeGreaterThan(50);
+    }
+  });
+
+  test('reflexo do cenário na água (como nos exemplos do usuário) em todas as fases com água; a lava não reflete; sem canvas de verdade não faz nada', async () => {
+    const { SURFACE, drawReflection } = await import('../../src/water.js');
+    for (const [k, c] of Object.entries(SURFACE.kinds)) {
+      if (k === 'dino') expect(c.reflect).toBe(0);
+      else expect(c.reflect, k).toBeGreaterThan(0.3);
+      // Ondas em faixas compridas na horizontal (água calma)
+      if (k !== 'dino') expect(c.stretch, k).toBeGreaterThanOrEqual(2);
+    }
+    if (isNode) {
+      const { ctx, calls } = recordingCtx();
+      expect(drawReflection(ctx, 1, 'ice')).toBe(false);
+      expect(calls.length).toBe(0);
+    } else {
+      // O que está acima da linha d'água aparece logo abaixo dela, de cabeça para baixo
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      const g = c.getContext('2d');
+      g.fillStyle = '#204060';
+      g.fillRect(0, 0, W, H);
+      g.fillStyle = '#FF0000';
+      g.fillRect(600, WATER_TOP - 30, 80, 40); // "barco" vermelho logo acima da linha
+      expect(drawReflection(g, 0, 'ice')).toBe(true);
+      const p = g.getImageData(640, WATER_TOP + 20, 1, 1).data;
+      expect(p[0]).toBeGreaterThan(p[2] + 40);
+      // Longe dele, nada de vermelho
+      const q = g.getImageData(200, WATER_TOP + 20, 1, 1).data;
+      expect(q[0]).toBeLessThan(q[2]);
+      expect(drawReflection(g, 0, 'dino')).toBe(false);
+    }
+  });
+
+  test('num aparelho lento (volume desligado pelo fps baixo) volta para a ondulação de traços', () => {
+    const was = volume.enabled;
+    try {
+      volume.enabled = false;
+      const g = makeGame({ level: 1 });
+      const r = recordingCtx();
+      g.renderer.drawWater(r.ctx, 1, { hor: [200, 220, 240] });
+      expect(r.calls.filter((c) => c[0] === 'quadraticCurveTo').length).toBeGreaterThan(50);
+    } finally {
+      volume.enabled = was;
+    }
+  });
+
+  if (!isNode) {
+    test('no navegador: a superfície tem ondas de verdade (claro e escuro, sem estourar), anima, sem emendas entre as faixas da perspectiva', async () => {
+      const { SURFACE, drawLiquidSurface } = await import('../../src/water.js');
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      const g = c.getContext('2d');
+      const paint = (t, kind = 'ice') => {
+        g.globalCompositeOperation = 'source-over';
+        g.globalAlpha = 1;
+        g.fillStyle = '#1C7E99';
+        g.fillRect(0, 0, W, H);
+        return drawLiquidSurface(g, t, kind);
+      };
+      const t0 = Date.now();
+      while (!paint(1) && Date.now() - t0 < 20000) await new Promise((r) => setTimeout(r, 16));
+      expect(paint(1)).toBe(true);
+      const lum = (y) => {
+        const d = g.getImageData(0, y, W, 1).data;
+        const out = [];
+        for (let i = 0; i < d.length; i += 4) out.push((d[i] + d[i + 1] + d[i + 2]) / 3);
+        return out;
+      };
+      // Claros e escuros na frente (ondas), não uma cor lisa
+      const row = lum(600);
+      expect(Math.max(...row) - Math.min(...row)).toBeGreaterThan(30);
+      // Sem estourar (pedido do usuário: brilho e reflexo demais viravam manchas pretas e
+      // brancas de borda dura): quase nenhum pixel da água chega ao preto ou ao branco
+      {
+        const d = g.getImageData(0, WATER_TOP + 20, W, H - WATER_TOP - 20).data;
+        let clip = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          const l = (d[i] + d[i + 1] + d[i + 2]) / 3;
+          if (l < 12 || l > 235) clip++;
+        }
+        expect(clip / (d.length / 4)).toBeLessThan(0.01);
+      }
+      // Anima: outro instante, outra imagem
+      const loop = SURFACE.kinds.ice.loop;
+      const a = g.getImageData(0, 500, W, 40).data;
+      paint(1 + loop / 3);
+      const b = g.getImageData(0, 500, W, 40).data;
+      let diff = 0;
+      for (let i = 0; i < a.length; i += 4) diff += Math.abs(a[i] - b[i]);
+      expect(diff / (a.length / 4)).toBeGreaterThan(4);
+      // Sem emendas: a diferença entre linhas vizinhas numa divisa de faixa não é maior
+      // que dentro das faixas
+      paint(1);
+      const steps = [];
+      let prev = lum(WATER_TOP + 40);
+      for (let y = WATER_TOP + 41; y < H - 2; y++) {
+        const cur = lum(y);
+        let s = 0;
+        for (let x = 0; x < W; x += 4) s += Math.abs(cur[x] - prev[x]);
+        steps.push(s / (W / 4));
+        prev = cur;
+      }
+      const sorted = [...steps].sort((p, q) => p - q);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      expect(Math.max(...steps)).toBeLessThan(median * 3 + 12);
+      // A lava também fica pronta e tem fendas acesas (pixels bem claros) sobre a crosta
+      const t1 = Date.now();
+      const lava = () => {
+        g.globalCompositeOperation = 'source-over';
+        g.globalAlpha = 1;
+        g.fillStyle = '#D2380E';
+        g.fillRect(0, 0, W, H);
+        return drawLiquidSurface(g, 1, 'dino');
+      };
+      while (!lava() && Date.now() - t1 < 20000) await new Promise((r) => setTimeout(r, 16));
+      expect(lava()).toBe(true);
+      const d = g.getImageData(0, 560, W, 60).data;
+      let bright = 0;
+      let dark = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i] > 220 && d[i + 1] > 110) bright++; // fenda acesa (amarelada)
+        if (d[i] < 120) dark++;
+      }
+      expect(bright).toBeGreaterThan(200);
+      expect(dark).toBeGreaterThan(2000);
     });
   }
 });

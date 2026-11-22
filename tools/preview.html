@@ -17,7 +17,8 @@
        ?parado=1 congela a simulação (só o desenho continua)
  ?modelo=0 / ?relevo=0 / ?frente=0 desligam o personagem 3D / o relevo / o primeiro plano (comparar e medir)
        ?poder=duck|boot  jogador com o poder (e o item na fileira)
-       ?x=N      põe o jogador em X na costa (a câmera já chega lá: parallax) -->
+       ?x=N      põe o jogador em X na costa (a câmera já chega lá: parallax)
+       ?jetski=1 na Praia, jet ski passando sem parar (clique para ligar o som) -->
   <canvas id="game"></canvas>
   <script type="module">
     import { W, H, STEP, DEPTH } from '../src/config.js';
@@ -60,6 +61,19 @@
       game.player.givePower(q.get('poder'));
       game.player.powerT = 999;
       game.critters.list.push({ kind: q.get('poder'), row: 1, dir: 1, vx: 0, x: 520, w: 40, ph: 0, power: true });
+    }
+    // Som: liberado no primeiro clique/tecla (o navegador exige um gesto)
+    const unlockAudio = () => game.sfx.unlock();
+    window.addEventListener('keydown', unlockAudio);
+    window.addEventListener('pointerdown', unlockAudio);
+    // ?jetski=1 (Praia): um jet ski passa de novo assim que o anterior some, alternando o lado
+    if (q.get('jetski')) {
+      let dir = 1;
+      setInterval(() => {
+        if (game.boats.list.some((v) => v.kind === 'jetski')) return;
+        game.boats.list.push({ kind: 'jetski', dir, x: dir > 0 ? -70 : W + 70, y: 179, t: 0 });
+        dir = -dir;
+      }, 1500);
     }
     if (q.get('parado')) game.update = () => {};
     game.start();
