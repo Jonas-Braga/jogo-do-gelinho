@@ -544,5 +544,10 @@
   "Cenários de fundo em 3D: Floresta › morros com pinheiros nas faixas do 2D, a mata atrás da clareira (longe da linha do jogador) e a mesma foto do fundo 2D",
   "Cenários de fundo em 3D: Floresta › na Floresta, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)",
   "Cenários de fundo em 3D: Espaço › crateras de verdade longe da base e fora da linha do jogador; cordilheiras lunares nas faixas do 2D",
-  "Cenários de fundo em 3D: Espaço › no Espaço, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)"
+  "Cenários de fundo em 3D: Espaço › no Espaço, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)",
+  "Cenários de fundo em 3D: Praia › mar até o horizonte do 2D, as mesmas ilhas, a onda quebrando antes da areia e a foto do tamanho do fundo 2D",
+  "Cenários de fundo em 3D: Praia › na Praia, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)",
+  "Praia: barco e jet ski no mar ao fundo › de vez em quando passa um veleiro (devagar, mais ao fundo) ou um jet ski (rápido, mais perto), nunca dois do mesmo tipo juntos",
+  "Praia: barco e jet ski no mar ao fundo › só na Praia: na fase 20 os barcos passam; nas outras fases especiais e nas normais, não",
+  "Praia: barco e jet ski no mar ao fundo › desenho: com o 3D ligado e as fotos prontas, barco e jet ski usam as fotos; sem elas, o desenho 2D; a esteira de espuma é sempre 2D"
 ]

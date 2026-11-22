@@ -661,3 +661,120 @@ export const spaceScenery = {
   },
   apply() {},
 };
+
+// ---------------------------------------------------------------- Praia
+// Fase 20 (Praia): mar aberto até o horizonte (superfície com ondulação, mais clara
+// perto da areia), ilhas com relevo e coqueirinhos, a onda quebrando antes da areia
+// (rolo de espuma), a areia com marcas do vento e montinhos, conchas espalhadas
+// (longe da cabana) e a areia molhada e brilhante descendo para a água.
+export const SEA_HORIZON = 150; // linha do horizonte (igual ao 2D)
+export const ISLANDS = [
+  // [x, largura, altura na tela] (como no 2D)
+  [700, 120, 16], [880, 60, 9], [180, 80, 11],
+];
+export const BEACH_SAND_BACK = SHORE_TOP - 2; // onde a onda quebra e começa a areia
+export const SHELLS = 26;
+
+export const beachScenery = {
+  box: { left: 0, right: W, top: 0, bottom: -BG_H },
+  res: 2,
+  elevation: SCENE_EL,
+  distance: 1300,
+  poses: () => [{ key: 'main' }],
+  stage: (studio) => studio.stageScenery({
+    target: [640, 0, 480], size: 950, fog: { color: '#CFEAF0', near: 1050, far: 2400 },
+    sky: 1, ground: '#E8D6A8', keyIntensity: 3.2, sun: [-0.78, 0.5, -0.25], exposure: 0.95,
+  }),
+  build(kit) {
+    const { THREE, group, mat } = kit;
+    const root = group();
+    const vcol = (extra = {}) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, ...extra });
+    let seed = 1;
+    const rnd = () => hash(seed++, 11, 171);
+    // Mar: do horizonte até debaixo da areia, ondulado, azul fundo ao longe e turquesa perto
+    const zHor = zAt(SEA_HORIZON);
+    const zSand = zAt(BEACH_SAND_BACK);
+    const cFar = new THREE.Color('#2B8FB8');
+    const cNear = new THREE.Color('#48C9D0');
+    const sea = heightField(THREE, {
+      x0: -40, x1: W + 40, z0: zHor, z1: zSand + 20, dx: 6, dz: 3,
+      h: (x, z) => Math.sin(x * 0.05 + z * 0.4) * 0.35 + Math.sin(x * 0.11 - z * 0.25) * 0.25 + (fbm(x * 0.03, z * 0.08, 181, 3) - 0.5) * 0.8,
+      colorAt: (c, x, y, z) => c.copy(cFar).lerp(cNear, Math.min(1, Math.max(0, (z - zHor) / (zSand - zHor)) ** 1.4)),
+    });
+    root.add(kit.mesh(sea, vcol({ roughness: 0.18, metalness: 0.1 })));
+    // Ilhas: morrinhos verdes com faixa de areia e coqueirinhos
+    const palmsT = [];
+    const palmsL = [];
+    ISLANDS.forEach(([x, w, hh], i) => {
+      const z = zHor + 6 + i * 2;
+      const isle = kit.mesh(new THREE.SphereGeometry(1, 28, 12, 0, TAU, 0, Math.PI / 2), mat('#3E8C6A', 0.85), x, 0, z);
+      isle.scale.set(w / 2, hh / C, 14);
+      root.add(isle);
+      const sand = kit.mesh(new THREE.CylinderGeometry(1, 1.06, 1, 28), mat('#F2DFB0', 0.9), x, 0.3, z);
+      sand.scale.set(w / 2 + 3, 1.2, 16);
+      root.add(sand);
+      // Coqueirinhos: tronco inclinado e copa de folhas
+      for (let k = 0; k < Math.max(2, Math.round(w / 28)); k++) {
+        const px = x + (rnd() - 0.5) * w * 0.6;
+        const top = (hh / C) * (1 - ((px - x) / (w / 2)) ** 2);
+        const ph = 10 + rnd() * 6;
+        palmsT.push({ x: px, y: top * 0.8, z, s: 1, sy: ph, rz: (rnd() - 0.5) * 0.5 });
+        palmsL.push({ x: px, y: top * 0.8 + ph * 0.95, z, s: 4 + rnd() * 1.5, sy: 0.35, ry: rnd() * TAU });
+      }
+    });
+    const trunkG = new THREE.CylinderGeometry(0.4, 0.6, 1, 6);
+    trunkG.translate(0, 0.5, 0);
+    root.add(instanced(THREE, trunkG, mat('#7A5A3A', 0.9), palmsT));
+    const crown = new THREE.ConeGeometry(1, 1, 7, 1, true);
+    crown.rotateX(Math.PI);
+    root.add(instanced(THREE, crown, new THREE.MeshStandardMaterial({ color: '#2F7E4A', roughness: 0.8, side: THREE.DoubleSide }), palmsL));
+    // Onda quebrando: rolo de espuma ondulado na frente da areia e a água subindo nela
+    const foam = [];
+    for (let x = -60; x <= W + 60; x += 24) {
+      const k = noise2(x * 0.03, 2, 183);
+      foam.push({ p: [x, 0.8 + k * 0.8, zSand - 2 + Math.sin(x * 0.04) * 2], w: 1.6 + k, h: 1.2 + k * 0.6 });
+    }
+    root.add(kit.sweep(foam, mat('#FFFFFF', 0.6, { emissive: '#CFF4F4', emissiveIntensity: 0.35 }), { radial: 10, cap: 0.5, steps: foam.length * 6 }));
+    // Areia: marcas do vento (ondinhas paralelas que o sol baixo realça) e montinhos
+    const zEdge = zAt(EDGE_TOP);
+    const cS1 = new THREE.Color('#FFE6B0');
+    const cS2 = new THREE.Color('#F0C886');
+    const sandH = (x, z) => {
+      const k = (z - zSand) / (zEdge - zSand);
+      const dune = (fbm(x * 0.008, z * 0.02, 187, 4) - 0.45) * (9 - k * 5) * Math.min(1, (1 - k) * 6);
+      const ripples = Math.sin(x * 0.09 + z * 0.35 + fbm(x * 0.01, z * 0.02, 189, 2) * 8) * 0.45 * Math.min(1, (1 - k) * 4);
+      return dune + ripples + Math.min(0, (k - 0.04) * 30) * 0.15;
+    };
+    const sandGeo = heightField(THREE, {
+      x0: -40, x1: W + 40, z0: zSand, z1: zEdge, dx: 4, dz: 3,
+      h: sandH,
+      colorAt: (c, x, y, z) => c.copy(cS1).lerp(cS2, Math.min(1, fbm(x * 0.02, z * 0.05, 191, 3) * 0.9 + Math.max(0, (z - zSand) / (zEdge - zSand) - 0.6))),
+    });
+    root.add(kit.mesh(sandGeo, vcol({ bumpMap: grainTexture(THREE, 17), bumpScale: 0.5 })));
+    // Conchas e estrelinhas-do-mar (longe da cabana)
+    const shells = [];
+    for (let i = 0; i < SHELLS; i++) {
+      const x = rnd() * W;
+      if (Math.abs(x - IGLOO_X) < 170) continue;
+      const z = zSand + 20 + rnd() * (zEdge - zSand - 34);
+      shells.push({ x, y: sandH(x, z) + 0.4, z, s: 2 + rnd() * 1.2, sy: 0.45, ry: rnd() * TAU, color: ['#F7B7A3', '#FFFFFF', '#F4D08A', '#F59A7A'][i % 4] });
+    }
+    root.add(instanced(THREE, new THREE.SphereGeometry(1, 10, 6), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.4 }), shells));
+    // Areia molhada descendo para a água (brilhante), com a cor do mar embaixo
+    // Mais claras que as do 2D: a beira fica de costas para o sol
+    const cTop = new THREE.Color('#FFF0C8');
+    const cMid = new THREE.Color('#F0D29A');
+    const cLow = new THREE.Color('#9EE2DE');
+    const bank = bankWall(THREE, {
+      zEdge, step: 6, rows: 8,
+      bulge: (x, v) => (noise2(x * 0.04, v * 2, 193) - 0.5) * 3 + v * 30,
+      color: (c, x, v) => {
+        if (v < 0.5) c.copy(cTop).lerp(cMid, v / 0.5);
+        else c.copy(cMid).lerp(cLow, (v - 0.5) / 0.5);
+      },
+    });
+    root.add(kit.mesh(bank.geo, vcol({ roughness: 0.35 })));
+    return { root };
+  },
+  apply() {},
+};

@@ -8,6 +8,7 @@ import { Renderer } from './renderer.js';
 import { Critters } from './enemies.js';
 import { Bear } from './bear.js';
 import { Sleigh } from './christmas.js';
+import { SeaTraffic } from './beach.js';
 import { Sfx } from './audio.js';
 import { levelParams, levelIntro } from './levels.js';
 import { loadHighScore, saveHighScore, loadTrophies, saveTrophies } from './storage.js';
@@ -49,6 +50,7 @@ export class Game {
     this.critters = new Critters(this);
     this.bear = new Bear(this);
     this.sleigh = new Sleigh();
+    this.boats = new SeaTraffic();
     this.special = null; // tema da fase especial atual (specials.js) ou null
     this.renderer = new Renderer(this.ctx);
     this.time = 0;
@@ -134,6 +136,7 @@ export class Game {
     this.celebration = null;
     this.special = null;
     this.sleigh.reset();
+    this.boats.reset();
     this.sfx.setMusic(null);
   }
 
@@ -255,6 +258,7 @@ export class Game {
     // Fase especial: tema, trilha de fundo e trenó
     this.special = this.params.special;
     this.sleigh.reset();
+    this.boats.reset();
     this.sfx.setMusic(this.special?.music || null);
     // Aviso no início da fase (não bloqueia o jogo)
     this.banner = { ...levelIntro(this.level), t: 0, life: this.special ? 3.6 : 2.6 };
@@ -336,6 +340,7 @@ export class Game {
       return;
     }
     if (this.special?.sleigh && this.sleigh.update(dt)) this.sfx.play('sleigh');
+    if (this.special?.boats) this.boats.update(dt);
     this.player.update(dt, this.input);
     if (this.state === 'play' || this.state === 'entering') {
       this.critters.update(dt);

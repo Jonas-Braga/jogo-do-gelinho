@@ -1,6 +1,6 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
-  rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
+  rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, drawBoat3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
   basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D,
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
@@ -25,7 +25,7 @@ import {
 } from './space.js';
 import {
   makeBeachBackground, drawBeachDecor, drawSkyGulls, boardSprite, drawGull, drawSiri, drawJellyfish,
-  drawTropicalFish, drawHut, drawHutDoorFront, SEA, beachArt,
+  drawTropicalFish, drawHut, drawHutDoorFront, SEA, beachArt, drawSeaTraffic,
 } from './beach.js';
 import {
   makeHalloweenBackground, drawHalloweenSky, drawHalloweenDecor, pumpkinSprite, drawGhost, drawSpider,
@@ -197,6 +197,7 @@ export class Renderer {
     beachArt.on = this.normal3d;
     beachArt.palm = drawPalm3D;
     beachArt.parasol = drawParasol3D;
+    beachArt.boat = drawBoat3D;
     halloweenArt.on = this.normal3d;
     halloweenArt.tree = drawDeadTree3D;
     halloweenArt.jack = drawJack3D;
@@ -253,6 +254,8 @@ export class Renderer {
     if (scenery === 'beach') drawSkyGulls(ctx, t);
     if (sp?.sleigh) drawSleigh(ctx, game.sleigh, t);
     ctx.translate(-camera.x * (shore - far), 0);
+    // Barco e jet ski no mar ao fundo (atrás dos enfeites da costa)
+    if (sp?.boats) drawSeaTraffic(ctx, game.boats, t);
     if (sp?.decor === 'natal') drawChristmasTrees(ctx, t);
     if (sp?.decor === 'floresta') drawForestDecor(ctx, t);
     if (sp?.decor === 'espaco') drawSpaceDecor(ctx, t);

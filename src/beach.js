@@ -141,7 +141,7 @@ export const PALMS = [
 export const UMBRELLA = { x: 250, base: 246 };
 export const PALM_LEAF = '#2F9E4A';
 // Gancho do visual 3D (src/model3d.js): coqueiros e guarda-sol em 3D quando ligado
-export const beachArt = { on: false, palm: null, parasol: null };
+export const beachArt = { on: false, palm: null, parasol: null, boat: null };
 
 export function drawBeachDecor(ctx, t) {
   PALMS.forEach((p, k) => drawPalm(ctx, p, t, k));
@@ -1116,4 +1116,169 @@ export function drawHutDoorFront(ctx, igloo, t) {
   drawLeafCurtain(ctx, igloo.curtain, t);
   drawDoorFrame(ctx);
   ctx.restore();
+}
+
+// ---------------------------------------------------------------- Barcos no mar ao fundo
+// De vez em quando passa um veleiro (devagar, lá no fundo) ou um jet ski (rápido, um
+// pouco mais perto), deixando esteira de espuma. Nunca dois do mesmo tipo ao mesmo tempo.
+export const BOATS = {
+  firstDelay: 4,
+  minGap: 9,
+  maxGap: 18,
+  margin: 70,
+  kinds: {
+    sail: { y: 167, speed: 24 },
+    jetski: { y: 179, speed: 150 },
+  },
+};
+// Visual 3D pelo gancho beachArt.boat (a esteira continua 2D)
+
+export class SeaTraffic {
+  constructor(rand = Math.random) {
+    this.rand = rand;
+    this.reset();
+  }
+
+  reset() {
+    this.list = [];
+    this.timer = BOATS.firstDelay;
+    this.passes = { sail: 0, jetski: 0 };
+  }
+
+  // Retorna o tipo que começou a passar neste instante (ou null)
+  update(dt) {
+    for (const v of this.list) {
+      v.t += dt;
+      v.x += v.dir * BOATS.kinds[v.kind].speed * dt;
+    }
+    this.list = this.list.filter((v) => v.x > -BOATS.margin - 1 && v.x < W + BOATS.margin + 1);
+    this.timer -= dt;
+    if (this.timer > 0) return null;
+    this.timer = BOATS.minGap + this.rand() * (BOATS.maxGap - BOATS.minGap);
+    const free = Object.keys(BOATS.kinds).filter((k) => !this.list.some((v) => v.kind === k));
+    if (!free.length) return null;
+    const kind = free[Math.floor(this.rand() * free.length)];
+    const dir = this.rand() < 0.5 ? 1 : -1;
+    this.list.push({ kind, dir, x: dir > 0 ? -BOATS.margin : W + BOATS.margin, y: BOATS.kinds[kind].y, t: 0 });
+    this.passes[kind]++;
+    return kind;
+  }
+}
+
+export function drawSeaTraffic(ctx, traffic, t) {
+  // O de trás primeiro (o veleiro fica mais ao fundo)
+  const list = [...traffic.list].sort((a, b) => a.y - b.y);
+  for (const v of list) {
+    ctx.save();
+    const bob = v.kind === 'jetski' ? Math.sin(v.t * 14) * 0.7 : Math.sin(v.t * 2) * 0.5;
+    ctx.translate(v.x, v.y + bob);
+    drawWake(ctx, v);
+    if (!(beachArt.on && beachArt.boat?.(ctx, v))) {
+      ctx.scale(v.dir, 1);
+      if (v.kind === 'sail') drawSailboat2D(ctx);
+      else drawJetski2D(ctx, v.t);
+    }
+    ctx.restore();
+  }
+}
+
+// Esteira de espuma: em V atrás do veleiro; rastro comprido e borrifo atrás do jet ski
+function drawWake(ctx, v) {
+  const back = -v.dir;
+  ctx.save();
+  if (v.kind === 'sail') {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = 1;
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(back * 14, 0.5);
+      ctx.lineTo(back * 46, 0.5 + s * 2.2);
+      ctx.stroke();
+    }
+  } else {
+    const g = ctx.createLinearGradient(0, 0, back * 90, 0);
+    g.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+    g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(back * 6, -0.5);
+    ctx.lineTo(back * 90, -0.2);
+    ctx.lineTo(back * 90, 2.2);
+    ctx.lineTo(back * 6, 1.6);
+    ctx.fill();
+    // Borrifo saltando atrás
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    for (let i = 0; i < 6; i++) {
+      const k = (v.t * 3 + i / 6) % 1;
+      ctx.beginPath();
+      ctx.arc(back * (10 + k * 16), -3 - Math.sin(k * Math.PI) * 5, 1.4 * (1 - k) + 0.3, 0, TAU);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// Veleiro de frente para a direita, com a linha d'água em y = 0
+function drawSailboat2D(ctx) {
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.moveTo(-20, -6);
+  ctx.lineTo(22, -6);
+  ctx.lineTo(15, 0);
+  ctx.lineTo(-17, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#1E5FA8';
+  ctx.fillRect(-18, -3, 36, 1.4);
+  ctx.fillStyle = '#E9EEF2';
+  ctx.fillRect(-10, -10, 12, 4);
+  ctx.strokeStyle = '#8A8F96';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-2, -6);
+  ctx.lineTo(-2, -44);
+  ctx.stroke();
+  ctx.fillStyle = '#FFF8EC';
+  ctx.beginPath();
+  ctx.moveTo(-3, -42);
+  ctx.lineTo(-3, -9);
+  ctx.lineTo(-20, -9);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#F2EEE4';
+  ctx.beginPath();
+  ctx.moveTo(-1, -40);
+  ctx.lineTo(18, -8);
+  ctx.lineTo(-1, -8);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Jet ski com o piloto, de frente para a direita, linha d'água em y = 0
+function drawJetski2D(ctx, t) {
+  ctx.fillStyle = '#F2C21B';
+  ctx.beginPath();
+  ctx.moveTo(-10, -1);
+  ctx.lineTo(10, -2);
+  ctx.lineTo(7, -5);
+  ctx.lineTo(-9, -5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#E24A2E';
+  ctx.fillRect(-9, -2, 18, 1.2);
+  ctx.fillStyle = '#1E2F4A';
+  ctx.fillRect(-5, -7, 6, 2.4);
+  // Piloto: colete laranja e capacete
+  ctx.fillStyle = '#F27A1A';
+  ctx.fillRect(-3, -14, 4, 7);
+  ctx.fillStyle = '#F4C9A0';
+  ctx.beginPath();
+  ctx.arc(-1, -16, 2.2, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = '#1E2F4A';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(0, -12);
+  ctx.lineTo(5, -9 + Math.sin(t * 14) * 0.4);
+  ctx.stroke();
 }

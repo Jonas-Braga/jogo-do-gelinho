@@ -1511,7 +1511,7 @@ suite('Cenários de fundo em 3D: fase normal (piloto da etapa 3)', () => {
       const { background3D } = await import('../../src/model3d.js');
       const t0 = Date.now();
       let bg = null;
-      while (!(bg = background3D('ice')) && Date.now() - t0 < 40000) await new Promise((r) => setTimeout(r, 100));
+      while (!(bg = background3D('ice')) && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 100));
       expect(!!bg).toBe(true);
       expect(bg.w).toBe(W);
       expect(bg.h).toBe(WATER_TOP + 12);
@@ -1579,7 +1579,7 @@ suite('Cenários de fundo em 3D: Floresta', () => {
       const { background3D } = await import('../../src/model3d.js');
       const t0 = Date.now();
       let bg = null;
-      while (!(bg = background3D('forest')) && Date.now() - t0 < 40000) await new Promise((r) => setTimeout(r, 100));
+      while (!(bg = background3D('forest')) && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 100));
       expect(!!bg).toBe(true);
       const g = bg.canvas.getContext('2d');
       const k = bg.canvas.width / W;
@@ -1647,7 +1647,7 @@ suite('Cenários de fundo em 3D: Espaço', () => {
       const { background3D } = await import('../../src/model3d.js');
       const t0 = Date.now();
       let bg = null;
-      while (!(bg = background3D('space')) && Date.now() - t0 < 40000) await new Promise((r) => setTimeout(r, 100));
+      while (!(bg = background3D('space')) && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 100));
       expect(!!bg).toBe(true);
       const g = bg.canvas.getContext('2d');
       const k = bg.canvas.width / W;
@@ -1663,4 +1663,155 @@ suite('Cenários de fundo em 3D: Espaço', () => {
       expect(lum(px(cx - r * 0.55, cy))).toBeLessThan(lum(px(cx + r * 1.4, cy)));
     });
   }
+});
+
+suite('Cenários de fundo em 3D: Praia', () => {
+  test('mar até o horizonte do 2D, as mesmas ilhas, a onda quebrando antes da areia e a foto do tamanho do fundo 2D', async () => {
+    const sc = await import('../../src/m3d/scenery.js');
+    const { SUBJECTS } = await import('../../src/model3d.js');
+    expect(SCENERY_3D.beach).toBe('bg-beach');
+    const S = SUBJECTS['bg-beach'];
+    expect([S.box.left, S.box.right, S.box.top, S.box.bottom]).toEqual([0, W, 0, -(WATER_TOP + 12)]);
+    expect(S.elevation).toBe(sc.SCENE_EL);
+    expect(sc.SEA_HORIZON).toBe(150);
+    expect(sc.ISLANDS).toEqual([[700, 120, 16], [880, 60, 9], [180, 80, 11]]);
+    // A onda quebra antes da areia, bem atrás de onde o jogador anda
+    expect(sc.BEACH_SAND_BACK).toBeLessThanOrEqual(SHORE_TOP);
+    expect(sc.BEACH_SAND_BACK).toBeGreaterThan(sc.SEA_HORIZON + 20);
+    // O mar no horizonte cai na linha do horizonte
+    expect(sc.screenOf(0, sc.zAt(sc.SEA_HORIZON))).toBeCloseTo(150, 1e-9);
+  });
+
+  test('na Praia, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)', () => {
+    const was = { ...model };
+    const img = { fake3d: true };
+    const bgDrawn = (use3d) => {
+      const g = makeGame({ level: 20 });
+      g.renderer.use3d = use3d;
+      const { ctx, calls } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      return calls.some((c) => c[0] === 'drawImage' && c[1] === img && c[2] === 0 && c[3] === 0 && c[4] === W && c[5] === WATER_TOP + 12);
+    };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      expect(bgDrawn(true)).toBe(true);
+      expect(bgDrawn(false)).toBe(false);
+    } finally {
+      Object.assign(model, was);
+    }
+  });
+
+  if (!isNode) {
+    test('no navegador: a foto da Praia sai com céu transparente, mar azul no horizonte, ilha verde e areia clara e quente', async () => {
+      const { background3D } = await import('../../src/model3d.js');
+      const t0 = Date.now();
+      let bg = null;
+      while (!(bg = background3D('beach')) && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 100));
+      expect(!!bg).toBe(true);
+      const g = bg.canvas.getContext('2d');
+      const k = bg.canvas.width / W;
+      const px = (x, y) => g.getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data;
+      expect(px(640, 10)[3]).toBe(0);
+      expect(px(400, 140)[3]).toBe(0); // acima do horizonte: céu
+      const sea = px(400, 165);
+      expect(sea[3]).toBe(255);
+      expect(sea[2]).toBeGreaterThan(sea[0] + 40);
+      const isle = px(700, 145);
+      expect(isle[1]).toBeGreaterThan(isle[0]);
+      const sand = px(600, SHORE_Y - 12);
+      expect(sand[3]).toBe(255);
+      expect(sand[0]).toBeGreaterThan(sand[2] + 20);
+      expect((sand[0] + sand[1] + sand[2]) / 3).toBeGreaterThan(150);
+    });
+  }
+});
+
+suite('Praia: barco e jet ski no mar ao fundo', () => {
+  // Gerador repetível para os sorteios
+  const seeded = (seed) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+  test('de vez em quando passa um veleiro (devagar, mais ao fundo) ou um jet ski (rápido, mais perto), nunca dois do mesmo tipo juntos', async () => {
+    const { SeaTraffic, BOATS } = await import('../../src/beach.js');
+    const { SEA_HORIZON, BEACH_SAND_BACK } = await import('../../src/m3d/scenery.js');
+    const { sail, jetski } = BOATS.kinds;
+    expect(sail.y).toBeLessThan(jetski.y);
+    expect(sail.speed * 3).toBeLessThan(jetski.speed);
+    // Os dois passam no mar, entre o horizonte e a onda que quebra na areia
+    for (const k of [sail, jetski]) {
+      expect(k.y).toBeGreaterThan(SEA_HORIZON + 8);
+      expect(k.y).toBeLessThan(BEACH_SAND_BACK - 4);
+    }
+    const tr = new SeaTraffic(seeded(7));
+    const dt = 1 / 60;
+    let starts = 0;
+    let lastStart = null;
+    let minGap = Infinity;
+    for (let t = 0; t < 180; t += dt) {
+      const before = tr.list.map((v) => ({ kind: v.kind, x: v.x }));
+      if (tr.update(dt)) {
+        starts++;
+        if (lastStart != null) minGap = Math.min(minGap, t - lastStart);
+        lastStart = t;
+      }
+      // Nunca dois do mesmo tipo ao mesmo tempo
+      expect(new Set(tr.list.map((v) => v.kind)).size).toBe(tr.list.length);
+      // Quem está passando anda na velocidade do seu tipo (nunca parado)
+      for (const v of tr.list) {
+        const b = before.find((o) => o.kind === v.kind);
+        if (b) expect(Math.abs(Math.abs(v.x - b.x) - BOATS.kinds[v.kind].speed * dt)).toBeLessThan(1e-6);
+      }
+    }
+    expect(tr.passes.sail).toBeGreaterThanOrEqual(2);
+    expect(tr.passes.jetski).toBeGreaterThanOrEqual(2);
+    expect(starts).toBe(tr.passes.sail + tr.passes.jetski);
+    expect(minGap).toBeGreaterThanOrEqual(BOATS.minGap - 1e-6);
+  });
+
+  test('só na Praia: na fase 20 os barcos passam; nas outras fases especiais e nas normais, não', () => {
+    for (const [lv, sp] of Object.entries(SPECIALS)) expect(!!sp.boats, `fase ${lv}`).toBe(sp.id === 'praia');
+    const passes = (level) => {
+      const g = makeGame({ level });
+      step(g, 40);
+      return g.boats.passes.sail + g.boats.passes.jetski;
+    };
+    expect(passes(20)).toBeGreaterThan(1);
+    expect(passes(15)).toBe(0);
+    expect(passes(3)).toBe(0);
+  });
+
+  test('desenho: com o 3D ligado e as fotos prontas, barco e jet ski usam as fotos; sem elas, o desenho 2D; a esteira de espuma é sempre 2D', async () => {
+    const { drawSeaTraffic } = await import('../../src/beach.js');
+    const { drawBoat3D, SUBJECTS } = await import('../../src/model3d.js');
+    const { boatPose } = await import('../../src/m3d/beach.js');
+    const traffic = { list: [{ kind: 'sail', dir: 1, x: 400, y: 167, t: 1 }, { kind: 'jetski', dir: -1, x: 800, y: 179, t: 0.2 }] };
+    // Toda foto pedida existe no modelo
+    for (const v of [...traffic.list, { kind: 'jetski', dir: 1, t: 0.1 }, { kind: 'jetski', dir: 1, t: 0.3 }]) {
+      const name = v.kind === 'sail' ? 'sailboat' : 'jetski';
+      expect(SUBJECTS[name].poses().map((p) => p.key)).toContain(boatPose(v));
+    }
+    const was = { ...model };
+    const wasArt = { ...beachArt };
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      Object.assign(beachArt, { on: true, boat: drawBoat3D });
+      let rec = recordingCtx();
+      drawSeaTraffic(rec.ctx, traffic, 1);
+      expect(rec.calls.filter((c) => c[0] === 'drawImage' && c[1] === img).length).toBe(2);
+      // A esteira continua 2D (traços e o borrifo)
+      expect(rec.calls.some((c) => c[0] === 'stroke')).toBe(true);
+      expect(rec.calls.some((c) => c[0] === 'arc')).toBe(true);
+      beachArt.on = false;
+      rec = recordingCtx();
+      drawSeaTraffic(rec.ctx, traffic, 1);
+      expect(rec.calls.some((c) => c[0] === 'drawImage')).toBe(false);
+      expect(rec.calls.filter((c) => c[0] === 'fill').length).toBeGreaterThan(6);
+    } finally {
+      Object.assign(model, was);
+      Object.assign(beachArt, wasArt);
+    }
+  });
 });

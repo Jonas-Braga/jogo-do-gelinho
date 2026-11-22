@@ -940,3 +940,166 @@ export const parasol = {
   },
   apply() {},
 };
+
+// ---------------------------------------------------------------- Barco e jet ski
+// Passam no mar ao fundo da Praia (SeaTraffic em src/beach.js). Medidas em pixels da
+// tela, de frente para +x, com a linha d'água em y = 0 (nada abaixo dela: o casco é
+// cortado na água). Fotos {quadro}{lado}: R de frente para a direita, L para a esquerda,
+// os dois um pouco virados para a câmera.
+const boatYaw = (f) => (f === 'L' ? Math.PI + 0.35 : -0.35);
+
+export const sailboat = {
+  box: { left: -36, right: 36, top: 52, bottom: -4 },
+  res: 3,
+  elevation: 0.25,
+  poses: () => ['R', 'L'].map((f) => ({ key: `0${f}`, f })),
+  build(kit) {
+    const { THREE, mat, group, mesh, sweep, bone } = kit;
+    const root = group();
+    const hullW = mat('#FFFFFF', 0.35);
+    // Casco: fundo reto na linha d'água, popa larga e proa fina e levantada
+    root.add(sweep([
+      { p: [-20, 3, 0], w: 4.6, h: 3, hb: 3 },
+      { p: [-10, 3, 0], w: 6, h: 3.2, hb: 3 },
+      { p: [6, 3.2, 0], w: 5.6, h: 3.2, hb: 3.2 },
+      { p: [17, 3.8, 0], w: 3, h: 2.6, hb: 2.6 },
+      { p: [23, 5, 0], w: 0.6, h: 1.4, hb: 1.4 },
+    ], hullW, { radial: 18, cap: 0.3 }));
+    // Faixa azul no costado
+    root.add(sweep([
+      { p: [-19.8, 2.4, 0], w: 4.75, h: 0.5 },
+      { p: [-10, 2.4, 0], w: 6.15, h: 0.5 },
+      { p: [6, 2.6, 0], w: 5.75, h: 0.5 },
+      { p: [17, 3.2, 0], w: 3.15, h: 0.5 },
+      { p: [22, 4.2, 0], w: 1, h: 0.4 },
+    ], mat('#1E5FA8', 0.4), { radial: 18, cap: 0.3 }));
+    // Cabine com janelinhas
+    const cabin = mesh(new THREE.BoxGeometry(12, 4, 7.4), mat('#EEF2F4', 0.4), -5, 7.4, 0);
+    root.add(cabin);
+    for (const z of [-3.75, 3.75]) {
+      for (const x of [-8.5, -5, -1.5]) root.add(mesh(new THREE.BoxGeometry(2, 1.3, 0.2), mat('#2A4A66', 0.2), x, 7.8, z));
+    }
+    // Mastro, retranca e a bandeirinha no topo
+    const metal = mat('#9AA2AA', 0.3, { metalness: 0.4 });
+    root.add(bone(0.55, [0, 6, 0], [0, 50, 0], metal));
+    root.add(bone(0.45, [0, 10.5, 0], [-19, 10.5, 0], metal));
+    const flag = mesh(new THREE.PlaneGeometry(4, 2.4), mat('#E5484D', 0.6, { side: THREE.DoubleSide }), -2, 49, 0);
+    root.add(flag);
+    // Velas: superfície de triângulo estufada pelo vento (lona clara)
+    const sail = (a, b, c, bulge, color) => {
+      const g = new THREE.BufferGeometry();
+      const pos = [];
+      const N = 8;
+      const pt = (u, v) => {
+        // u ao longo de a→b, v de lá até c (triângulo subdividido)
+        const x = a[0] + (b[0] - a[0]) * u + (c[0] - a[0]) * v;
+        const y = a[1] + (b[1] - a[1]) * u + (c[1] - a[1]) * v;
+        const k = Math.sin(Math.PI * Math.min(1, u + v)) * Math.sin(Math.PI * Math.min(1, v / Math.max(0.001, 1 - u) || 0));
+        return [x, y, bulge * k];
+      };
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N - i; j++) {
+          const u0 = i / N, u1 = (i + 1) / N, v0 = j / N, v1 = (j + 1) / N;
+          pos.push(...pt(u0, v0), ...pt(u1, v0), ...pt(u0, v1));
+          if (i + j < N - 1) pos.push(...pt(u1, v0), ...pt(u1, v1), ...pt(u0, v1));
+        }
+      }
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.computeVertexNormals();
+      return mesh(g, mat(color, 0.75, { side: THREE.DoubleSide }));
+    };
+    root.add(sail([-0.8, 11.5, 0], [-0.8, 47, 0], [-18.5, 11.5, 0], 2.4, '#FFF8EC'));
+    root.add(sail([0.8, 9.5, 0], [0.8, 44, 0], [21, 6.5, 0], 1.8, '#F2EEE4'));
+    return { root, flag };
+  },
+  apply(rig, p) {
+    rig.root.rotation.y = boatYaw(p.f);
+    rig.flag.rotation.y = 0.3;
+  },
+};
+
+export const jetski = {
+  box: { left: -16, right: 16, top: 22, bottom: -3 },
+  res: 4,
+  elevation: 0.25,
+  // Dois quadros de balanço (o nariz sobe e desce batendo nas marolas)
+  poses: () => ['R', 'L'].flatMap((f) => [0, 1].map((i) => ({ key: `${i}${f}`, f, i }))),
+  build(kit) {
+    const { THREE, mat, group, sphere, sweep, bone } = kit;
+    const root = group();
+    const craft = group();
+    root.add(craft);
+    const yellow = mat('#F2C21B', 0.3);
+    // Casco esguio (mais estreito atrás), com a proa afinada
+    craft.add(sweep([
+      { p: [-10, 1.8, 0], w: 3.2, h: 1.8, hb: 1.8 },
+      { p: [-2, 2, 0], w: 3.6, h: 2, hb: 2 },
+      { p: [6, 2.2, 0], w: 3.1, h: 2, hb: 2.2 },
+      { p: [11.5, 3, 0], w: 0.9, h: 0.9, hb: 1.2 },
+    ], yellow, { radial: 16, cap: 0.3 }));
+    craft.add(sweep([
+      { p: [-9.9, 1.2, 0], w: 3.3, h: 0.45 },
+      { p: [-2, 1.3, 0], w: 3.7, h: 0.45 },
+      { p: [6, 1.6, 0], w: 3.2, h: 0.45 },
+      { p: [11, 2.6, 0], w: 1.1, h: 0.4 },
+    ], mat('#E24A2E', 0.35), { radial: 16, cap: 0.3 }));
+    // Capô levantado na frente, com o para-brisa escuro
+    craft.add(sweep([
+      { p: [1.5, 4, 0], w: 2.8, h: 1.2 },
+      { p: [5.5, 4.6, 0], w: 2.6, h: 1.6 },
+      { p: [10, 3.6, 0], w: 1.2, h: 0.8 },
+    ], yellow, { radial: 14, cap: 0.5 }));
+    const shield = kit.mesh(new THREE.BoxGeometry(0.3, 2.2, 3.6), mat('#22384A', 0.1, { transparent: true, opacity: 0.85 }), 3.4, 6.2, 0);
+    shield.rotation.z = -0.5;
+    craft.add(shield);
+    // Banco e o guidão
+    const navy = mat('#1E2F4A', 0.5);
+    craft.add(sweep([
+      { p: [-7, 4.4, 0], w: 2, h: 1 },
+      { p: [-2, 4.8, 0], w: 2.2, h: 1.2 },
+      { p: [1.5, 4.8, 0], w: 1.8, h: 1 },
+    ], navy, { radial: 12, cap: 0.6 }));
+    craft.add(bone(0.6, [3.2, 5.4, 0], [4.6, 8.4, 0], navy));
+    craft.add(bone(0.45, [4.6, 8.4, -3.2], [4.6, 8.4, 3.2], navy));
+    // Piloto: colete laranja, capacete, braços com cotovelo e pernas com joelho
+    const skin = mat('#F4C9A0', 0.6);
+    const suit = mat('#22324E', 0.6);
+    const vest = mat('#F27A1A', 0.6);
+    const rider = group();
+    craft.add(rider);
+    rider.add(sweep([
+      { p: [-2.6, 6.2, 0], w: 2.2, h: 1.8 },
+      { p: [-1.6, 9.5, 0], w: 2.4, h: 1.9 },
+      { p: [-0.8, 12.6, 0], w: 2.3, h: 1.7 },
+    ], vest, { radial: 14, cap: 0.6, up: [1, 0, 0] }));
+    rider.add(sphere(2.1, skin, -0.2, 15.4, 0, 14));
+    const helmet = sphere(2.35, mat('#FFFFFF', 0.3), -0.4, 15.9, 0, 14);
+    helmet.scale.set(1, 0.85, 1);
+    rider.add(helmet);
+    rider.add(sphere(0.4, mat('#1A1A1A', 0.2), 1.7, 15.3, 0.9, 6));
+    for (const s of [-1, 1]) {
+      const sh = [-0.8, 12.3, s * 2.2];
+      const el = [1.8, 10.2, s * 3.2];
+      const hand = [4.6, 8.4, s * 3];
+      rider.add(bone(0.75, sh, el, suit));
+      rider.add(bone(0.65, el, hand, skin));
+      rider.add(sphere(0.8, skin, ...hand, 8));
+      // Joelho dobrado para a frente e o pé apoiado no estribo do lado do casco
+      const hip = [-2.4, 6, s * 1.6];
+      const knee = [1.2, 7.6, s * 2.8];
+      const foot = [-0.8, 3.8, s * 3.9];
+      rider.add(bone(1, hip, knee, suit));
+      rider.add(bone(0.85, knee, foot, suit));
+      rider.add(sphere(0.9, navy, foot[0] + 0.6, foot[1], foot[2], 8));
+    }
+    return { root, craft, rider };
+  },
+  apply(rig, p) {
+    rig.root.rotation.y = boatYaw(p.f);
+    // Nariz para cima no quadro 1 (batendo na marola), corpo compensando
+    rig.craft.rotation.z = p.i ? 0.07 : -0.02;
+    rig.rider.rotation.z = p.i ? -0.06 : 0.03;
+  },
+};
+
+export const boatPose = (v) => `${v.kind === 'jetski' && Math.sin(v.t * 14) > 0 ? 1 : 0}${v.dir < 0 ? 'L' : 'R'}`;

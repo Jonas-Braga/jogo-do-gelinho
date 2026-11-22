@@ -8,6 +8,7 @@
 //   music    trilha de fundo (chave de MUSIC em audio.js)
 //   outfits  roupas: { player, bear }
 //   sleigh   trenó voando ao fundo de vez em quando
+//   boats    barco e jet ski passando no mar ao fundo de vez em quando (Praia)
 //   decor    enfeites do cenário (árvores, luzes no iglu)
 //   scenery  cenário inteiro trocado: 'forest' = mata, rio, troncos e folhas caindo;
 //            'space' = lua, céu estrelado, rio de poeira estelar, asteroides e
@@ -82,6 +83,7 @@ export const SPECIALS = {
     music: 'praia',
     outfits: { player: 'surfer', bear: 'giantCrab' },
     sleigh: false,
+    boats: true,
     decor: 'praia',
     scenery: 'beach',
     house: 'hut',

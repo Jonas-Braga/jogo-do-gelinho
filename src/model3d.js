@@ -21,7 +21,7 @@ import {
 } from './m3d/space.js';
 import { BASE, BASE_PIECES, drawBaseDoor, drawUfoBeam, drawCometTail, drawCometDust, drawStarGlow } from './space.js';
 import {
-  giantCrab, gull, siri, jellyfish, tfish, boardSubject, BOARD, BOARD_SCHEMES, hut as hutModel, palms as palmModels, parasol as parasolModel,
+  giantCrab, gull, siri, jellyfish, tfish, boardSubject, BOARD, BOARD_SCHEMES, hut as hutModel, palms as palmModels, parasol as parasolModel, sailboat, jetski, boatPose,
 } from './m3d/beach.js';
 import { HUT, HUT_PIECES, drawHutDoor, drawTorchFlame, isBuoy } from './beach.js';
 import {
@@ -35,7 +35,7 @@ import { CAVE, CAVE_PIECES, drawCaveDoor, drawCaveTorchFlame } from './dino.js';
 import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
-import { iceScenery, forestScenery, spaceScenery, BG_H } from './m3d/scenery.js';
+import { iceScenery, forestScenery, spaceScenery, beachScenery, BG_H } from './m3d/scenery.js';
 import { SHORE_TOP } from './config.js';
 
 const M = DEPTH.model3d;
@@ -51,7 +51,7 @@ export const SUBJECTS = {
   // Espaço
   'player-astronaut': player.withOutfit('astronaut'), alien, ufo, crawler, comet, star, base: baseModel, lander: landerModel, flag: flagModel,
   // Praia
-  'player-surfer': player.withOutfit('surfer'), giantCrab, gull, siri, jellyfish, tfish, hut: hutModel, parasol: parasolModel,
+  'player-surfer': player.withOutfit('surfer'), giantCrab, gull, siri, jellyfish, tfish, hut: hutModel, parasol: parasolModel, sailboat, jetski,
   ...Object.fromEntries(palmModels.map((m, k) => [`palm${k}`, m])),
   // Halloween
   'player-wizard': player.withOutfit('wizard'), werewolf, ghost, spider, eyeball, candy, jack: jackModel, deadTree: deadTreeModel, haunted: hauntedModel,
@@ -60,7 +60,7 @@ export const SUBJECTS = {
   // Prêmios das fases especiais (iguais em todas)
   bag: bagModel, heart: heartModel,
   // Cenários de fundo (uma foto do tamanho do fundo 2D)
-  'bg-ice': iceScenery, 'bg-forest': forestScenery, 'bg-space': spaceScenery,
+  'bg-ice': iceScenery, 'bg-forest': forestScenery, 'bg-space': spaceScenery, 'bg-beach': beachScenery,
 };
 // Fases especiais já convertidas ao 3D (as outras seguem inteiras em 2D)
 export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia', 'halloween', 'dinossauros']);
@@ -115,7 +115,9 @@ export function want(name) {
   loadModel();
   if (status[name] || !subjectOf(name)) return;
   status[name] = 'queued';
-  queue.push(name);
+  // Cenários de fundo passam na frente (é a maior imagem da tela)
+  if (name.startsWith('bg-')) queue.unshift(name);
+  else queue.push(name);
   pump();
 }
 
@@ -779,6 +781,16 @@ export function drawParasol3D(ctx) {
   return true;
 }
 
+// Barco ou jet ski no mar ao fundo da Praia (linha d'água em 0, 0; a esteira é 2D)
+export function drawBoat3D(ctx, v) {
+  const name = v.kind === 'sail' ? 'sailboat' : 'jetski';
+  want(name);
+  const img = sprite(name, boatPose(v));
+  if (!img) return false;
+  blit(ctx, img, SUBJECTS[name].box);
+  return true;
+}
+
 // Cabana de palha 3D: mesmo comportamento da drawHut 2D (sombra, contornos-guia,
 // peças caindo com o quique, janela acesa, chamas das tochas e a porta 2D por cima)
 export function drawHut3D(ctx, igloo, t) {
@@ -1025,7 +1037,7 @@ export function drawCave3D(ctx, igloo, t) {
 // Fundo 3D de um cenário, no mesmo formato do fundo 2D ({ canvas, w, h }), ou null
 // enquanto a foto não fica pronta (vale o 2D). A névoa na base das montanhas e os
 // brilhos da neve continuam em 2D, por cima da foto, como no desenho antigo.
-export const SCENERY_3D = { ice: 'bg-ice', forest: 'bg-forest', space: 'bg-space' };
+export const SCENERY_3D = { ice: 'bg-ice', forest: 'bg-forest', space: 'bg-space', beach: 'bg-beach' };
 const backgrounds = {};
 export function background3D(kind) {
   const name = SCENERY_3D[kind];
@@ -1050,6 +1062,7 @@ export function background3D(kind) {
   g.scale(img.width / W, img.height / BG_H);
   if (kind === 'ice') iceFinish(g);
   else if (kind === 'forest') forestFinish(g);
+  else if (kind === 'beach') beachFinish(g);
   backgrounds[name] = { img: null, bg: { canvas: c, w: W, h: BG_H } };
   delete model.sprites[`${name}:main`];
   return backgrounds[name].bg;
@@ -1078,4 +1091,21 @@ function forestFinish(g) {
   grd.addColorStop(1, 'rgba(210, 230, 210, 0.3)');
   g.fillStyle = grd;
   g.fillRect(0, SHORE_TOP - 26, W, 30);
+}
+
+function beachFinish(g) {
+  let s = 41;
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  // Brilhos do sol no mar (entre o horizonte e a onda)
+  for (let i = 0; i < 90; i++) {
+    g.fillStyle = `rgba(255, 255, 240, ${0.3 + rnd() * 0.5})`;
+    g.fillRect(rnd() * W, 154 + rnd() * (SHORE_TOP - 160), 4 + rnd() * 10, 1);
+  }
+  // Espuma de bolinhas na beira do mar (como no 2D)
+  g.fillStyle = 'rgba(255, 255, 255, 0.85)';
+  for (let x = 0; x < W; x += 8 + rnd() * 10) {
+    g.beginPath();
+    g.arc(x, BG_H - 6 + rnd() * 4, 1.5 + rnd() * 2.5, 0, Math.PI * 2);
+    g.fill();
+  }
 }
