@@ -1,6 +1,6 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
-  CRITTERS_3D, THEMES_3D,
+  rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
 import {
@@ -19,7 +19,7 @@ import {
 } from './forest.js';
 import {
   makeSpaceBackground, drawSpaceSky, asteroidSprite, drawUfo, drawCrawler, drawComet, drawStarBonus,
-  drawSpaceDecor, drawBase, drawBaseDoorFront, drawStardust, DUST,
+  drawSpaceDecor, drawBase, drawBaseDoorFront, drawStardust, DUST, spaceArt,
 } from './space.js';
 import {
   makeBeachBackground, drawBeachDecor, drawSkyGulls, boardSprite, drawGull, drawSiri, drawJellyfish,
@@ -50,7 +50,7 @@ const CRITTER_DRAW = {
 
 // Construções das fases especiais (o iglu se desenha sozinho)
 // Casas 3D por estilo (as que ainda não têm ficam no 2D)
-const HOUSE_3D = { cabin: drawCabin3D };
+const HOUSE_3D = { cabin: drawCabin3D, base: drawBase3D };
 const HOUSE_DRAW = {
   cabin: { body: drawCabin, front: drawCabinDoorFront },
   base: { body: drawBase, front: drawBaseDoorFront },
@@ -64,7 +64,7 @@ const WATERS = { forest: RIVER, space: DUST, beach: SEA, halloween: HAUNT, dino:
 const ICE_WATER = { water: ['#1C7E99', '#0E5670', '#052A40'], ripple: [190, 235, 250], bank: 'rgba(3, 30, 48, 0.35)' };
 // Placas de cada cenário: gelo, troncos, asteroides ou pranchas
 // Placas 3D por cenário (os que ainda não têm ficam no 2D)
-const FLOE_3D = { ice: floeSprite3D, forest: logSprite3D };
+const FLOE_3D = { ice: floeSprite3D, forest: logSprite3D, space: rockSprite3D };
 const FLOE_SPRITE = {
   forest: logSprite, space: asteroidSprite, beach: boardSprite, halloween: pumpkinSprite, dino: rockSprite,
 };
@@ -189,6 +189,9 @@ export class Renderer {
     forestArt.on = this.normal3d;
     forestArt.pine = drawPine3D;
     forestArt.mushroom = drawMushroom3D;
+    spaceArt.on = this.normal3d;
+    spaceArt.lander = drawLander3D;
+    spaceArt.flag = drawFlag3D;
     if (DEPTH.sway && tr && typeof tr.a === 'number') followCamera(game.player.x, dt);
 
     ctx.save();
@@ -486,9 +489,11 @@ export class Renderer {
         for (const c of game.critters.inRow(i)) {
           if (c.x <= minX || c.x >= maxX) continue;
           const draw2d = c.kind === 'fish' ? fishDraw : CRITTER_DRAW[c.kind];
-          // Fase normal: bichos 3D (o desenho 2D vale até a foto ficar pronta)
-          const try3d = this.normal3d && CRITTERS_3D.has(c.kind) && !(c.kind === 'fish' && FISH_DRAW[scenery]);
-          const draw = try3d ? (g, cc, y, tt) => drawCritter3D(g, cc, y, tt) || draw2d(g, cc, y, tt) : draw2d;
+          // Bichos 3D (o desenho 2D vale até a foto ficar pronta); o peixe vira o modelo
+          // do tema (estrelinha no espaço) ou fica 2D nos temas ainda não convertidos
+          const kind3d = c.kind === 'fish' ? FISH_3D[scenery] || (FISH_DRAW[scenery] ? null : 'fish') : c.kind;
+          const try3d = this.normal3d && kind3d && CRITTERS_3D.has(kind3d);
+          const draw = try3d ? (g, cc, y, tt) => drawCritter3D(g, cc, y, tt, kind3d) || draw2d(g, cc, y, tt) : draw2d;
           if (c.kicked) {
             // Chutado: voa girando por cima da fileira
             ctx.save();
@@ -500,7 +505,7 @@ export class Renderer {
           } else {
             const fly = FLYING.has(c.kind);
             contactShadow(ctx, c.x, row.y + 4, fly ? 18 : 24, fly ? 40 : 0, fly ? 0.18 : 0.26);
-            if (!(try3d && drawCritter3D(ctx, c, row.y, t))) {
+            if (!(try3d && drawCritter3D(ctx, c, row.y, t, kind3d))) {
               withVolume(ctx, [c.x - 80, row.y - 120, c.x + 80, row.y + 50], (g) => draw2d(g, c, row.y, t), undefined, { key: c });
             }
           }

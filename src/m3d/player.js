@@ -180,19 +180,112 @@ function plaidTexture(THREE) {
   return tex;
 }
 
+// ---- Traje de astronauta (Espaço): cinto com fivela azul, painel de controle no
+// peito com três botões e a mochila de oxigênio nas costas (grade e luzinha verde)
+function buildSuit(kit, body, trim) {
+  const { THREE, mat, mesh, group } = kit;
+  const belt = mesh(new THREE.TorusGeometry(16.4, 2.3, 8, 40), trim, 0, 14.6, 0);
+  belt.rotation.x = Math.PI / 2;
+  belt.scale.set(1, 0.84, 1);
+  body.add(belt);
+  body.add(mesh(new THREE.BoxGeometry(6, 4.4, 1.6), mat('#5B8BD9', 0.4), 0, 14.6, 14));
+  // Painel no peito (inclinado como o casaco)
+  const panel = group(2.5, 33.5, 10.6);
+  panel.rotation.x = -0.2;
+  body.add(panel);
+  panel.add(mesh(new THREE.BoxGeometry(14, 9.5, 2), mat('#C3CAD6', 0.45), 0, 0, 0));
+  ['#E5484D', '#5AF0A0', '#5B8BD9'].forEach((c, i) => {
+    panel.add(mesh(new THREE.BoxGeometry(2.8, 2.8, 1), mat(c, 0.3, { emissive: c, emissiveIntensity: 0.35 }), -4.2 + i * 4.2, 1.2, 1.3));
+  });
+  panel.add(mesh(new THREE.BoxGeometry(10, 1, 0.6), mat('#7C8294', 0.5), 0, -2.6, 1.1));
+  // Mochila de oxigênio: caixa de cantos arredondados com dois cilindros e a grade
+  const pack = group(0, 35, -14);
+  body.add(pack);
+  const s = new THREE.Shape();
+  s.moveTo(-10, -12);
+  s.lineTo(10, -12);
+  s.quadraticCurveTo(13, -12, 13, -9);
+  s.lineTo(13, 10);
+  s.quadraticCurveTo(13, 14, 9, 14);
+  s.lineTo(-9, 14);
+  s.quadraticCurveTo(-13, 14, -13, 10);
+  s.lineTo(-13, -9);
+  s.quadraticCurveTo(-13, -12, -10, -12);
+  const geo = new THREE.ExtrudeGeometry(s, { depth: 6, bevelEnabled: true, bevelThickness: 1.6, bevelSize: 1.6, bevelSegments: 3 });
+  geo.translate(0, 0, -6);
+  pack.add(mesh(geo, mat('#CDD3DD', 0.5)));
+  for (const x of [-7, 7]) {
+    const tank = mesh(new THREE.CapsuleGeometry(3.4, 18, 6, 14), mat('#E8ECF2', 0.4), x, 1, -9.5);
+    pack.add(tank);
+  }
+  for (let i = 0; i < 5; i++) pack.add(mesh(new THREE.BoxGeometry(12, 1.2, 1), mat('#6A7080', 0.6), 0, 7 - i * 3.6, -13.4));
+  pack.add(mesh(new THREE.BoxGeometry(2.6, 2.6, 1), mat('#5AF0A0', 0.3, { emissive: '#5AF0A0', emissiveIntensity: 0.8 }), 7, -9, -13.4));
+}
+
+// Capacete: casco branco com a abertura do visor na frente (o rosto aparece por
+// dentro), vidro azulado com brilho, aro, luzinha verde na lateral e anel do pescoço.
+// Ponto da esfera do Three.js: x = −r·cos φ·sen θ, y = r·cos θ, z = r·sen φ·sen θ
+// (φ = π/2 é a frente).
+const HELMET = { r: 16, y: 1.5, z: 1.6, phi: 0.9, top: 0.8, bottom: 2.05 };
+function buildHelmet(kit, head) {
+  const { THREE, mat, mesh } = kit;
+  const { r, phi, top, bottom } = HELMET;
+  const shellM = mat('#F6F8FB', 0.35, { side: THREE.DoubleSide });
+  const front = Math.PI / 2;
+  const part = (p0, pl, t0, tl, m, rr = r) => {
+    const o = mesh(new THREE.SphereGeometry(rr, 40, 26, p0, pl, t0, tl), m, 0, HELMET.y, HELMET.z);
+    head.add(o);
+    return o;
+  };
+  part(front + phi, Math.PI * 2 - phi * 2, 0, Math.PI, shellM);
+  part(front - phi, phi * 2, 0, top, shellM);
+  part(front - phi, phi * 2, bottom, Math.PI - bottom, shellM);
+  // Vidro do visor (um pouco maior que a abertura)
+  const glass = part(front - phi - 0.04, phi * 2 + 0.08, top - 0.04, bottom - top + 0.08,
+    mat('#8CC8FF', 0.05, { transparent: true, opacity: 0.22, depthWrite: false, metalness: 0.2 }), r + 0.3);
+  glass.castShadow = false;
+  // Aro do visor seguindo a borda da abertura
+  const at = (p, t, rr = r + 0.4) => new THREE.Vector3(-rr * Math.cos(p) * Math.sin(t), HELMET.y + rr * Math.cos(t), HELMET.z + rr * Math.sin(p) * Math.sin(t));
+  const pts = [];
+  const N = 12;
+  for (let i = 0; i < N; i++) pts.push(at(front - phi + (phi * 2 * i) / N, top));
+  for (let i = 0; i < N; i++) pts.push(at(front + phi, top + ((bottom - top) * i) / N));
+  for (let i = 0; i < N; i++) pts.push(at(front + phi - (phi * 2 * i) / N, bottom));
+  for (let i = 0; i < N; i++) pts.push(at(front - phi, bottom - ((bottom - top) * i) / N));
+  const rim = mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 96, 0.9, 8, true), mat('#9AA4B6', 0.35));
+  head.add(rim);
+  // Brilho no vidro (arco no alto à esquerda, do lado da luz)
+  const hl = [];
+  for (let i = 0; i <= 8; i++) hl.push(at(front - phi * 0.75 + i * 0.07, top + 0.18 + i * 0.03, r + 0.6));
+  const shine = mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hl), 16, 0.55, 6), mat('#FFFFFF', 0.1, { emissive: '#FFFFFF', emissiveIntensity: 0.6, transparent: true, opacity: 0.8 }));
+  shine.castShadow = false;
+  head.add(shine);
+  // Luzinhas verdes nas laterais e o anel do pescoço
+  for (const s of [-1, 1]) {
+    const l = at(front + s * (phi + 0.5), 1.05, r + 0.3);
+    head.add(mesh(new THREE.SphereGeometry(1.3, 10, 8), mat('#5AF0A0', 0.3, { emissive: '#5AF0A0', emissiveIntensity: 0.9 }), l.x, l.y, l.z));
+  }
+  const neck = mesh(new THREE.TorusGeometry(10.5, 2.4, 10, 32), mat('#8E95A6', 0.4), 0, -12.4, 0);
+  neck.rotation.x = Math.PI / 2;
+  head.add(neck);
+}
+
 export function build(kit, outfit = 'parka') {
   const { THREE, mat, mesh, group, capsule, sphere, furRing, lathe } = kit;
   const sweater = outfit === 'sweater';
   const lumber = outfit === 'lumberjack';
+  const astro = outfit === 'astronaut';
   const plaid = lumber ? new THREE.MeshStandardMaterial({ map: plaidTexture(THREE), roughness: 0.95, metalness: 0 }) : null;
   const leather = mat('#3A2614', 0.7);
-  const parka = mat(C.parka, 0.8);
-  const parkaDark = mat(C.parkaShade, 0.85);
+  // Traje de astronauta: branco com sombra cinza-azulada, botas e luvas cinza
+  const parka = astro ? mat('#F4F6F9', 0.55) : mat(C.parka, 0.8);
+  const parkaDark = astro ? mat('#D5DAE3', 0.6) : mat(C.parkaShade, 0.85);
+  const suitTrim = mat('#AEB6C4', 0.5);
   const fur = mat(C.fur, 1);
   const furShade = mat(C.furShade, 1);
-  const boots = mat(C.boots, 0.6);
-  const pants = mat(lumber ? '#33507A' : C.pants, 0.9);
-  const mitten = mat('#5A3E2A', 0.9);
+  const boots = mat(astro ? '#8A90A0' : C.boots, 0.6);
+  const pants = mat(lumber ? '#33507A' : astro ? '#E1E6EE' : C.pants, astro ? 0.6 : 0.9);
+  const mitten = mat(astro ? '#7C8294' : '#5A3E2A', astro ? 0.6 : 0.9);
   const skin = mat('#E3A87E', 0.7);
   const ink = mat(C.ink, 0.3);
   const white = mat('#FFFFFF', 0.3);
@@ -219,7 +312,12 @@ export function build(kit, outfit = 'parka') {
     boot.position.set(0, -6.5, 1.8);
     boot.scale.set(1, 1.15, 0.95);
     knee.add(boot);
-    if (lumber) {
+    if (astro) {
+      // Bota do traje: anel cinza (sem pelo)
+      const trim = mesh(new THREE.TorusGeometry(5, 1.4, 8, 18), suitTrim, 0, -1.5, 0.4);
+      trim.rotation.x = Math.PI / 2;
+      knee.add(trim);
+    } else if (lumber) {
       // Botina de trabalho: borda de couro (sem pelo)
       const trim = mesh(new THREE.TorusGeometry(4.8, 1.3, 8, 18), leather, 0, -1.5, 0.4);
       trim.rotation.x = Math.PI / 2;
@@ -247,6 +345,8 @@ export function build(kit, outfit = 'parka') {
     rib.rotation.x = Math.PI / 2;
     rib.scale.set(1, 0.84, 1.15);
     body.add(rib);
+  } else if (astro) {
+    buildSuit(kit, body, suitTrim);
   } else if (lumber) {
     // Cinto de couro com fivela dourada e suspensórios azuis (cruzados nas costas)
     const belt = mesh(new THREE.TorusGeometry(16.4, 2.2, 8, 40), mat('#4A2E18', 0.6), 0, 14.6, 0);
@@ -295,6 +395,14 @@ export function build(kit, outfit = 'parka') {
       const line = mesh(new THREE.TorusGeometry(4.6, 0.45, 6, 18), knitWhite, 0, -7, 0);
       line.rotation.x = Math.PI / 2;
       elbow.add(line);
+    } else if (astro) {
+      // Punho do traje (anel cinza) e o emblema da bandeirinha no ombro
+      const cuff = mesh(new THREE.TorusGeometry(4.4, 1.3, 8, 18), suitTrim, 0, -7.2, 0);
+      cuff.rotation.x = Math.PI / 2;
+      elbow.add(cuff);
+      const patch = mesh(new THREE.BoxGeometry(1, 4.4, 5.6), mat('#2C6FD6', 0.5), side * 4.6, -2.5, 0);
+      patch.add(mesh(new THREE.BoxGeometry(1, 1.6, 1.6), mat('#FFD84A', 0.4), side * 0.2, 0, 0));
+      sh.add(patch);
     } else if (lumber) {
       // Punho da camisa abotoado
       const cuff = mesh(new THREE.TorusGeometry(4.2, 1.4, 8, 18), mat('#8E211C', 0.9), 0, -7.2, 0);
@@ -316,7 +424,13 @@ export function build(kit, outfit = 'parka') {
   const head = group(0, 59, 0);
   head.scale.setScalar(1.12);
   body.add(head);
-  if (lumber) {
+  if (astro) {
+    // Touca de comunicação escura atrás do rosto; o capacete vem depois do rosto
+    const capM = mat('#2A3550', 0.7);
+    const cap = sphere(12.4, capM, 0, 0.5, -0.8, 24);
+    cap.scale.set(1, 1.02, 0.95);
+    head.add(cap);
+  } else if (lumber) {
     // Sem capuz: cabeça, cabelo na nuca, orelhas, gorro de lã e barba curta
     const hair = mat('#6B4524', 0.9);
     const skull = sphere(12.2, skin, 0, -0.5, 1.5, 28);
@@ -385,6 +499,7 @@ export function build(kit, outfit = 'parka') {
   oh.scale.set(1, 1.35, 0.5);
   scared.add(oh);
   for (const g of [calm, cold, scared]) head.add(g);
+  if (astro) buildHelmet(kit, head);
 
   return { root, body, legs, arms, head, faces: { calm, cold, scared } };
 }
@@ -425,7 +540,7 @@ export function apply(rig, p) {
 
 // Modelo do personagem com uma roupa ('parka' ou 'sweater')
 const outfits = new Map();
-export const OUTFITS_3D = ['parka', 'sweater', 'lumberjack'];
+export const OUTFITS_3D = ['parka', 'sweater', 'lumberjack', 'astronaut'];
 export function withOutfit(outfit = 'parka') {
   if (!outfits.has(outfit)) outfits.set(outfit, { box, poses, apply, playerPose, build: (kit) => build(kit, outfit) });
   return outfits.get(outfit);

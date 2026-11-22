@@ -194,7 +194,7 @@ export function footAt(leg, u) {
 
 // Cinemática inversa de dois ossos no plano (z, y). A dianteira dobra para trás
 // (cotovelo/pulso), a traseira dobra para a frente (joelho)
-function solveLeg(rig, leg, u, bob) {
+export function solveLeg(rig, leg, u, bob) {
   const { THREE } = rig;
   const hy = leg.hip.y + bob;
   const hz = leg.hip.z;

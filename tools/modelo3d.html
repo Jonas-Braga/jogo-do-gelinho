@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><title>Fotos dos modelos 3D</title></head><body style="margin:0;background:#cfe0ea;font:12px sans-serif">
 <!-- Ferramenta de desenvolvimento: mostra as fotos de um modelo 3D (src/m3d/).
-     ?m=player|bear|goose|crab|clam|fish|floe70|floe36  modelo
+     ?m=player|bear|goose|...|floe82|log36|rock82  modelo
      ?k=idleR,run0R,...                   só estas fotos (senão, todas)
      ?z=1.5                               zoom -->
 <canvas id=c width=1600 height=900></canvas>
@@ -8,12 +8,13 @@
 import { model, want, SUBJECTS } from '../src/model3d.js';
 import { floeSubject } from '../src/m3d/floes.js';
 import { logSubject } from '../src/m3d/forest.js';
+import { rockSubject } from '../src/m3d/space.js';
 const q = new URLSearchParams(location.search);
 const name = q.get('m') || 'player';
 const z = Number(q.get('z') || 1);
 want(name);
 const ctx = document.getElementById('c').getContext('2d');
-const S = SUBJECTS[name] || (name.startsWith('log') ? logSubject(Number(name.slice(3))) : floeSubject(Number(name.slice(4))));
+const S = SUBJECTS[name] || (name.startsWith('log') ? logSubject(Number(name.slice(3))) : name.startsWith('rock') ? rockSubject(Number(name.slice(4))) : floeSubject(Number(name.slice(4))));
 const keys = q.get('k')?.split(',') || S.poses().map((p) => p.key);
 const pre = name === 'player' ? '' : name + ':';
 const wait = () => {

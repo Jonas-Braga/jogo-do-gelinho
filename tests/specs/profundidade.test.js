@@ -21,6 +21,8 @@ import { xmasArt, drawChristmasTrees, TREES } from '../../src/christmas.js';
 import { bonusArt, drawMoneyBag, drawHeart } from '../../src/bonus.js';
 import { logSprite3D, drawCabin3D } from '../../src/model3d.js';
 import { CABIN_PIECES } from '../../src/forest.js';
+import { rockSprite3D, drawBase3D, FISH_3D } from '../../src/model3d.js';
+import { BASE_PIECES, spaceArt, drawSpaceDecor } from '../../src/space.js';
 
 // Contexto 2D falso que registra as chamadas
 function recordingCtx() {
@@ -779,5 +781,120 @@ suite('Floresta em 3D', () => {
       drawCabin3D(r.ctx, g.igloo, 0);
       expect(r.calls.filter((c) => c[0] === 'fillRect').length).toBeGreaterThan(3);
     });
+  });
+});
+
+suite('Espaço em 3D', () => {
+  const withFake = (fn) => {
+    const was = { ...model };
+    const asked = [];
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: (_, k) => (asked.push(String(k)), img) });
+      fn(asked, img);
+    } finally {
+      Object.assign(model, was);
+    }
+  };
+
+  test('o Espaço é uma fase convertida: astronauta, alienígena, asteroides, base, módulo, bandeira, bichos e estrelinha em 3D', () => {
+    expect(THEMES_3D.has(SPECIALS[15].id)).toBe(true);
+    withFake((asked) => {
+      const g = makeGame({ level: 15, quiet: false });
+      step(g, 6);
+      Object.assign(g.bear, { active: true, x: 400, dir: 1, chasing: true });
+      for (let i = 0; i < 8; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.critters.list.length = 0;
+      for (const [k, kind] of ['ufo', 'crawler', 'comet', 'fish'].entries()) {
+        g.critters.list.push({ kind, row: k, dir: 1, vx: 0, x: 300 + k * 200, w: 30, ph: 0 });
+      }
+      g.renderer.use3d = true;
+      const { ctx } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      const has = (pre) => asked.some((k) => k.startsWith(pre));
+      for (const pre of ['player-astronaut:', 'alien:', 'rock', 'base:', 'lander:', 'flag:', 'ufo:', 'crawler:', 'comet:', 'star:']) {
+        expect(has(pre)).toBe(true);
+      }
+      // O "peixe" do espaço é a estrelinha, nunca o peixe 3D da fase normal
+      expect(FISH_3D.space).toBe('star');
+      expect(has('fish:')).toBe(false);
+    });
+  });
+
+  test('disco, bichinho lunar, cometa e estrelinha: toda foto pedida existe; o alienígena usa o passo do urso', () => {
+    for (const kind of ['ufo', 'crawler', 'comet', 'star']) {
+      const S = SUBJECTS[kind];
+      const keys = new Set(S.poses().map((p) => p.key));
+      for (const dir of [1, -1]) for (let t = 0; t < 3; t += 0.011) expect(keys.has(S.pose({ dir, ph: 0.7 }, t))).toBe(true);
+    }
+    const A = SUBJECTS.alien;
+    const keys = new Set(A.poses().map((p) => p.key));
+    expect([...keys].sort()).toEqual(bear3d.poses().map((p) => p.key).sort());
+    for (const chasing of [false, true]) {
+      for (let t = 0; t < 2; t += 0.037) expect(keys.has(A.pose({ walk: t * 3, dir: chasing ? -1 : 1, chasing }, t))).toBe(true);
+    }
+  });
+
+  test('a foto do asteroide tem as mesmas medidas do sprite 2D', () => {
+    withFake((asked, img) => {
+      for (const w of [36, 82]) {
+        const s = rockSprite3D({ w, seed: 7, sprites: {} }, true);
+        expect(s.canvas).toBe(img);
+        expect([s.ox, s.oy, s.w, s.h]).toEqual([12, 22, w + 24, 66]);
+      }
+    });
+  });
+
+  test('base lunar 3D: peças assentadas numa foto, a que cai por cima, luz acesa com alguém dentro e a porta 2D por cima', () => {
+    const keys = new Set(SUBJECTS.base.poses().map((p) => p.key));
+    for (let n = 1; n < BASE_PIECES.length; n++) expect(keys.has(`n${n}`)).toBe(true);
+    for (let i = 0; i < BASE_PIECES.length - 1; i++) expect(keys.has(`b${i}`)).toBe(true);
+    expect(keys.has('lit')).toBe(true);
+    withFake((asked) => {
+      const g = makeGame({ level: 15 });
+      for (let i = 0; i < 5; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.igloo.add();
+      const { ctx } = recordingCtx();
+      expect(drawBase3D(ctx, g.igloo, 0)).toBe(true);
+      expect(asked.includes('base:n5')).toBe(true);
+      expect(asked.includes('base:b5')).toBe(true);
+      // Pronta e com o astronauta lá dentro: foto acesa e a porta 2D (abertura, folhas, batente)
+      for (let i = 0; i < 16; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.igloo.lit = true;
+      asked.length = 0;
+      const r = recordingCtx();
+      drawBase3D(r.ctx, g.igloo, 0);
+      expect(asked.includes('base:lit')).toBe(true);
+      // abertura e batente da porta (roundRect) e a faixa de aviso (fillRect)
+      expect(r.calls.filter((c) => c[0] === 'roundRect').length).toBeGreaterThan(1);
+      expect(r.calls.some((c) => c[0] === 'fillRect')).toBe(true);
+    });
+  });
+
+  test('módulo de pouso e bandeira: 3D pelo gancho, e o 2D de sempre se a foto não estiver pronta', () => {
+    const was = { ...spaceArt };
+    try {
+      const calls = [];
+      Object.assign(spaceArt, { on: true, lander: () => (calls.push('lander'), true), flag: () => (calls.push('flag'), true) });
+      const a = recordingCtx();
+      drawSpaceDecor(a.ctx, 0);
+      expect(calls).toEqual(['lander', 'flag']);
+      // Sem a foto: o desenho 2D completo (pernas, estágio dourado, cabine, bandeira)
+      Object.assign(spaceArt, { lander: () => false, flag: () => false });
+      const b = recordingCtx();
+      drawSpaceDecor(b.ctx, 0);
+      spaceArt.on = false;
+      const c = recordingCtx();
+      drawSpaceDecor(c.ctx, 0);
+      expect(b.calls.length).toBe(c.calls.length);
+      expect(b.calls.length).toBeGreaterThan(a.calls.length + 20);
+    } finally {
+      Object.assign(spaceArt, was);
+    }
   });
 });

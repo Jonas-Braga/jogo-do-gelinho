@@ -249,6 +249,8 @@ export function makeSpaceBackground() {
 // ---------------------------------------------------------------- Enfeites da costa
 // Módulo de pouso e bandeira à esquerda, longe da base
 export const SPACE_DECOR = { lander: { x: 110, base: 240 }, flag: { x: 214, base: 244 } };
+// Gancho do visual 3D (src/model3d.js): módulo de pouso e bandeira em 3D quando ligado
+export const spaceArt = { on: false, lander: null, flag: null };
 
 export function drawSpaceDecor(ctx, t) {
   const { lander, flag } = SPACE_DECOR;
@@ -258,6 +260,11 @@ export function drawSpaceDecor(ctx, t) {
   ctx.beginPath();
   ctx.ellipse(4, 2, 58, 6, 0, 0, TAU);
   ctx.fill();
+  if (spaceArt.on && spaceArt.lander?.(ctx, t)) {
+    ctx.restore();
+    drawFlag(ctx, flag);
+    return;
+  }
   // Pernas com sapatas
   ctx.strokeStyle = '#B9BCC6';
   ctx.lineWidth = 3;
@@ -323,10 +330,17 @@ export function drawSpaceDecor(ctx, t) {
   ctx.arc(14, -97, 2.4, 0, TAU);
   ctx.fill();
   ctx.restore();
+  drawFlag(ctx, flag);
+}
 
-  // Bandeira com uma estrela (pano esticado por uma haste, já que não há vento)
+// Bandeira com uma estrela (pano esticado por uma haste, já que não há vento)
+function drawFlag(ctx, flag) {
   ctx.save();
   ctx.translate(flag.x, flag.base);
+  if (spaceArt.on && spaceArt.flag?.(ctx)) {
+    ctx.restore();
+    return;
+  }
   ctx.strokeStyle = '#D8DBE4';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -478,9 +492,9 @@ export function asteroidSprite(piece, active) {
 // Desenhados em relação à linha da fileira (y = onde os pés do jogador pisam).
 
 // Disco voador baixinho, com um tripulante na cúpula e luzes girando
-export function drawUfo(ctx, c, y, t) {
+// Facho de luz até a fileira; devolve a altura do disco (também usado pelo disco 3D)
+export function drawUfoBeam(ctx, c, y, t) {
   const by = y - 30 + Math.sin(t * 3 + c.ph) * 4;
-  // Facho de luz até a fileira
   const beam = ctx.createLinearGradient(0, by, 0, y + 14);
   beam.addColorStop(0, 'rgba(160, 255, 200, 0.28)');
   beam.addColorStop(1, 'rgba(160, 255, 200, 0)');
@@ -492,6 +506,11 @@ export function drawUfo(ctx, c, y, t) {
   ctx.lineTo(c.x - 20, y + 14);
   ctx.closePath();
   ctx.fill();
+  return by;
+}
+
+export function drawUfo(ctx, c, y, t) {
+  const by = drawUfoBeam(ctx, c, y, t);
   ctx.save();
   ctx.translate(c.x, by);
   ctx.scale(c.dir, 1);
@@ -597,7 +616,8 @@ export function drawCrawler(ctx, c, y, t) {
 }
 
 // Cometinha deslizando rente à poeira, com a cauda brilhante para trás
-export function drawComet(ctx, c, y, t) {
+// Cauda (também usada pelo cometa 3D, que só troca o núcleo); devolve a altura do núcleo
+export function drawCometTail(ctx, c, y, t) {
   const hop = Math.max(0, Math.sin(t * 3 + c.ph)) * 10;
   const cy = y + 2 - hop;
   ctx.save();
@@ -618,7 +638,28 @@ export function drawComet(ctx, c, y, t) {
     ctx.closePath();
     ctx.fill();
   }
-  ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+  return cy;
+}
+
+// Poeira levantada quando ele encosta na fileira
+export function drawCometDust(ctx, c, y, t) {
+  const hop = Math.max(0, Math.sin(t * 3 + c.ph)) * 10;
+  if (hop < 3) {
+    ctx.fillStyle = 'rgba(225, 210, 255, 0.6)';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc(c.x - c.dir * (10 + i * 7), y + 8 - i, 1.6, 0, TAU);
+      ctx.fill();
+    }
+  }
+}
+
+export function drawComet(ctx, c, y, t) {
+  const cy = drawCometTail(ctx, c, y, t);
+  ctx.save();
+  ctx.translate(c.x, cy);
+  ctx.scale(c.dir, 1);
   // Núcleo de gelo e rocha
   const g = ctx.createRadialGradient(-2, -3, 1, 0, 0, 10);
   g.addColorStop(0, '#FFFFFF');
@@ -645,26 +686,24 @@ export function drawComet(ctx, c, y, t) {
   ctx.lineTo(7, 2.6);
   ctx.stroke();
   ctx.restore();
-  // Poeira levantada
-  if (hop < 3) {
-    ctx.fillStyle = 'rgba(225, 210, 255, 0.6)';
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath();
-      ctx.arc(c.x - c.dir * (10 + i * 7), y + 8 - i, 1.6, 0, TAU);
-      ctx.fill();
-    }
-  }
+  drawCometDust(ctx, c, y, t);
 }
 
 // Estrelinha dourada boiando (vale os pontos do peixe)
 export const STAR_GOLD = '#FFD84A';
-export function drawStarBonus(ctx, c, y, t) {
+// Brilho em volta (também usado pela estrela 3D); devolve a altura da estrela
+export function drawStarGlow(ctx, c, y, t) {
   const by = y - 8 + Math.sin(t * 4 + c.ph) * 3;
   const glow = ctx.createRadialGradient(c.x, by, 2, c.x, by, 22);
   glow.addColorStop(0, 'rgba(255, 220, 90, 0.55)');
   glow.addColorStop(1, 'rgba(255, 220, 90, 0)');
   ctx.fillStyle = glow;
   ctx.fillRect(c.x - 22, by - 22, 44, 44);
+  return by;
+}
+
+export function drawStarBonus(ctx, c, y, t) {
+  const by = drawStarGlow(ctx, c, y, t);
   ctx.save();
   ctx.translate(c.x, by);
   ctx.scale(Math.cos(t * 3 + c.ph) * 0.35 + 0.75, 1); // girando
@@ -864,6 +903,8 @@ const VENT = { x0: 74, x1: 82, top: -MH - 26 };
 const SOLAR = { x0: 108, x1: 156, y0: -92, y1: -50, pole: 132 };
 
 export const BASE_DOOR = { x: IGLOO.x, bottom: SHORE_Y + 1, w: IGLOO.doorRx, h: IGLOO.doorH };
+// Medidas da base (para o modelo 3D em src/m3d/space.js)
+export const BASE = { MW, MH, DOME, VENT, SOLAR };
 
 const third = (MW * 2) / 3;
 export const BASE_PIECES = [
@@ -1206,8 +1247,13 @@ export function drawBase(ctx, igloo, t) {
     ctx.restore();
   }
   ctx.restore();
+  drawBaseDoor(ctx, igloo, t);
+}
 
-  // Porta (peça 16): abertura escura, luz quando acesa, folhas e batente
+// Porta (peça 16): abertura escura, luz quando acesa, folhas e batente (ou o contorno
+// tracejado enquanto não está pronta). Também usada pela base 3D (src/model3d.js)
+export function drawBaseDoor(ctx, igloo, t) {
+  const n = igloo.count;
   const r = doorRect();
   if (n < RULES.iglooPieces) {
     ctx.save();
