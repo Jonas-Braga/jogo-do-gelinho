@@ -26,6 +26,7 @@ import { BASE_PIECES, spaceArt, drawSpaceDecor } from '../../src/space.js';
 import { boardSprite3D, drawHut3D } from '../../src/model3d.js';
 import { HUT_PIECES, beachArt, drawBeachDecor, PALMS } from '../../src/beach.js';
 import { boardSubject } from '../../src/m3d/beach.js';
+import { JUMP_YAW } from '../../src/m3d/player.js';
 
 // Contexto 2D falso que registra as chamadas
 function recordingCtx() {
@@ -1018,5 +1019,42 @@ suite('Praia em 3D', () => {
     } finally {
       Object.assign(beachArt, was);
     }
+  });
+});
+
+suite('Pulo 3D de frente, de costas e na diagonal', () => {
+  const player = (o) => ({ state: 'jump', moving: false, facing: 1, kickT: 0, crouch: 0, back: false, ...o });
+
+  test('pulando para a frente o corpo fica de frente para a câmera; voltando, de costas', () => {
+    expect(playerPose(player({ from: 0, to: 1 }), 0).key).toBe('jumpF');
+    expect(playerPose(player({ from: -1, to: 0, facing: -1 }), 0).key).toBe('jumpF');
+    expect(playerPose(player({ from: 2, to: 1 }), 0).key).toBe('jumpB');
+    expect(playerPose(player({ from: 0, to: -1, facing: -1 }), 0).key).toBe('jumpB');
+    expect(JUMP_YAW.F).toBe(0);
+    expect(JUMP_YAW.B).toBe(Math.PI);
+  });
+
+  test('pulando na diagonal o corpo vira para o lado do pulo', () => {
+    expect(playerPose(player({ from: 0, to: 1, moving: true, facing: 1 }), 0).key).toBe('jumpFR');
+    expect(playerPose(player({ from: 0, to: 1, moving: true, facing: -1 }), 0).key).toBe('jumpFL');
+    expect(playerPose(player({ from: 1, to: 0, moving: true, facing: 1 }), 0).key).toBe('jumpBR');
+    expect(playerPose(player({ from: 1, to: 0, moving: true, facing: -1 }), 0).key).toBe('jumpBL');
+    // A frente do corpo aponta para a direção do pulo: (sen yaw) = lado, (cos yaw) = para a câmera
+    const dir = (k) => [Math.sign(Math.round(Math.sin(JUMP_YAW[k]) * 100)), Math.sign(Math.round(Math.cos(JUMP_YAW[k]) * 100))];
+    expect(dir('FR')).toEqual([1, 1]);
+    expect(dir('FL')).toEqual([-1, 1]);
+    expect(dir('BR')).toEqual([1, -1]);
+    expect(dir('BL')).toEqual([-1, -1]);
+  });
+
+  test('toda foto de pulo existe em todas as roupas 3D, e o jogo de verdade usa a foto de frente', () => {
+    for (const name of Object.keys(SUBJECTS).filter((k) => k === 'player' || k.startsWith('player-'))) {
+      const keys = new Set(SUBJECTS[name].poses().map((p) => p.key));
+      for (const k of ['F', 'FR', 'FL', 'B', 'BR', 'BL']) expect(keys.has(`jump${k}`)).toBe(true);
+    }
+    const g = makeGame({ level: 1 });
+    g.player.jump(0);
+    step(g, 0.1);
+    expect(playerPose(g.player, 0).key.startsWith('jumpF')).toBe(true);
   });
 });

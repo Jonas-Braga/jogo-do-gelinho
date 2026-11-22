@@ -29,8 +29,13 @@ export function playerPose(p, t) {
       return { key: p.moving ? `run${frameOf(t * 13, M.runFrames)}${facing}` : `idle${facing}`, anim: p.moving ? 'run' : 'idle' };
     case 'freeze':
       return { key: `cold${facing}`, anim: 'freeze' };
-    case 'jump':
-      return { key: `jump${facing}`, anim: 'jump' };
+    case 'jump': {
+      // De frente para a câmera pulando para a frente (para a fileira de baixo), de
+      // costas voltando (para cima); com ← ou → apertado, virado na diagonal do pulo
+      if (p.from == null || p.to == null || p.to === p.from) return { key: `jump${facing}`, anim: 'jump' };
+      const side = p.moving ? facing : '';
+      return { key: `jump${p.to > p.from ? 'F' : 'B'}${side}`, anim: 'jump' };
+    }
     case 'swim':
       return { key: `swim${frameOf(t * 6, 4)}${facing}`, anim: 'swim' };
     case 'drown':
@@ -56,7 +61,7 @@ export function poses() {
   for (const f of ['R', 'L']) {
     out.push({ key: `idle${f}`, facing: f, arms: [0.2, 0.15], face: 'calm' });
     out.push({ key: `cold${f}`, facing: f, arms: [-0.45, -0.3], hug: true, face: 'cold' });
-    out.push({ key: `jump${f}`, facing: f, legs: [0.5, 0.9], knees: [0.8, 1.3], arms: [-2.0, -2.3], elbows: [0.45, 0.35], face: 'calm' });
+    out.push({ key: `jump${f}`, facing: f, ...JUMP });
     for (let i = 0; i < n; i++) {
       out.push({ key: `run${i}${f}`, ...walk(i, f) });
       const w = walk(i, f);
@@ -78,11 +83,25 @@ export function poses() {
       out.push({ key: `swim${i}${f}`, facing: f, legs: [0.4, -0.2], arms: [-1.4 - s * 0.5, -1.4 + s * 0.5], elbows: [0.5 + s * 0.4, 0.5 - s * 0.4], face: 'calm' });
     }
   }
+  // Pulo entre as fileiras: de frente (F, para a câmera) ou de costas (B), reto ou na
+  // diagonal para o lado em que ele vai (R/L). yaw: para onde a frente do corpo aponta
+  // Os braços abrem para os lados e para cima (de frente, erguidos para a frente cobririam o rosto)
+  for (const [k, yaw] of Object.entries(JUMP_YAW)) {
+    out.push({ key: `jump${k}`, facing: k.length > 1 ? k[1] : 'R', yaw, ...JUMP, arms: null, spread: [2.1, 2.3], face: k[0] === 'B' ? 'none' : 'calm' });
+  }
   // De costas (entrando no iglu)
   out.push({ key: 'backIdle', facing: 'B', arms: [0.15, 0.15], face: 'none' });
   for (let i = 0; i < n; i++) out.push({ key: `back${i}`, ...walk(i, 'B'), face: 'none' });
   return out;
 }
+
+// Pose do pulo (pernas encolhidas, braços erguidos) e a direção do corpo em cada pulo
+const JUMP = { legs: [0.5, 0.9], knees: [0.8, 1.3], arms: [-2.0, -2.3], elbows: [0.45, 0.35], face: 'calm' };
+export const JUMP_DIAGONAL = 0.6;
+export const JUMP_YAW = {
+  F: 0, FR: JUMP_DIAGONAL, FL: -JUMP_DIAGONAL,
+  B: Math.PI, BR: Math.PI - JUMP_DIAGONAL, BL: Math.PI + JUMP_DIAGONAL,
+};
 
 // Perfil torneado do casaco: [raio, altura]
 const COAT = [[0, 13], [17, 13], [16.2, 18], [14, 28], [12, 38], [10, 45], [7, 48.5], [0, 49]];
@@ -625,7 +644,7 @@ export function build(kit, outfit = 'parka') {
 }
 
 export function apply(rig, p) {
-  const yaw = p.facing === 'B' ? Math.PI : (p.facing === 'L' ? -1 : 1) * M.yaw;
+  const yaw = p.yaw ?? (p.facing === 'B' ? Math.PI : (p.facing === 'L' ? -1 : 1) * M.yaw);
   rig.root.rotation.y = yaw;
   rig.body.position.y = p.bob || 0;
   // Qual lado do modelo fica perto da câmera: virado para a direita é o lado −x
@@ -640,7 +659,12 @@ export function apply(rig, p) {
   rig.arms.forEach((a, i) => {
     const side = i ? 1 : -1;
     const elbow = a.userData.elbow;
-    if (p.up) {
+    if (p.spread) {
+      // Abertos para os lados e para cima, cotovelos um pouco dobrados
+      a.rotation.set(-0.2, 0, side * val(p.spread, i));
+      a.scale.set(1, 1, 1);
+      elbow.rotation.set(-0.45, 0, 0);
+    } else if (p.up) {
       // Erguidos em "V" acima da cabeça, sacudindo (esticados, como no desenho 2D)
       a.rotation.set(-0.35, 0, side * (Math.PI - 0.32 + val(p.up, i) * 0.6));
       a.scale.set(1, 1.4, 1);
