@@ -35,7 +35,7 @@ import { CAVE, CAVE_PIECES, drawCaveDoor, drawCaveTorchFlame } from './dino.js';
 import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
-import { iceScenery, BG_H } from './m3d/scenery.js';
+import { iceScenery, forestScenery, BG_H } from './m3d/scenery.js';
 import { SHORE_TOP } from './config.js';
 
 const M = DEPTH.model3d;
@@ -60,7 +60,7 @@ export const SUBJECTS = {
   // Prêmios das fases especiais (iguais em todas)
   bag: bagModel, heart: heartModel,
   // Cenários de fundo (uma foto do tamanho do fundo 2D)
-  'bg-ice': iceScenery,
+  'bg-ice': iceScenery, 'bg-forest': forestScenery,
 };
 // Fases especiais já convertidas ao 3D (as outras seguem inteiras em 2D)
 export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia', 'halloween', 'dinossauros']);
@@ -1025,7 +1025,7 @@ export function drawCave3D(ctx, igloo, t) {
 // Fundo 3D de um cenário, no mesmo formato do fundo 2D ({ canvas, w, h }), ou null
 // enquanto a foto não fica pronta (vale o 2D). A névoa na base das montanhas e os
 // brilhos da neve continuam em 2D, por cima da foto, como no desenho antigo.
-export const SCENERY_3D = { ice: 'bg-ice' };
+export const SCENERY_3D = { ice: 'bg-ice', forest: 'bg-forest' };
 const backgrounds = {};
 export function background3D(kind) {
   const name = SCENERY_3D[kind];
@@ -1049,6 +1049,7 @@ export function background3D(kind) {
   g.drawImage(img, 0, 0);
   g.scale(img.width / W, img.height / BG_H);
   if (kind === 'ice') iceFinish(g);
+  else if (kind === 'forest') forestFinish(g);
   backgrounds[name] = { img: null, bg: { canvas: c, w: W, h: BG_H } };
   delete model.sprites[`${name}:main`];
   return backgrounds[name].bg;
@@ -1068,4 +1069,13 @@ function iceFinish(g) {
     g.fillStyle = rnd() < 0.6 ? 'rgba(255,255,255,0.9)' : 'rgba(200, 230, 245, 0.6)';
     g.fillRect(rnd() * W, SHORE_TOP + 4 + rnd() * 62, 1.1, 1.1);
   }
+}
+
+function forestFinish(g) {
+  // Névoa leve entre a mata e a clareira (como no 2D, mais fraca: a névoa 3D já existe)
+  const grd = g.createLinearGradient(0, SHORE_TOP - 26, 0, SHORE_TOP + 4);
+  grd.addColorStop(0, 'rgba(210, 230, 210, 0)');
+  grd.addColorStop(1, 'rgba(210, 230, 210, 0.3)');
+  g.fillStyle = grd;
+  g.fillRect(0, SHORE_TOP - 26, W, 30);
 }

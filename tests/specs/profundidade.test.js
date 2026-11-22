@@ -10,6 +10,7 @@ import {
   camera, followCamera, swayAt, maxSway, sceneLight, foregroundKind,
 } from '../../src/depth.js';
 import { SPECIALS } from '../../src/specials.js';
+import { SCENERY_3D } from '../../src/model3d.js';
 import { playerPose, poseList, loadModel, model, SUBJECTS, CRITTERS_3D, floeSprite3D, THEMES_3D } from '../../src/model3d.js';
 import { floeSubject } from '../../src/m3d/floes.js';
 import * as bear3d from '../../src/m3d/bear.js';
@@ -1488,7 +1489,18 @@ suite('Cenários de fundo em 3D: fase normal (piloto da etapa 3)', () => {
       expect(bgDrawn(1, true), 'fase normal').toBe(true);
       expect(bgDrawn(5, true), 'Natal').toBe(true);
       expect(bgDrawn(1, false), 'sem 3D').toBe(false);
-      expect(bgDrawn(10, true), 'Floresta (sem cenário 3D ainda)').toBe(false);
+      // Primeira fase especial cujo cenário ainda não tem foto 3D; quando todas tiverem,
+      // um cenário sai da lista só durante o teste
+      const pending = Object.keys(SPECIALS).map(Number).sort((a, b) => a - b).find((lv) => SPECIALS[lv].scenery && !SCENERY_3D[SPECIALS[lv].scenery]);
+      const lv = pending ?? Object.keys(SPECIALS).map(Number).find((l) => SPECIALS[l].scenery);
+      const kind = SPECIALS[lv].scenery;
+      const saved = SCENERY_3D[kind];
+      delete SCENERY_3D[kind];
+      try {
+        expect(bgDrawn(lv, true), `fase ${lv} (cenário sem foto 3D)`).toBe(false);
+      } finally {
+        if (saved) SCENERY_3D[kind] = saved;
+      }
     } finally {
       Object.assign(model, was);
     }
@@ -1516,6 +1528,72 @@ suite('Cenários de fundo em 3D: fase normal (piloto da etapa 3)', () => {
       const wall = px(300, WATER_TOP - 6);
       expect(wall[3]).toBe(255);
       expect(wall[2]).toBeGreaterThan(wall[0] + 20);
+    });
+  }
+});
+
+suite('Cenários de fundo em 3D: Floresta', () => {
+  test('morros com pinheiros nas faixas do 2D, a mata atrás da clareira (longe da linha do jogador) e a mesma foto do fundo 2D', async () => {
+    const sc = await import('../../src/m3d/scenery.js');
+    const { SUBJECTS } = await import('../../src/model3d.js');
+    expect(SCENERY_3D.forest).toBe('bg-forest');
+    const S = SUBJECTS['bg-forest'];
+    expect([S.box.left, S.box.right, S.box.top, S.box.bottom]).toEqual([0, W, 0, -(WATER_TOP + 12)]);
+    expect(S.res).toBe(2);
+    expect(S.elevation).toBe(sc.SCENE_EL);
+    for (const h of sc.FOREST_HILLS) {
+      expect(h.top[0]).toBeGreaterThanOrEqual(80);
+      expect(h.top[1]).toBeLessThanOrEqual(170);
+      expect(h.top[0]).toBeLessThan(h.top[1]);
+    }
+    // O morro de trás fica mais longe (mais apagado pela névoa)
+    expect(sc.FOREST_HILLS[0].zc).toBeLessThan(sc.FOREST_HILLS[1].zc);
+    // A mata fica no fundo da clareira, bem atrás de onde o jogador anda
+    expect(sc.FOREST_EDGE.line).toBeGreaterThanOrEqual(sc.SNOW_BACK);
+    expect(sc.FOREST_EDGE.line).toBeLessThan(SHORE_Y - 40);
+  });
+
+  test('na Floresta, com a foto pronta, o fundo vem do 3D (e sem 3D continua o 2D)', () => {
+    const was = { ...model };
+    const img = { fake3d: true };
+    const bgDrawn = (use3d) => {
+      const g = makeGame({ level: 10 });
+      g.renderer.use3d = use3d;
+      const { ctx, calls } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      return calls.some((c) => c[0] === 'drawImage' && c[1] === img && c[2] === 0 && c[3] === 0 && c[4] === W && c[5] === WATER_TOP + 12);
+    };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      expect(bgDrawn(true)).toBe(true);
+      expect(bgDrawn(false)).toBe(false);
+    } finally {
+      Object.assign(model, was);
+    }
+  });
+
+  if (!isNode) {
+    test('no navegador: a foto da Floresta sai com céu transparente, a clareira verde e o barranco de terra na beira', async () => {
+      const { background3D } = await import('../../src/model3d.js');
+      const t0 = Date.now();
+      let bg = null;
+      while (!(bg = background3D('forest')) && Date.now() - t0 < 40000) await new Promise((r) => setTimeout(r, 100));
+      expect(!!bg).toBe(true);
+      const g = bg.canvas.getContext('2d');
+      const k = bg.canvas.width / W;
+      const px = (x, y) => g.getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data;
+      expect(px(640, 10)[3]).toBe(0);
+      // Clareira: verde (mais verde que vermelho e que azul)
+      const grass = px(500, SHORE_Y - 12);
+      expect(grass[3]).toBe(255);
+      expect(grass[1]).toBeGreaterThan(grass[0]);
+      expect(grass[1]).toBeGreaterThan(grass[2]);
+      // Barranco: terra (mais vermelho que azul)
+      const bank = px(500, WATER_TOP - 6);
+      expect(bank[3]).toBe(255);
+      expect(bank[0]).toBeGreaterThan(bank[2] + 15);
     });
   }
 });

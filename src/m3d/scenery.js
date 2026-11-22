@@ -283,3 +283,244 @@ export const iceScenery = {
   },
   apply() {},
 };
+
+// ---------------------------------------------------------------- Peças em lote
+// Muitas cópias da mesma forma (pinheiros, tufos, pedras) num InstancedMesh só:
+// items = [{ x, y, z, s (escala), sx/sy/sz?, rx/ry/rz?, color? }]
+function instanced(THREE, geo, material, items, { shadow = true } = {}) {
+  const m = new THREE.InstancedMesh(geo, material, items.length);
+  const o = new THREE.Object3D();
+  const c = new THREE.Color();
+  items.forEach((it, i) => {
+    o.position.set(it.x, it.y, it.z);
+    o.rotation.set(it.rx || 0, it.ry || 0, it.rz || 0);
+    o.scale.set(it.s * (it.sx || 1), it.s * (it.sy || 1), it.s * (it.sz || 1));
+    o.updateMatrix();
+    m.setMatrixAt(i, o.matrix);
+    if (it.color) m.setColorAt(i, c.set(it.color));
+  });
+  m.castShadow = shadow;
+  m.receiveShadow = true;
+  return m;
+}
+
+// Pinheiro em 4 partes (tronco e 3 saias de galhos), cada parte em lote. Altura ~1, pé em 0.
+function pineParts(THREE) {
+  const trunk = new THREE.CylinderGeometry(0.035, 0.05, 0.22, 6);
+  trunk.translate(0, 0.11, 0);
+  const tiers = [0, 1, 2].map((i) => {
+    const r = 0.3 - i * 0.07;
+    const h = 0.42 - i * 0.06;
+    // Saia de galhos: cone com a borda franjada (raio irregular na borda de baixo)
+    const g = new THREE.ConeGeometry(r, h, 9, 2);
+    const p = g.getAttribute('position');
+    for (let v = 0; v < p.count; v++) {
+      const y = p.getY(v);
+      if (y < -h / 2 + 0.001) {
+        const a = Math.atan2(p.getZ(v), p.getX(v));
+        const k = 1 + Math.sin(a * 9) * 0.12;
+        p.setX(v, p.getX(v) * k);
+        p.setZ(v, p.getZ(v) * k);
+        p.setY(v, y - 0.03 * (1 - Math.cos(a * 9)) * 0.5);
+      }
+    }
+    g.computeVertexNormals();
+    g.translate(0, 0.18 + i * 0.22 + h / 2, 0);
+    return g;
+  });
+  return { trunk, tiers };
+}
+function addPines(THREE, root, items, { leaf, bark }) {
+  const P = pineParts(THREE);
+  const barkM = new THREE.MeshStandardMaterial({ color: bark, roughness: 0.9 });
+  const leafM = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.85 });
+  root.add(instanced(THREE, P.trunk, barkM, items));
+  // A cor de cada pinheiro varia; as saias de cima ficam um pouco mais claras
+  const base = new THREE.Color(leaf);
+  P.tiers.forEach((g, i) => {
+    const tinted = items.map((it) => ({ ...it, color: base.clone().offsetHSL((it.hue || 0) * 0.04, 0, i * 0.03 + (it.light || 0) * 0.08) }));
+    root.add(instanced(THREE, g, leafM, tinted));
+  });
+}
+
+// Paredão/barranco da beira: grade em x × altura com ondulação e cor por vértice
+function bankWall(THREE, { zEdge, step = 4, rows = 10, bulge, color }) {
+  const wallBottom = -((BG_H - EDGE_TOP + 6) / C);
+  const nx = Math.ceil((W + 80) / step) + 1;
+  const pos = [];
+  const col = [];
+  const tmp = new THREE.Color();
+  for (let j = 0; j < rows; j++) {
+    const v = j / (rows - 1);
+    for (let i = 0; i < nx; i++) {
+      const x = -40 + ((W + 80) * i) / (nx - 1);
+      pos.push(x, wallBottom * v, zEdge + bulge(x, v));
+      color(tmp, x, v);
+      col.push(tmp.r, tmp.g, tmp.b);
+    }
+  }
+  const idx = [];
+  for (let j = 0; j < rows - 1; j++) {
+    for (let i = 0; i < nx - 1; i++) {
+      const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return { geo: g, bottom: wallBottom };
+}
+
+// ---------------------------------------------------------------- Floresta
+// Fase 10 (Floresta): morros ao longe cobertos de pinheiros (a névoa apaga os de
+// trás), a mata fechada atrás da clareira, a clareira de grama ondulada com capim,
+// florzinhas e manchas de terra, e o barranco de terra com pedras e raízes entrando no rio.
+export const FOREST_HILLS = [
+  { zc: 170, depth: 170, top: [88, 128], base: 205, seed: 5, freq: 0.004, tint: '#7FA8A0' },
+  { zc: 360, depth: 120, top: [124, 152], base: 205, seed: 8, freq: 0.006, tint: '#5E8C7A' },
+];
+export const FOREST_EDGE = { line: SNOW_BACK + 2 };
+
+function hillHeight(r, x, z) {
+  const across = 1 - Math.abs(z - r.zc) / (r.depth / 2);
+  const shape = Math.pow(Math.max(0, across), 0.8);
+  const prof = fbm(x * r.freq, r.seed * 1.3, r.seed, 4);
+  const topScreen = r.top[1] - (r.top[1] - r.top[0]) * Math.min(1, Math.max(0, (prof - 0.3) * 2.2));
+  return yAt(r.base, z) + ((r.base - topScreen) / C) * shape;
+}
+
+// Altura da grama da clareira (a mesma para o chão e para os tufos em cima dele)
+function meadow(x, z, zBack, zEdge) {
+  const k = (z - zBack) / (zEdge - zBack);
+  return (fbm(x * 0.009, z * 0.025, 71, 4) - 0.45) * (10 - k * 6) * Math.min(1, (1 - k) * 6);
+}
+
+export const forestScenery = {
+  box: { left: 0, right: W, top: 0, bottom: -BG_H },
+  res: 2,
+  elevation: SCENE_EL,
+  distance: 1300,
+  poses: () => [{ key: 'main' }],
+  stage: (studio) => studio.stageScenery({
+    target: [640, 0, 480], size: 950, fog: { color: '#B9D3C8', near: 900, far: 1900 },
+    sky: 0.9, ground: '#6E7C52', keyIntensity: 3.3, sun: [-0.78, 0.5, -0.25], exposure: 0.95,
+  }),
+  build(kit) {
+    const { THREE, group, mat } = kit;
+    const root = group();
+    const vcol = (extra = {}) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, ...extra });
+    let seed = 1;
+    const rnd = () => hash(seed++, 7, 101);
+    // Morros e os pinheiros em cima deles (menores nos de trás)
+    FOREST_HILLS.forEach((r, hi) => {
+      const tint = new THREE.Color(r.tint);
+      const geo = heightField(THREE, {
+        x0: -140, x1: W + 140, z0: r.zc - r.depth / 2, z1: r.zc + r.depth / 2, dx: 8, dz: 6,
+        h: (x, z) => hillHeight(r, x, z),
+        colorAt: (c) => c.copy(tint).offsetHSL(0, 0, -0.08),
+      });
+      root.add(kit.mesh(geo, vcol()));
+      const items = [];
+      const n = hi === 0 ? 900 : 700;
+      for (let i = 0; i < n; i++) {
+        const x = -60 + rnd() * (W + 120);
+        const z = r.zc - r.depth * 0.42 + rnd() * r.depth * 0.84;
+        const y = hillHeight(r, x, z);
+        if (y < yAt(r.base, z) + 2) continue; // só em cima do morro
+        const s = (hi === 0 ? 16 : 24) * (0.7 + rnd() * 0.6);
+        items.push({ x, y: y - 1, z, s, sy: 1.1 + rnd() * 0.4, ry: rnd() * TAU, hue: rnd() - 0.5, light: rnd() - 0.5 });
+      }
+      addPines(THREE, root, items, { leaf: hi === 0 ? '#4E7A66' : '#3E6F52', bark: '#3A2A1C' });
+    });
+    // Mata fechada atrás da clareira: três fileiras, as da frente maiores
+    const edge = [];
+    for (let row = 0; row < 3; row++) {
+      const sy = FOREST_EDGE.line - row * 7;
+      for (let x = -30; x < W + 30; x += (18 + row * 4) * (0.6 + rnd() * 0.8)) {
+        const z = zAt(sy) - rnd() * 8;
+        const s = (40 - row * 8) * (0.6 + rnd() * 0.7);
+        edge.push({ x: x + (rnd() - 0.5) * 8, y: -2, z, s, sy: 1 + rnd() * 0.3, ry: rnd() * TAU, hue: rnd() - 0.5, light: rnd() - 0.2 - row * 0.2 });
+      }
+    }
+    addPines(THREE, root, edge, { leaf: '#3A6E4E', bark: '#4A3424' });
+    // Clareira: grama ondulada, mais clara no sol, manchas de terra batida
+    const zBack = zAt(SNOW_BACK - 6);
+    const zEdge = zAt(EDGE_TOP);
+    const cG1 = new THREE.Color('#8DB65A');
+    const cG2 = new THREE.Color('#5E8A38');
+    const cDirt = new THREE.Color('#8A7046');
+    const grass = heightField(THREE, {
+      x0: -40, x1: W + 40, z0: zBack, z1: zEdge, dx: 6, dz: 5,
+      h: (x, z) => meadow(x, z, zBack, zEdge),
+      colorAt: (c, x, y, z) => {
+        const n = fbm(x * 0.02, z * 0.05, 73, 3);
+        c.copy(cG2).lerp(cG1, Math.min(1, n * 1.4));
+        const dirt = fbm(x * 0.012, z * 0.06, 79, 3);
+        if (dirt > 0.62) c.lerp(cDirt, Math.min(0.7, (dirt - 0.62) * 4));
+      },
+    });
+    root.add(kit.mesh(grass, vcol({ bumpMap: grainTexture(THREE, 9), bumpScale: 0.6 })));
+    // Tufos de capim (folhas em leque) e florzinhas espalhados na clareira
+    const blade = new THREE.ConeGeometry(0.5, 4, 3);
+    blade.translate(0, 2, 0);
+    const tufts = [];
+    const flowers = [];
+    for (let i = 0; i < 1000; i++) {
+      const x = -20 + rnd() * (W + 40);
+      const z = zBack + 10 + rnd() * (zEdge - zBack - 14);
+      const y = meadow(x, z, zBack, zEdge);
+      for (let b = 0; b < 3; b++) {
+        tufts.push({ x: x + (b - 1) * 0.8, y, z, s: 0.8 + rnd() * 0.7, rz: (b - 1) * 0.45, ry: rnd() * TAU, color: rnd() < 0.6 ? '#B2D872' : '#86B44E' });
+      }
+      if (i % 9 === 0) flowers.push({ x: x + 2, y: y + 2.2, z, s: 1, color: ['#FFF4C2', '#F7D25C', '#E9A6D8', '#FFFFFF'][i % 4] });
+    }
+    root.add(instanced(THREE, blade, new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.8 }), tufts, { shadow: false }));
+    root.add(instanced(THREE, new THREE.SphereGeometry(1.1, 6, 4), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.6 }), flowers, { shadow: false }));
+    // Barranco de terra: mais escuro embaixo, entrando no rio
+    // Cores mais claras que as do 2D: o barranco fica de costas para o sol
+    const cTop = new THREE.Color('#D2A672');
+    const cMid = new THREE.Color('#A87C4E');
+    const cLow = new THREE.Color('#5E4428');
+    const bank = bankWall(THREE, {
+      zEdge,
+      // Inclinado para trás (a base mais para a frente): pega a luz do céu
+      bulge: (x, v) => (noise2(x * 0.06, v * 3, 81) - 0.5) * 5 + (noise2(x * 0.2, v * 6, 83) - 0.5) * 1.5 + v * 9,
+      color: (c, x, v) => {
+        if (v < 0.45) c.copy(cTop).lerp(cMid, v / 0.45);
+        else c.copy(cMid).lerp(cLow, (v - 0.45) / 0.55);
+        c.multiplyScalar(0.9 + noise2(x * 0.3, v * 8, 85) * 0.2);
+      },
+    });
+    root.add(kit.mesh(bank.geo, vcol({ roughness: 0.95 })));
+    // Pedras encravadas no barranco
+    const stones = [];
+    for (let x = -10; x < W + 10; x += 16 + rnd() * 34) {
+      const v = 0.15 + rnd() * 0.55;
+      stones.push({ x, y: bank.bottom * v, z: zEdge + 2 + v * 9, s: 4 + rnd() * 5, sy: 0.6 + rnd() * 0.3, sz: 0.7, ry: rnd() * TAU, rx: rnd(), color: rnd() < 0.5 ? '#8C8A7E' : '#6E6C62' });
+    }
+    root.add(instanced(THREE, new THREE.DodecahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.75, flatShading: true }), stones));
+    // Raízes saindo do barranco (curvas que descem para a água)
+    const rootM = mat('#4A3420', 0.9);
+    for (let i = 0; i < 16; i++) {
+      const x = hash(i, 3, 87) * W;
+      const d = (hash(i, 4, 87) - 0.5) * 16;
+      root.add(kit.sweep([
+        { p: [x, 0, zEdge - 1], w: 1.4, h: 1.4 },
+        { p: [x + d * 0.4, bank.bottom * 0.3, zEdge + 3.5], w: 1.1, h: 1.1 },
+        { p: [x + d, bank.bottom * 0.75, zEdge + 2.5], w: 0.6, h: 0.6 },
+      ], rootM, { radial: 8, cap: 0.6 }));
+    }
+    // Borda de grama por cima do barranco (um pouco para fora)
+    const lip = [];
+    for (let x = -60; x <= W + 60; x += 30) {
+      const k = noise2(x * 0.05, 5, 89);
+      lip.push({ p: [x, 0.4 + k * 0.8, zEdge + 1], w: 2.4 + k * 1.2, h: 1.5 + k * 0.6 });
+    }
+    root.add(kit.sweep(lip, mat('#6E9B44', 0.9), { radial: 10, cap: 0.5, steps: lip.length * 6 }));
+    return { root };
+  },
+  apply() {},
+};
