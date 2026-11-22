@@ -1,6 +1,7 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
-  rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, CRITTERS_3D, THEMES_3D, FISH_3D,
+  rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D,
+  CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
 import {
@@ -23,7 +24,7 @@ import {
 } from './space.js';
 import {
   makeBeachBackground, drawBeachDecor, drawSkyGulls, boardSprite, drawGull, drawSiri, drawJellyfish,
-  drawTropicalFish, drawHut, drawHutDoorFront, SEA,
+  drawTropicalFish, drawHut, drawHutDoorFront, SEA, beachArt,
 } from './beach.js';
 import {
   makeHalloweenBackground, drawHalloweenSky, drawHalloweenDecor, pumpkinSprite, drawGhost, drawSpider,
@@ -50,7 +51,7 @@ const CRITTER_DRAW = {
 
 // Construções das fases especiais (o iglu se desenha sozinho)
 // Casas 3D por estilo (as que ainda não têm ficam no 2D)
-const HOUSE_3D = { cabin: drawCabin3D, base: drawBase3D };
+const HOUSE_3D = { cabin: drawCabin3D, base: drawBase3D, hut: drawHut3D };
 const HOUSE_DRAW = {
   cabin: { body: drawCabin, front: drawCabinDoorFront },
   base: { body: drawBase, front: drawBaseDoorFront },
@@ -64,7 +65,7 @@ const WATERS = { forest: RIVER, space: DUST, beach: SEA, halloween: HAUNT, dino:
 const ICE_WATER = { water: ['#1C7E99', '#0E5670', '#052A40'], ripple: [190, 235, 250], bank: 'rgba(3, 30, 48, 0.35)' };
 // Placas de cada cenário: gelo, troncos, asteroides ou pranchas
 // Placas 3D por cenário (os que ainda não têm ficam no 2D)
-const FLOE_3D = { ice: floeSprite3D, forest: logSprite3D, space: rockSprite3D };
+const FLOE_3D = { ice: floeSprite3D, forest: logSprite3D, space: rockSprite3D, beach: boardSprite3D };
 const FLOE_SPRITE = {
   forest: logSprite, space: asteroidSprite, beach: boardSprite, halloween: pumpkinSprite, dino: rockSprite,
 };
@@ -192,6 +193,9 @@ export class Renderer {
     spaceArt.on = this.normal3d;
     spaceArt.lander = drawLander3D;
     spaceArt.flag = drawFlag3D;
+    beachArt.on = this.normal3d;
+    beachArt.palm = drawPalm3D;
+    beachArt.parasol = drawParasol3D;
     if (DEPTH.sway && tr && typeof tr.a === 'number') followCamera(game.player.x, dt);
 
     ctx.save();

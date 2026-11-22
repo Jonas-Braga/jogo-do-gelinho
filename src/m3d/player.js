@@ -180,6 +180,92 @@ function plaidTexture(THREE) {
   return tex;
 }
 
+// ---- Surfista (Praia): estampa florida da camisa (verde-água com hibiscos rosa e
+// brancos e folhinhas), cabeça sem capuz com cabelo loiro bagunçado e os óculos
+function floralTexture(THREE) {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = S;
+  c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = '#1FB5B0';
+  g.fillRect(0, 0, S, S);
+  let seed = 41;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  g.fillStyle = 'rgba(30, 120, 60, 0.75)';
+  for (let i = 0; i < 30; i++) {
+    g.beginPath();
+    g.ellipse(rnd() * S, rnd() * S, 9, 4, rnd() * Math.PI, 0, Math.PI * 2);
+    g.fill();
+  }
+  for (let i = 0; i < 22; i++) {
+    const x = rnd() * S;
+    const y = rnd() * S;
+    g.fillStyle = i % 2 ? '#FFFFFF' : '#FF6FA8';
+    for (let k = 0; k < 5; k++) {
+      const a = (k * Math.PI * 2) / 5 + i;
+      g.beginPath();
+      g.arc(x + Math.cos(a) * 7, y + Math.sin(a) * 7, 5.5, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.fillStyle = '#FFD23F';
+    g.beginPath();
+    g.arc(x, y, 3.4, 0, Math.PI * 2);
+    g.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 1);
+  return tex;
+}
+
+function buildSurfHead(kit, head, skin) {
+  const { THREE, mat, mesh, group, sphere } = kit;
+  const hair = mat('#F2C94C', 0.75);
+  const hairDark = mat('#D9A830', 0.8);
+  const skull = sphere(12.2, skin, 0, -0.5, 1.5, 28);
+  skull.scale.set(1, 1.03, 0.98);
+  head.add(skull);
+  for (const s of [-1, 1]) head.add(sphere(2.8, skin, s * 12, -0.5, 2, 12));
+  // Cabelo: calota na nuca e no alto e tufos espetados para todo lado
+  const back = sphere(12.8, hair, 0, 1.5, -2, 24);
+  back.scale.set(1, 0.95, 0.92);
+  head.add(back);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(13, 28, 12, 0, Math.PI * 2, 0, Math.PI * 0.42), hair);
+  cap.position.set(0, 1.2, 0.8);
+  cap.castShadow = cap.receiveShadow = true;
+  head.add(cap);
+  const tufts = [[-8, 11, 4, -0.5, 0.4], [-3, 13, 6, -0.2, 0.1], [3, 13, 5, 0.25, -0.1], [8, 11, 3, 0.55, -0.3],
+    [-6, 12, -4, -0.4, -0.5], [0, 13.5, -1, 0, -0.3], [6, 12, -5, 0.4, -0.6], [0, 8, -10, 0, -1.2], [-9, 7, -7, -0.7, -0.9], [9, 7, -7, 0.7, -0.9]];
+  for (const [i, [x, y, z, rz, rx]] of tufts.entries()) {
+    const t = mesh(new THREE.ConeGeometry(3.2, 9, 8), i % 3 ? hair : hairDark, x, y, z);
+    t.rotation.set(rx, 0, -rz);
+    head.add(t);
+  }
+  // Franja caindo na testa (de lado)
+  const fringe = sphere(5.5, hair, 4, 8.6, 9.5, 14);
+  fringe.scale.set(1.4, 0.55, 0.6);
+  fringe.rotation.z = -0.35;
+  head.add(fringe);
+  // Óculos escuros (posição ajustada em apply: nos olhos ou na testa)
+  const glasses = group(0, 3.4, 15.2);
+  head.add(glasses);
+  const lens = mat('#1D2A33', 0.1, { metalness: 0.3 });
+  for (const s of [-1, 1]) {
+    const l = sphere(2.9, lens, s * 3.3, 0, 0, 14);
+    l.scale.set(1.15, 0.8, 0.35);
+    glasses.add(l);
+    const shine = sphere(0.8, mat('#FFFFFF', 0.1, { emissive: '#FFFFFF', emissiveIntensity: 0.4 }), s * 3.3 - 1, 0.8, 0.9, 8);
+    shine.castShadow = false;
+    glasses.add(shine);
+    const arm = kit.bone(0.45, [s * 6.4, 0.3, -0.5], [s * 11.6, 0.6, -9], mat('#FF6FA8', 0.5));
+    glasses.add(arm);
+  }
+  glasses.add(kit.bone(0.45, [-1.2, 0.4, 0.4], [1.2, 0.4, 0.4], mat('#FF6FA8', 0.5)));
+  return glasses;
+}
+
 // ---- Traje de astronauta (Espaço): cinto com fivela azul, painel de controle no
 // peito com três botões e a mochila de oxigênio nas costas (grade e luzinha verde)
 function buildSuit(kit, body, trim) {
@@ -275,6 +361,8 @@ export function build(kit, outfit = 'parka') {
   const sweater = outfit === 'sweater';
   const lumber = outfit === 'lumberjack';
   const astro = outfit === 'astronaut';
+  const surf = outfit === 'surfer';
+  const floral = surf ? new THREE.MeshStandardMaterial({ map: floralTexture(THREE), roughness: 0.8, metalness: 0 }) : null;
   const plaid = lumber ? new THREE.MeshStandardMaterial({ map: plaidTexture(THREE), roughness: 0.95, metalness: 0 }) : null;
   const leather = mat('#3A2614', 0.7);
   // Traje de astronauta: branco com sombra cinza-azulada, botas e luvas cinza
@@ -283,10 +371,11 @@ export function build(kit, outfit = 'parka') {
   const suitTrim = mat('#AEB6C4', 0.5);
   const fur = mat(C.fur, 1);
   const furShade = mat(C.furShade, 1);
-  const boots = mat(astro ? '#8A90A0' : C.boots, 0.6);
-  const pants = mat(lumber ? '#33507A' : astro ? '#E1E6EE' : C.pants, astro ? 0.6 : 0.9);
-  const mitten = mat(astro ? '#7C8294' : '#5A3E2A', astro ? 0.6 : 0.9);
   const skin = mat('#E3A87E', 0.7);
+  // Surfista: pés descalços (de chinelo), bermuda laranja e mãos de fora
+  const boots = surf ? skin : mat(astro ? '#8A90A0' : C.boots, 0.6);
+  const pants = mat(lumber ? '#33507A' : astro ? '#E1E6EE' : surf ? '#FF8A3D' : C.pants, astro ? 0.6 : 0.9);
+  const mitten = surf ? skin : mat(astro ? '#7C8294' : '#5A3E2A', astro ? 0.6 : 0.9);
   const ink = mat(C.ink, 0.3);
   const white = mat('#FFFFFF', 0.3);
   const cheek = mat('#E07A68', 0.8, { transparent: true, opacity: 0.55 });
@@ -312,7 +401,16 @@ export function build(kit, outfit = 'parka') {
     boot.position.set(0, -6.5, 1.8);
     boot.scale.set(1, 1.15, 0.95);
     knee.add(boot);
-    if (astro) {
+    if (surf) {
+      // Chinelo: sola azul e a tira entre os dedos; barra da bermuda na coxa
+      knee.add(mesh(new THREE.BoxGeometry(9, 1.6, 13.5), mat('#2FB5E8', 0.6), 0, -12, 2.4));
+      const strap = mesh(new THREE.TorusGeometry(3.6, 0.8, 6, 14, Math.PI), mat('#1F8FC0', 0.6), 0, -10.8, 4.6);
+      strap.rotation.x = -0.5;
+      knee.add(strap);
+      const cuff = mesh(new THREE.TorusGeometry(4.6, 1.2, 8, 18), mat('#D96A22', 0.85), 0, -7.6, 0);
+      cuff.rotation.x = Math.PI / 2;
+      hip.add(cuff);
+    } else if (astro) {
       // Bota do traje: anel cinza (sem pelo)
       const trim = mesh(new THREE.TorusGeometry(5, 1.4, 8, 18), suitTrim, 0, -1.5, 0.4);
       trim.rotation.x = Math.PI / 2;
@@ -337,7 +435,7 @@ export function build(kit, outfit = 'parka') {
   const knit = sweater ? new THREE.MeshStandardMaterial({ map: knitTexture(THREE), roughness: 0.95, metalness: 0 }) : null;
   const knitGreen = mat(KNIT_GREEN, 0.95);
   const knitWhite = mat(KNIT_WHITE, 0.95);
-  const coat = lathe(COAT, sweater ? knit : lumber ? plaid : parka, 48);
+  const coat = lathe(COAT, sweater ? knit : lumber ? plaid : surf ? floral : parka, 48);
   coat.scale.set(1, 1, 0.82);
   body.add(coat);
   if (sweater) {
@@ -347,6 +445,19 @@ export function build(kit, outfit = 'parka') {
     body.add(rib);
   } else if (astro) {
     buildSuit(kit, body, suitTrim);
+  } else if (surf) {
+    // Cós da bermuda com cordão branco, botões da camisa e a gola aberta
+    const band = mesh(new THREE.TorusGeometry(16.4, 2.4, 8, 40), mat('#D96A22', 0.85), 0, 14.4, 0);
+    band.rotation.x = Math.PI / 2;
+    band.scale.set(1, 0.84, 1);
+    body.add(band);
+    for (const x of [-1.4, 1.4]) body.add(kit.bone(0.45, [x, 14, 14.2], [x * 1.8, 9.5, 14.4], mat('#FFFFFF', 0.6)));
+    for (const [y, z] of [[36, 11.4], [28, 12.6], [20, 13.6]]) body.add(sphere(0.9, mat('#FFFFFF', 0.4), 1.5, y, z, 8));
+    for (const sd of [-1, 1]) {
+      const lapel = mesh(new THREE.BoxGeometry(5, 7, 0.8), floral, sd * 3.5, 45, 7.6);
+      lapel.rotation.set(-0.6, 0, sd * 0.5);
+      body.add(lapel);
+    }
   } else if (lumber) {
     // Cinto de couro com fivela dourada e suspensórios azuis (cruzados nas costas)
     const belt = mesh(new THREE.TorusGeometry(16.4, 2.2, 8, 40), mat('#4A2E18', 0.6), 0, 14.6, 0);
@@ -373,7 +484,7 @@ export function build(kit, outfit = 'parka') {
 
   // Braços (ombro em y = 42): manga do braço, cotovelo, antebraço, punho de pelo e luva
   const arm = (side) => {
-    const m = sweater ? mat(side < 0 ? '#E0403F' : '#A52528', 0.95) : lumber ? plaid : side < 0 ? parka : parkaDark;
+    const m = sweater ? mat(side < 0 ? '#E0403F' : '#A52528', 0.95) : lumber ? plaid : surf ? skin : side < 0 ? parka : parkaDark;
     const sh = group(side * 11, 42, 0);
     const upper = capsule(4.5, 4.5, m);
     upper.position.y = -4.6;
@@ -395,6 +506,12 @@ export function build(kit, outfit = 'parka') {
       const line = mesh(new THREE.TorusGeometry(4.6, 0.45, 6, 18), knitWhite, 0, -7, 0);
       line.rotation.x = Math.PI / 2;
       elbow.add(line);
+    } else if (surf) {
+      // Manga curta florida cobrindo só o alto do braço
+      const sleeve = mesh(new THREE.CylinderGeometry(5.4, 5.9, 7, 18, 1, true), floral, 0, -2.6, 0);
+      sleeve.material = new THREE.MeshStandardMaterial({ map: floral.map, roughness: 0.8, side: THREE.DoubleSide });
+      sh.add(sleeve);
+      sh.add(sphere(5.5, floral, 0, 0.6, 0, 14));
     } else if (astro) {
       // Punho do traje (anel cinza) e o emblema da bandeirinha no ombro
       const cuff = mesh(new THREE.TorusGeometry(4.4, 1.3, 8, 18), suitTrim, 0, -7.2, 0);
@@ -424,7 +541,10 @@ export function build(kit, outfit = 'parka') {
   const head = group(0, 59, 0);
   head.scale.setScalar(1.12);
   body.add(head);
-  if (astro) {
+  let glasses = null;
+  if (surf) {
+    glasses = buildSurfHead(kit, head, skin);
+  } else if (astro) {
     // Touca de comunicação escura atrás do rosto; o capacete vem depois do rosto
     const capM = mat('#2A3550', 0.7);
     const cap = sphere(12.4, capM, 0, 0.5, -0.8, 24);
@@ -501,7 +621,7 @@ export function build(kit, outfit = 'parka') {
   for (const g of [calm, cold, scared]) head.add(g);
   if (astro) buildHelmet(kit, head);
 
-  return { root, body, legs, arms, head, faces: { calm, cold, scared } };
+  return { root, body, legs, arms, head, glasses, faces: { calm, cold, scared } };
 }
 
 export function apply(rig, p) {
@@ -536,11 +656,17 @@ export function apply(rig, p) {
     }
   });
   for (const [k, g] of Object.entries(rig.faces)) g.visible = p.face === k;
+  // Óculos escuros nos olhos; no susto sobem para a testa (como no desenho 2D)
+  if (rig.glasses) {
+    const up = p.face === 'scared';
+    rig.glasses.position.set(0, up ? 8.6 : 3.4, up ? 12.6 : 15.2);
+    rig.glasses.rotation.x = up ? -0.55 : 0;
+  }
 }
 
 // Modelo do personagem com uma roupa ('parka' ou 'sweater')
 const outfits = new Map();
-export const OUTFITS_3D = ['parka', 'sweater', 'lumberjack', 'astronaut'];
+export const OUTFITS_3D = ['parka', 'sweater', 'lumberjack', 'astronaut', 'surfer'];
 export function withOutfit(outfit = 'parka') {
   if (!outfits.has(outfit)) outfits.set(outfit, { box, poses, apply, playerPose, build: (kit) => build(kit, outfit) });
   return outfits.get(outfit);

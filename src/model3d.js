@@ -20,6 +20,10 @@ import {
   alien, ufo, crawler, comet, star, rockSubject, ROCK, base as baseModel, lander as landerModel, flag as flagModel, LANDER_LIGHT,
 } from './m3d/space.js';
 import { BASE, BASE_PIECES, drawBaseDoor, drawUfoBeam, drawCometTail, drawCometDust, drawStarGlow } from './space.js';
+import {
+  giantCrab, gull, siri, jellyfish, tfish, boardSubject, BOARD, BOARD_SCHEMES, hut as hutModel, palms as palmModels, parasol as parasolModel,
+} from './m3d/beach.js';
+import { HUT, HUT_PIECES, drawHutDoor, drawTorchFlame, isBuoy } from './beach.js';
 import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
@@ -36,17 +40,20 @@ export const SUBJECTS = {
   snake, bat, piranha, pine: pineModel, mushroom: mushroomModel, cabin: cabinModel,
   // Espaço
   'player-astronaut': player.withOutfit('astronaut'), alien, ufo, crawler, comet, star, base: baseModel, lander: landerModel, flag: flagModel,
+  // Praia
+  'player-surfer': player.withOutfit('surfer'), giantCrab, gull, siri, jellyfish, tfish, hut: hutModel, parasol: parasolModel,
+  ...Object.fromEntries(palmModels.map((m, k) => [`palm${k}`, m])),
   // Prêmios das fases especiais (iguais em todas)
   bag: bagModel, heart: heartModel,
 };
 // Fases especiais já convertidas ao 3D (as outras seguem inteiras em 2D)
-export const THEMES_3D = new Set(['natal', 'floresta', 'espaco']);
+export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia']);
 // Modelo do jogador por roupa e do urso por variante (null = sem modelo 3D: desenho 2D)
-const PLAYER_BY_OUTFIT = { parka: 'player', sweater: 'player-sweater', lumberjack: 'player-lumberjack', astronaut: 'player-astronaut' };
-const BEAR_BY_OUTFIT = { polar: 'bear', santaHat: 'bear-santa', brown: 'bear-brown', alien: 'alien' };
-export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish', 'snake', 'bat', 'piranha', 'ufo', 'crawler', 'comet', 'star']);
+const PLAYER_BY_OUTFIT = { parka: 'player', sweater: 'player-sweater', lumberjack: 'player-lumberjack', astronaut: 'player-astronaut', surfer: 'player-surfer' };
+const BEAR_BY_OUTFIT = { polar: 'bear', santaHat: 'bear-santa', brown: 'bear-brown', alien: 'alien', giantCrab: 'giantCrab' };
+export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish', 'snake', 'bat', 'piranha', 'ufo', 'crawler', 'comet', 'star', 'gull', 'siri', 'jellyfish', 'tfish']);
 // O que substitui o peixe em cada cenário convertido (sem entrada = o peixe 3D normal)
-export const FISH_3D = { space: 'star' };
+export const FISH_3D = { space: 'star', beach: 'tfish' };
 export const BOX = player.box;
 export const playerPose = player.playerPose;
 export const poseList = player.poses;
@@ -82,6 +89,7 @@ function subjectOf(name) {
   if (name.startsWith('floe')) return floeSubject(Number(name.slice(4)));
   if (name.startsWith('log')) return logSubject(Number(name.slice(3)));
   if (name.startsWith('rock')) return rockSubject(Number(name.slice(4)));
+  if (name.startsWith('board')) return boardSubject(Number(name.slice(5)));
   return null;
 }
 
@@ -247,6 +255,23 @@ const ANCHOR = {
     before: (ctx) => drawCometTail(ctx, c, y, t), after: (ctx) => drawCometDust(ctx, c, y, t),
   }),
   star: (c, y, t) => ({ y: y - 8 + Math.sin(t * 4 + c.ph) * 3, before: (ctx) => drawStarGlow(ctx, c, y, t) }),
+  // Praia
+  gull: (c, y, t) => ({ y: y - 32 + Math.sin(t * 3 + c.ph) * 4, shadow: [c.x, y + 16, 16, 3.5, 'rgba(4, 70, 90, 0.22)'] }),
+  siri: (c, y) => ({ y: y - 2, shadow: [c.x, y + 2, 18, 3, 'rgba(4, 70, 90, 0.25)'] }),
+  jellyfish: (c, y, t) => ({
+    y: y + 2 - Math.max(0, Math.sin(t * 4 + c.ph)) * 5,
+    after: (ctx) => {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.ellipse(c.x, y + 9, 18, 3, 0, 0, TAU);
+      ctx.stroke();
+    },
+  }),
+  tfish: (c, y, t) => {
+    const hop = Math.max(0, Math.sin(t * 3 + c.ph)) * 12;
+    return { y: y + 4 - hop, tilt: hop > 2 ? -0.25 * c.dir : 0, water: y + 9, cover: hop < 3 ? 36 : 0 };
+  },
 };
 
 // kind: o modelo a usar (a estrelinha do espaço é um "peixe" com outro modelo)
@@ -609,5 +634,92 @@ export function drawBase3D(ctx, igloo, t) {
   }
   ctx.restore();
   drawBaseDoor(ctx, igloo, t);
+  return true;
+}
+
+// ---------------------------------------------------------------- Praia
+// Pranchas e boias: mesmo formato do sprite 2D (boardSprite)
+export function boardSprite3D(piece, active) {
+  const cacheKey = active ? '3d-board-on' : '3d-board-off';
+  if (piece.sprites[cacheKey]) return piece.sprites[cacheKey];
+  const name = `board${piece.w}`;
+  want(name);
+  const v = isBuoy(piece) ? 'b' : piece.seed % BOARD_SCHEMES.length;
+  const img = sprite(name, `${v}${active ? 1 : 0}`);
+  if (!img) return null;
+  const s = { canvas: img, ox: BOARD.PAD, oy: BOARD.TOP, w: piece.w + BOARD.PAD * 2, h: BOARD.H };
+  piece.sprites[cacheKey] = s;
+  return s;
+}
+
+// Ganchos de src/beach.js (beachArt): coqueiro k (já na base dele, girando com o
+// vento) e o guarda-sol com cadeira e castelo de areia
+export function drawPalm3D(ctx, k, angle) {
+  const name = `palm${k}`;
+  if (!SUBJECTS[name]) return false;
+  want(name);
+  const img = sprite(name, 'p');
+  if (!img) return false;
+  ctx.save();
+  ctx.rotate(angle);
+  blit(ctx, img, SUBJECTS[name].box);
+  ctx.restore();
+  return true;
+}
+
+export function drawParasol3D(ctx) {
+  want('parasol');
+  const img = sprite('parasol', 'u');
+  if (!img) return false;
+  blit(ctx, img, parasolModel.box);
+  return true;
+}
+
+// Cabana de palha 3D: mesmo comportamento da drawHut 2D (sombra, contornos-guia,
+// peças caindo com o quique, janela acesa, chamas das tochas e a porta 2D por cima)
+export function drawHut3D(ctx, igloo, t) {
+  want('hut');
+  const N = HUT_PIECES.length - 1; // a última peça é a porta
+  const blocks = Math.min(igloo.count, N);
+  let settled = 0;
+  while (settled < blocks && igloo.anim[settled] >= 1) settled++;
+  const settledKey = settled === N && igloo.lit ? 'lit' : `n${settled}`;
+  if (blocks > 0 && !sprite('hut', `b${blocks - 1}`)) return false;
+  if (settled > 0 && !sprite('hut', settledKey)) return false;
+  const { HW, WALL_H, ROOF } = HUT;
+  ctx.save();
+  ctx.translate(IGLOO.x, IGLOO.baseY);
+  ctx.fillStyle = 'rgba(150, 110, 50, 0.3)';
+  ctx.beginPath();
+  ctx.ellipse(6, 3, HW + 30, 9, 0, 0, TAU);
+  ctx.fill();
+  if (igloo.count < HUT_PIECES.length) {
+    ctx.save();
+    ctx.setLineDash([5, 6]);
+    ctx.strokeStyle = 'rgba(120, 85, 30, 0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-HW, -WALL_H, HW * 2, WALL_H);
+    ctx.beginPath();
+    ctx.moveTo(-ROOF.eave, ROOF.base);
+    ctx.lineTo(0, ROOF.peak);
+    ctx.lineTo(ROOF.eave, ROOF.base);
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (settled > 0) blit(ctx, sprite('hut', settledKey), hutModel.box);
+  for (let i = settled; i < blocks; i++) {
+    const a = igloo.anim[i];
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 3);
+    ctx.translate(0, -(1 - easeOutBack(a)) * 46);
+    blit(ctx, sprite('hut', `b${i}`), hutModel.box);
+    ctx.restore();
+  }
+  // Chamas das tochas já assentadas (tremulando, em 2D)
+  HUT_PIECES.forEach((p, i) => {
+    if (p.kind === 'torch' && i < settled) drawTorchFlame(ctx, p.side, t);
+  });
+  ctx.restore();
+  drawHutDoor(ctx, igloo, t);
   return true;
 }

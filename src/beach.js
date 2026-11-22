@@ -140,6 +140,8 @@ export const PALMS = [
 ];
 export const UMBRELLA = { x: 250, base: 246 };
 export const PALM_LEAF = '#2F9E4A';
+// Gancho do visual 3D (src/model3d.js): coqueiros e guarda-sol em 3D quando ligado
+export const beachArt = { on: false, palm: null, parasol: null };
 
 export function drawBeachDecor(ctx, t) {
   PALMS.forEach((p, k) => drawPalm(ctx, p, t, k));
@@ -151,6 +153,10 @@ export function drawBeachDecor(ctx, t) {
   ctx.beginPath();
   ctx.ellipse(-8, 2, 44, 6, 0, 0, TAU);
   ctx.fill();
+  if (beachArt.on && beachArt.parasol?.(ctx)) {
+    ctx.restore();
+    return;
+  }
   ctx.strokeStyle = '#E8E2D2';
   ctx.lineWidth = 2.5;
   ctx.beginPath();
@@ -221,6 +227,10 @@ function drawPalm(ctx, { x, base, h, lean }, t, k) {
   ctx.fill();
   // Tronco curvo em gomos
   const sway = Math.sin(t * 1.1 + k * 2) * 3;
+  if (beachArt.on && beachArt.palm?.(ctx, k, sway / h)) {
+    ctx.restore();
+    return;
+  }
   const tx = Math.sin(lean) * h + sway;
   const ty = -h;
   const cx = tx * 0.2;
@@ -818,6 +828,8 @@ const ROOF = { eave: 124, base: -62, peak: -150 };
 const TORCH_X = 134;
 
 export const HUT_DOOR = { x: IGLOO.x, bottom: SHORE_Y + 1, w: IGLOO.doorRx, h: IGLOO.doorH };
+// Medidas da cabana (para o modelo 3D em src/m3d/beach.js)
+export const HUT = { HW, WALL_H, ROOF, TORCH_X };
 
 const third = (HW * 2) / 3;
 const band = (ROOF.base - ROOF.peak) / 5;
@@ -938,7 +950,12 @@ function drawTorch(ctx, side, t) {
   ctx.fillRect(x - 2.5, -64, 5, 64);
   ctx.fillStyle = '#6B4A22';
   ctx.fillRect(x - 5, -70, 10, 8);
-  // Chama
+  drawTorchFlame(ctx, side, t);
+}
+
+// Chama da tocha com o brilho tremulando (também usada pela cabana 3D)
+export function drawTorchFlame(ctx, side, t) {
+  const x = side * TORCH_X;
   const f = Math.sin(t * 13 + side) * 2;
   const glow = ctx.createRadialGradient(x, -78, 2, x, -78, 22);
   glow.addColorStop(0, 'rgba(255, 190, 80, 0.5)');
@@ -1052,8 +1069,13 @@ export function drawHut(ctx, igloo, t) {
     ctx.restore();
   }
   ctx.restore();
+  drawHutDoor(ctx, igloo, t);
+}
 
-  // Porta (peça 16): abertura escura, luz quando acesa, cortina e batente
+// Porta (peça 16): abertura escura, luz quando acesa, cortina e batente (ou o
+// contorno tracejado enquanto não está pronta). Também usada pela cabana 3D
+export function drawHutDoor(ctx, igloo, t) {
+  const n = igloo.count;
   const r = doorRect();
   if (n < RULES.iglooPieces) {
     ctx.save();

@@ -9,12 +9,13 @@ import { model, want, SUBJECTS } from '../src/model3d.js';
 import { floeSubject } from '../src/m3d/floes.js';
 import { logSubject } from '../src/m3d/forest.js';
 import { rockSubject } from '../src/m3d/space.js';
+import { boardSubject } from '../src/m3d/beach.js';
 const q = new URLSearchParams(location.search);
 const name = q.get('m') || 'player';
 const z = Number(q.get('z') || 1);
 want(name);
 const ctx = document.getElementById('c').getContext('2d');
-const S = SUBJECTS[name] || (name.startsWith('log') ? logSubject(Number(name.slice(3))) : name.startsWith('rock') ? rockSubject(Number(name.slice(4))) : floeSubject(Number(name.slice(4))));
+const S = SUBJECTS[name] || (name.startsWith('log') ? logSubject(Number(name.slice(3))) : name.startsWith('rock') ? rockSubject(Number(name.slice(4))) : name.startsWith('board') ? boardSubject(Number(name.slice(5))) : floeSubject(Number(name.slice(4))));
 const keys = q.get('k')?.split(',') || S.poses().map((p) => p.key);
 const pre = name === 'player' ? '' : name + ':';
 const wait = () => {

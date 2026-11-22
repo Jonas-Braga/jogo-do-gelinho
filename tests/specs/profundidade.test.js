@@ -23,6 +23,9 @@ import { logSprite3D, drawCabin3D } from '../../src/model3d.js';
 import { CABIN_PIECES } from '../../src/forest.js';
 import { rockSprite3D, drawBase3D, FISH_3D } from '../../src/model3d.js';
 import { BASE_PIECES, spaceArt, drawSpaceDecor } from '../../src/space.js';
+import { boardSprite3D, drawHut3D } from '../../src/model3d.js';
+import { HUT_PIECES, beachArt, drawBeachDecor, PALMS } from '../../src/beach.js';
+import { boardSubject } from '../../src/m3d/beach.js';
 
 // Contexto 2D falso que registra as chamadas
 function recordingCtx() {
@@ -895,6 +898,125 @@ suite('Espaço em 3D', () => {
       expect(b.calls.length).toBeGreaterThan(a.calls.length + 20);
     } finally {
       Object.assign(spaceArt, was);
+    }
+  });
+});
+
+suite('Praia em 3D', () => {
+  const withFake = (fn) => {
+    const was = { ...model };
+    const asked = [];
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: (_, k) => (asked.push(String(k)), img) });
+      fn(asked, img);
+    } finally {
+      Object.assign(model, was);
+    }
+  };
+
+  test('a Praia é uma fase convertida: surfista, caranguejo gigante, pranchas, cabana, coqueiros, guarda-sol, bichos e peixinho em 3D', () => {
+    expect(THEMES_3D.has(SPECIALS[20].id)).toBe(true);
+    withFake((asked) => {
+      const g = makeGame({ level: 20, quiet: false });
+      step(g, 6);
+      Object.assign(g.bear, { active: true, x: 400, dir: 1, chasing: true });
+      for (let i = 0; i < 8; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.critters.list.length = 0;
+      for (const [k, kind] of ['gull', 'siri', 'jellyfish', 'fish'].entries()) {
+        g.critters.list.push({ kind, row: k, dir: 1, vx: 0, x: 300 + k * 200, w: 30, ph: 0 });
+      }
+      g.renderer.use3d = true;
+      const { ctx } = recordingCtx();
+      g.renderer.ctx = ctx;
+      g.renderer.draw(g);
+      const has = (pre) => asked.some((k) => k.startsWith(pre));
+      for (const pre of ['player-surfer:', 'giantCrab:', 'board', 'hut:', 'palm0:', 'palm1:', 'parasol:', 'gull:', 'siri:', 'jellyfish:', 'tfish:']) {
+        expect(has(pre)).toBe(true);
+      }
+      // O "peixe" da praia é o peixinho tropical, nunca o peixe 3D da fase normal
+      expect(FISH_3D.beach).toBe('tfish');
+      expect(has('fish:')).toBe(false);
+    });
+  });
+
+  test('gaivota, siri, água-viva e peixinho: toda foto pedida existe; o caranguejo gigante usa o passo do urso', () => {
+    for (const kind of ['gull', 'siri', 'jellyfish', 'tfish']) {
+      const S = SUBJECTS[kind];
+      const keys = new Set(S.poses().map((p) => p.key));
+      for (const dir of [1, -1]) for (let t = 0; t < 3; t += 0.011) expect(keys.has(S.pose({ dir, ph: 0.7 }, t))).toBe(true);
+    }
+    const C = SUBJECTS.giantCrab;
+    const keys = new Set(C.poses().map((p) => p.key));
+    expect([...keys].sort()).toEqual(bear3d.poses().map((p) => p.key).sort());
+    for (const chasing of [false, true]) {
+      for (let t = 0; t < 2; t += 0.037) expect(keys.has(C.pose({ walk: t * 3, dir: chasing ? -1 : 1, chasing }, t))).toBe(true);
+    }
+  });
+
+  test('pranchas e boias: a foto tem as mesmas medidas do sprite 2D, e o pedaço curto de boia pede a foto da boia', () => {
+    withFake((asked, img) => {
+      for (const w of [36, 82]) {
+        const s = boardSprite3D({ w, seed: 6, k: 1, sprites: {} }, true);
+        expect(s.canvas).toBe(img);
+        expect([s.ox, s.oy, s.w, s.h]).toEqual([12, 22, w + 24, 62]);
+      }
+      asked.length = 0;
+      boardSprite3D({ w: 36, seed: 6, k: 0, sprites: {} }, false);
+      expect(asked).toEqual(['board36:b0']);
+      // Só os pedaços curtos têm a foto da boia
+      expect(boardSubject(36).poses().some((p) => p.key === 'b0')).toBe(true);
+      expect(boardSubject(82).poses().some((p) => p.key.startsWith('b'))).toBe(false);
+    });
+  });
+
+  test('cabana 3D: peças assentadas numa foto, a que cai por cima, janela acesa, chamas 2D das tochas e a porta 2D por cima', () => {
+    const keys = new Set(SUBJECTS.hut.poses().map((p) => p.key));
+    for (let n = 1; n < HUT_PIECES.length; n++) expect(keys.has(`n${n}`)).toBe(true);
+    for (let i = 0; i < HUT_PIECES.length - 1; i++) expect(keys.has(`b${i}`)).toBe(true);
+    expect(keys.has('lit')).toBe(true);
+    withFake((asked) => {
+      const g = makeGame({ level: 20 });
+      for (let i = 0; i < 5; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.igloo.add();
+      const { ctx } = recordingCtx();
+      expect(drawHut3D(ctx, g.igloo, 0)).toBe(true);
+      expect(asked.includes('hut:n5')).toBe(true);
+      expect(asked.includes('hut:b5')).toBe(true);
+      for (let i = 0; i < 16; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.igloo.lit = true;
+      asked.length = 0;
+      const r = recordingCtx();
+      drawHut3D(r.ctx, g.igloo, 0);
+      expect(asked.includes('hut:lit')).toBe(true);
+      // Chamas (2 brilhos com gradiente) e a porta: abertura, luz e batente (fillRect)
+      expect(r.calls.filter((c) => c[0] === 'createRadialGradient').length).toBe(2);
+      expect(r.calls.filter((c) => c[0] === 'fillRect').length).toBeGreaterThan(3);
+    });
+  });
+
+  test('coqueiros e guarda-sol: 3D pelo gancho, e o 2D de sempre se a foto não estiver pronta', () => {
+    const was = { ...beachArt };
+    try {
+      const calls = [];
+      Object.assign(beachArt, { on: true, palm: (ctx, k) => (calls.push(`palm${k}`), true), parasol: () => (calls.push('parasol'), true) });
+      const a = recordingCtx();
+      drawBeachDecor(a.ctx, 0);
+      expect(calls).toEqual([...PALMS.map((_, k) => `palm${k}`), 'parasol']);
+      Object.assign(beachArt, { palm: () => false, parasol: () => false });
+      const b = recordingCtx();
+      drawBeachDecor(b.ctx, 0);
+      beachArt.on = false;
+      const c = recordingCtx();
+      drawBeachDecor(c.ctx, 0);
+      expect(b.calls.length).toBe(c.calls.length);
+      expect(b.calls.length).toBeGreaterThan(a.calls.length + 40);
+    } finally {
+      Object.assign(beachArt, was);
     }
   });
 });
