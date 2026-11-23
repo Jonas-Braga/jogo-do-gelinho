@@ -560,5 +560,7 @@
   "Áudio · motor do jet ski na Praia › voz contínua no Web Audio simulado: liga uma vez só, acompanha o volume e silencia com null",
   "Água com aspecto de líquido › toda fase tem a sua superfície (água em todas, lava nos Dinossauros) e sem canvas de verdade continua a ondulação antiga",
   "Água com aspecto de líquido › reflexo do cenário na água (como nos exemplos do usuário) em todas as fases com água; a lava não reflete; sem canvas de verdade não faz nada",
-  "Água com aspecto de líquido › num aparelho lento (volume desligado pelo fps baixo) volta para a ondulação de traços"
+  "Água com aspecto de líquido › num aparelho lento (volume desligado pelo fps baixo) volta para a ondulação de traços",
+  "Câmera: deslocamento maior para os lados › a câmera vai mais longe para cada lado (pedido do usuário: ~1 cm a mais), com o parallax de sempre",
+  "Personagem anda até a borda visível da tela › em toda profundidade (costa e fileiras), andando para um lado ele para com a figura a PLAYER.edge da borda que se vê (sem parede invisível antes)"
 ]

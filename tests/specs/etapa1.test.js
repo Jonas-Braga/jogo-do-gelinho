@@ -160,16 +160,25 @@ suite('Etapa 1 · loop, placas e movimento', () => {
     expect(g.player.state).toBe('stand');
   });
 
-  test('jogador não sai da tela', () => {
+  test('jogador não sai da tela', async () => {
+    // Adaptado com aprovação do usuário: confere onde o jogador APARECE na tela (a costa
+    // é desenhada encolhida pela perspectiva e a câmera, parada ali, desloca a cena), e
+    // não a posição no mundo; assim ele anda até a borda visível sem sair dela
+    const { depthScale, swayFactor } = await import('../../src/depth.js');
+    const { DEPTH } = await import('../../src/config.js');
+    const onScreen = (x, y) => {
+      const s = depthScale(y);
+      return DEPTH.vanishX + (x - DEPTH.vanishX) * s - (x - W / 2) * DEPTH.sway.amount * swayFactor(s);
+    };
     const g = makeGame();
     hold(g, 'left');
     step(g, 5);
     release(g, 'left');
-    expect(g.player.x).toBeGreaterThanOrEqual(PLAYER.edge);
+    expect(onScreen(g.player.x, SHORE_Y)).toBeGreaterThanOrEqual(PLAYER.edge - 1e-6);
     hold(g, 'right');
     step(g, 8);
     release(g, 'right');
-    expect(g.player.x).toBeLessThanOrEqual(W - PLAYER.edge);
+    expect(onScreen(g.player.x, SHORE_Y)).toBeLessThanOrEqual(W - PLAYER.edge + 1e-6);
   });
 
   test('placa leva o jogador contra a borda e ele cai na água', () => {

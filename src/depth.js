@@ -66,6 +66,20 @@ export function swayLayer(ctx, f, fn) {
 }
 
 // Posição na tela de um ponto do mundo (x) na profundidade y
+// Até onde o personagem anda numa linha de chão y: até a figura dele chegar a
+// PLAYER.edge da borda VISÍVEL da tela, contando a perspectiva (a costa é desenhada
+// encolhida para o centro) e a câmera parada naquele ponto (ela acompanha o jogador e
+// leva a cena para o lado contrário). Só depende da configuração, nunca da câmera do
+// momento, então a simulação continua determinística.
+export function walkLimits(y, edge) {
+  const s = depthScale(y);
+  const af = DEPTH.sway.amount * swayFactor(s);
+  const vX = DEPTH.vanishX;
+  // tela = vX + (x − vX)·s − (x − W/2)·a·f  →  resolve x para tela = alvo
+  const at = (T) => (T - vX * (1 - s) - (W / 2) * af) / (s - af);
+  return [at(edge), at(W - edge)];
+}
+
 export const projectX = (x, y) => DEPTH.vanishX + (x - DEPTH.vanishX) * depthScale(y) + swayAt(y);
 
 // Intervalo do mundo (x) que aparece na tela numa profundidade (para descartar o que está fora)

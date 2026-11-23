@@ -1,6 +1,7 @@
 import { W, SHORE_Y, ROW_Y, PLAYER as P, PLAYER_HEIGHT } from './config.js';
 import { SCARE_TIME } from './bear.js';
 import { POWERS } from './powers.js';
+import { walkLimits } from './depth.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -119,7 +120,7 @@ export class Player {
     if (this.row < 0 || !this.support) return;
     const nx = this.game.rows[this.row].pieceX(this.support);
     const d = nx - this.supportX;
-    if (Math.abs(d) < 60) this.x = clamp(this.x + d, P.edge, W - P.edge); // ignora o "pulo" do wrap
+    if (Math.abs(d) < 60) this.x = this.limitX(this.x + d); // ignora o "pulo" do wrap
     this.supportX = nx;
   }
 
@@ -167,7 +168,7 @@ export class Player {
           this.stepAcc = 0.2; // o primeiro passo soa logo ao começar a andar
         }
         this.carry();
-        this.x = clamp(this.x + h * P.walkSpeed * dt, P.edge, W - P.edge);
+        this.x = this.limitX(this.x + h * P.walkSpeed * dt);
         if (this.row >= 0) {
           // A placa saiu de baixo (levada pela borda da tela, abriu, ou o jogador andou para fora).
           const r = rows[this.row].pieceAt(this.x);
@@ -191,7 +192,7 @@ export class Player {
         this.moving = h !== 0;
         // No ar dá para ir para os lados; o alcance cresce com a velocidade da fase
         const air = this.game.params?.airSpeed ?? P.walkSpeed * P.airControl;
-        this.x = clamp(this.x + h * air * dt, P.edge, W - P.edge);
+        this.x = this.limitX(this.x + h * air * dt);
         const k = Math.min(this.t, 1);
         const arc = this.to < this.from ? P.arcUp : P.arcDown;
         this.y = this.y0 + (this.y1 - this.y0) * k - arc * 4 * k * (1 - k);
@@ -202,7 +203,7 @@ export class Player {
         // Boiando com a boia de patinho: não é levado pela correnteza, nada devagar
         // e pula (↑/↓) de volta para o gelo ou para a costa
         this.moving = h !== 0;
-        this.x = clamp(this.x + h * POWERS.swimSpeed * dt, P.edge, W - P.edge);
+        this.x = this.limitX(this.x + h * POWERS.swimSpeed * dt);
         // Uma placa passou por ele: sobe nela (conta como pouso)
         const r = rows[this.row].pieceAt(this.x);
         if (r) {
@@ -341,7 +342,19 @@ export class Player {
 
   // Empurrado por um inimigo: desloca na direção dele.
   push(nx) {
-    this.x = clamp(nx, P.edge, W - P.edge);
+    this.x = this.limitX(nx);
+  }
+
+  // Linha do chão do jogador (no pulo, entre a fileira de onde saiu e a de destino)
+  groundY() {
+    if (this.state === 'jump' && this.y0 != null) return this.y0 + (this.y1 - this.y0) * clamp(this.t, 0, 1);
+    return this.row >= 0 ? this.game.rows[this.row]?.y ?? SHORE_Y : SHORE_Y;
+  }
+
+  // Limite dos lados: a borda visível da tela naquela profundidade (walkLimits)
+  limitX(x) {
+    const [lo, hi] = walkLimits(this.groundY(), P.edge);
+    return clamp(x, lo, hi);
   }
 
   // Alcançado pelo urso: levanta os braços e foge assustado (dir = para longe do urso).

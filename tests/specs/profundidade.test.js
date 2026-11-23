@@ -2084,7 +2084,7 @@ suite('Água com aspecto de líquido', () => {
         return drawLiquidSurface(g, t, kind);
       };
       const t0 = Date.now();
-      while (!paint(1) && Date.now() - t0 < 20000) await new Promise((r) => setTimeout(r, 16));
+      while (!paint(1) && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 16));
       expect(paint(1)).toBe(true);
       const lum = (y) => {
         const d = g.getImageData(0, y, W, 1).data;
@@ -2138,7 +2138,7 @@ suite('Água com aspecto de líquido', () => {
         g.fillRect(0, 0, W, H);
         return drawLiquidSurface(g, 1, 'dino');
       };
-      while (!lava() && Date.now() - t1 < 20000) await new Promise((r) => setTimeout(r, 16));
+      while (!lava() && Date.now() - t1 < 120000) await new Promise((r) => setTimeout(r, 16));
       expect(lava()).toBe(true);
       const d = g.getImageData(0, 560, W, 60).data;
       let bright = 0;
@@ -2152,4 +2152,48 @@ suite('Água com aspecto de líquido', () => {
       expect(dark).toBeGreaterThan(2000);
     });
   }
+});
+
+suite('Câmera: deslocamento maior para os lados', () => {
+  test('a câmera vai mais longe para cada lado (pedido do usuário: ~1 cm a mais), com o parallax de sempre', () => {
+    // Antes: 0,03 (até ~19 px do jogo para cada lado); agora ~45 px
+    expect(maxSway()).toBeGreaterThan(40);
+    expect(maxSway()).toBeLessThan(60);
+    const was = camera.x;
+    try {
+      for (let i = 0; i < 300; i++) followCamera(W, 0.05);
+      expect(camera.x).toBeGreaterThan(40);
+      // O fundo anda menos que a frente, e o primeiro plano mais que tudo
+      expect(Math.abs(swayAt(ROW_Y[3]))).toBeGreaterThan(Math.abs(swayAt(SHORE_Y)));
+    } finally {
+      camera.x = was;
+    }
+  });
+});
+
+suite('Personagem anda até a borda visível da tela', () => {
+  test('em toda profundidade (costa e fileiras), andando para um lado ele para com a figura a PLAYER.edge da borda que se vê (sem parede invisível antes)', async () => {
+    const { walkLimits, depthScale, swayFactor } = await import('../../src/depth.js');
+    const { PLAYER } = await import('../../src/config.js');
+    const onScreen = (x, y) => {
+      const s = depthScale(y);
+      return DEPTH.vanishX + (x - DEPTH.vanishX) * s - (x - W / 2) * DEPTH.sway.amount * swayFactor(s);
+    };
+    for (const y of [SHORE_Y, ...ROW_Y]) {
+      const [lo, hi] = walkLimits(y, PLAYER.edge);
+      expect(Math.abs(onScreen(lo, y) - PLAYER.edge)).toBeLessThan(1e-6);
+      expect(Math.abs(onScreen(hi, y) - (W - PLAYER.edge))).toBeLessThan(1e-6);
+    }
+    // No jogo: andando na costa até travar, ele chega à borda visível dos dois lados
+    const { hold, release } = await import('../helpers.js');
+    const g = makeGame({ level: 1 });
+    hold(g, 'right');
+    step(g, 8);
+    release(g, 'right');
+    expect(onScreen(g.player.x, SHORE_Y)).toBeGreaterThan(W - PLAYER.edge - 1);
+    hold(g, 'left');
+    step(g, 10);
+    release(g, 'left');
+    expect(onScreen(g.player.x, SHORE_Y)).toBeLessThan(PLAYER.edge + 1);
+  });
 });

@@ -159,28 +159,35 @@ function toCanvas(img) {
 
 // Estado de cada tipo: gerando (gen) ou pronto (frames + padrões)
 const surfaces = {};
-export const surfaceState = (kind) => (surfaces[kind]?.frames ? 'ready' : surfaces[kind] ? 'baking' : 'none');
+export const surfaceState = (kind) => (surfaces[kind]?.canvases ? 'ready' : surfaces[kind] ? 'baking' : 'none');
 
 function surfaceFor(ctx, kind) {
+  // Só num canvas de verdade (um contexto falso de teste nunca gera nem guarda nada)
+  if (typeof document === 'undefined' || typeof DOMMatrix === 'undefined' || !SURFACE.kinds[kind]) return null;
+  if (!(ctx?.canvas?.width > 0) || typeof ctx.createPattern !== 'function') return null;
   let s = surfaces[kind];
-  if (!s) {
-    if (typeof document === 'undefined' || typeof DOMMatrix === 'undefined' || !SURFACE.kinds[kind]) return null;
-    s = surfaces[kind] = { gen: bake(kind) };
-  }
-  if (!s.frames) {
+  if (!s) s = surfaces[kind] = { gen: bake(kind) };
+  if (!s.canvases) {
     // Gera alguns quadros por vez enquanto a fase roda (até lá vale a ondulação antiga)
     const t0 = performance.now();
     while (performance.now() - t0 < 6) {
       const r = s.gen.next();
       if (r.done) {
-        s.frames = r.value.map((f) => ({ relief: ctx.createPattern(f.relief, 'repeat'), glow: ctx.createPattern(f.glow, 'repeat') }));
-        if (!s.frames[0].relief?.setTransform) s.frames = null; // navegador sem padrão transformável
+        s.canvases = r.value;
         break;
       }
     }
-    if (!s.frames) return null;
+    if (!s.canvases) return null;
   }
-  return s.frames;
+  // Os padrões são criados para cada canvas que desenha (a textura fica guardada)
+  s.patterns ||= new WeakMap();
+  let frames = s.patterns.get(ctx);
+  if (!frames) {
+    frames = s.canvases.map((f) => ({ relief: ctx.createPattern(f.relief, 'repeat'), glow: ctx.createPattern(f.glow, 'repeat') }));
+    if (!frames[0].relief?.setTransform) return null; // navegador sem padrão transformável
+    s.patterns.set(ctx, frames);
+  }
+  return frames;
 }
 
 // Faixas da tela (do fundo para a frente), mais finas ao fundo
