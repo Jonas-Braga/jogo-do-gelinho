@@ -4,6 +4,7 @@ import { MUTE_BUTTON } from './hud.js';
 import { createBackend } from './backend.js';
 import { AuthUI } from './auth-ui.js';
 import { InstallButton } from './install.js';
+import { prefetchLevel, levelReady } from './model3d.js';
 
 const canvas = document.getElementById('game');
 
@@ -22,6 +23,9 @@ try {
 const game = new Game(canvas, { title: true, backend });
 // Piloto da etapa 2: personagem da fase normal em 3D (fotografado ao abrir o jogo)
 game.renderer.use3d = true;
+// Fotos 3D tiradas antes de cada fase começar (sem o 2D aparecendo antes do 3D)
+game.preload = { request: prefetchLevel, ready: levelReady };
+prefetchLevel(1);
 new AuthUI(game, backend);
 new InstallButton(game);
 

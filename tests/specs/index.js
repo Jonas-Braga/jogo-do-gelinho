@@ -22,5 +22,6 @@ export const SPEC_FILES = [
   'dinossauros.test.js',
   'profundidade.test.js',
   'pontos.test.js',
+  'preload.test.js',
   'futuras.test.js',
 ];

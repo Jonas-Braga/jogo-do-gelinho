@@ -4,7 +4,8 @@
 // Cada modelo é fotografado só quando aparece pela primeira vez, aos poucos (algumas
 // poses por quadro) para não travar o jogo. Enquanto a foto não fica pronta, ou sem
 // internet/WebGL, vale o desenho 2D de sempre.
-import { DEPTH, W, IGLOO } from './config.js';
+import { DEPTH, W, IGLOO, BLOCK_W } from './config.js';
+import { levelParams } from './levels.js';
 import { Studio } from './m3d/kit.js';
 import * as player from './m3d/player.js';
 import * as bear from './m3d/bear.js';
@@ -1109,4 +1110,56 @@ function beachFinish(g) {
     g.arc(x, BG_H - 6 + rnd() * 4, 1.5 + rnd() * 2.5, 0, Math.PI * 2);
     g.fill();
   }
+}
+
+// ---------------------------------------------------------------- Fotos da fase seguinte
+// As fotos de um modelo só eram pedidas quando ele aparecia na tela, então no começo
+// de uma fase com modelos novos (fase especial, bicho novo) o desenho 2D aparecia por
+// um instante antes do 3D. `levelModels` lista tudo o que uma fase usa em 3D, para
+// o jogo pedir antes (durante a contagem do bônus) e só começar a fase com tudo pronto.
+const FLOE_PREFIX = { ice: 'floe', forest: 'log', space: 'rock', beach: 'board', halloween: 'pumpkin', dino: 'basalt' };
+const FRAG_W = 36; // largura dos pedaços das placas fragmentadas (src/floes.js)
+const HOUSE_MODELS = { igloo: ['igloo', 'porch'], cabin: ['cabin'], base: ['base'], hut: ['hut'], haunted: ['haunted'], cave: ['cave', 'caveTusks'] };
+const DECOR_MODELS = {
+  natal: ['xtree', 'sleigh'],
+  floresta: ['pine', 'mushroom'],
+  espaco: ['lander', 'flag'],
+  praia: ['parasol', ...palmModels.map((_, k) => `palm${k}`), 'sailboat', 'jetski'],
+  halloween: ['deadTree', 'jack'],
+  dino: ['fern', 'nest', 'egg'],
+};
+
+export function levelModels(level) {
+  const p = levelParams(level);
+  const sp = p.special;
+  if (sp && !THEMES_3D.has(sp.id)) return []; // fase especial ainda toda em 2D
+  const scenery = sp?.scenery || 'ice';
+  const out = [];
+  // O que aparece logo no primeiro quadro: fundo, placas, casa, personagem e enfeites
+  if (SCENERY_3D[scenery]) out.push(SCENERY_3D[scenery]);
+  out.push(`${FLOE_PREFIX[scenery]}${p.fragmented ? FRAG_W : BLOCK_W}`);
+  out.push(...(HOUSE_MODELS[sp?.house || 'igloo'] || []));
+  out.push(PLAYER_BY_OUTFIT[sp?.outfits?.player || 'parka']);
+  out.push(...(DECOR_MODELS[sp?.decor] || []));
+  // O que entra depois: urso, bichos, peixe e itens
+  if (p.bear) out.push(BEAR_BY_OUTFIT[sp?.outfits?.bear || 'polar']);
+  out.push(...(p.enemies || [p.enemy]));
+  out.push(scenery === 'ice' ? 'fish' : FISH_3D[scenery]);
+  out.push(...p.powers);
+  if (p.heat) out.push('cocoa');
+  if (sp) out.push('bag', 'heart');
+  return [...new Set(out.filter((n) => n && subjectOf(n)))];
+}
+
+// Pede as fotos de uma fase (as que já existem não são refeitas)
+export function prefetchLevel(level) {
+  for (const n of levelModels(level)) want(n);
+}
+
+// Todas as fotos da fase prontas? Sem 3D (Node, sem WebGL, Three.js indisponível)
+// não há o que esperar.
+export function levelReady(level) {
+  if (!M.enabled || typeof window === 'undefined' || !window.WebGLRenderingContext) return true;
+  if (model.state === 'failed') return true;
+  return levelModels(level).every((n) => status[n] === 'done');
 }

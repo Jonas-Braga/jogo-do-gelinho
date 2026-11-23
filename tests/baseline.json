@@ -574,5 +574,12 @@
   "Chocolate quente: +10° (fases normais a partir da 11) › pegar a caneca esquenta 10°, com aviso \"+10°\" e som",
   "Chocolate quente: +10° (fases normais a partir da 11) › não passa da temperatura inicial (45°)",
   "Chocolate quente: +10° (fases normais a partir da 11) › os graus ganhos viram bônus de temperatura no fim da fase",
-  "Chocolate quente: +10° (fases normais a partir da 11) › existe o som e o desenho da caneca (2D) funciona virada para os dois lados"
+  "Chocolate quente: +10° (fases normais a partir da 11) › existe o som e o desenho da caneca (2D) funciona virada para os dois lados",
+  "Fotos 3D da fase seguinte prontas antes de ela começar › cada fase lista os modelos 3D que usa (fundo, placas, casa, personagem, enfeites, urso, bichos, itens)",
+  "Fotos 3D da fase seguinte prontas antes de ela começar › o jogo de verdade (src/main.js) importa e liga o gancho das fotos",
+  "Fotos 3D da fase seguinte prontas antes de ela começar › sem 3D (Node) não há o que esperar",
+  "Fotos 3D da fase seguinte prontas antes de ela começar › ao entrar no iglu, o jogo pede as fotos da fase seguinte",
+  "Fotos 3D da fase seguinte prontas antes de ela começar › com as fotos ainda sendo tiradas, a fase seguinte espera (com o aviso \"Preparando a próxima fase…\")",
+  "Fotos 3D da fase seguinte prontas antes de ela começar › se as fotos demorarem demais (12 s), a fase começa assim mesmo",
+  "Fotos 3D da fase seguinte prontas antes de ela começar › na comemoração do troféu, a tecla espera as fotos e a fase segue sozinha quando ficam prontas"
 ]

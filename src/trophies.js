@@ -594,7 +594,11 @@ export function drawCelebration(ctx, game) {
     drawTrophy(ctx, lv, x0 + i * gap, cy + 160, s, { locked: !own.has(lv) });
   });
 
-  if (c.ready) {
+  if (c.ready && game.advancePending) {
+    ctx.font = `600 18px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.fillText('Preparando a próxima fase…', cx, H - 56);
+  } else if (c.ready) {
     ctx.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(t * 2.2));
     ctx.font = `800 20px ${FONT}`;
     ctx.fillStyle = '#FFFFFF';

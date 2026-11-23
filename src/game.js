@@ -22,6 +22,9 @@ import { BONUS } from './bonus.js';
 import { POWERS, POWER_NAMES } from './powers.js';
 import { HEAT } from './heat.js';
 
+// Espera máxima pelas fotos 3D da próxima fase (s); depois segue com o que houver
+export const PRELOAD_MAX = 12;
+
 // Cores das partículas de pouso por cenário: poeira na costa, lascas ao pousar
 // numa placa e brilhos da fileira que acende (padrão = neve e gelo)
 const LAND_FX = {
@@ -54,6 +57,13 @@ export class Game {
     this.boats = new SeaTraffic();
     this.special = null; // tema da fase especial atual (specials.js) ou null
     this.renderer = new Renderer(this.ctx);
+    // Fotos 3D da fase seguinte (src/main.js liga { request(nível), ready(nível) }):
+    // pedidas ao entrar no iglu; a fase só começa com elas prontas (no máximo
+    // PRELOAD_MAX s de espera), para o desenho 2D não aparecer antes do 3D
+    this.preload = null;
+    this.loadingNext = false;
+    this.waitNext = 0;
+    this.advancePending = false;
     this.time = 0;
     this.paused = false;
     this.fps = 60;
@@ -214,9 +224,20 @@ export class Game {
   // Fim da comemoração (tecla ou toque, depois de um instante): próxima fase
   endCelebration() {
     if (this.state !== 'trophy' || !this.celebration?.ready) return;
+    if (!this.nextReady()) {
+      this.advancePending = true; // continua sozinho quando as fotos ficarem prontas
+      return;
+    }
     this.celebration = null;
     this.level++;
     this.startLevel();
+  }
+
+  // Fotos 3D da próxima fase prontas (ou esperou demais, ou não há 3D)?
+  nextReady() {
+    const ok = !this.preload || this.waitNext >= PRELOAD_MAX || this.preload.ready(this.level + 1);
+    this.loadingNext = !ok;
+    return ok;
   }
 
   // Ranking do fim de jogo: espera o recorde ser gravado e busca os melhores
@@ -337,6 +358,14 @@ export class Game {
     if (this.state === 'trophy') {
       // Comemoração: o jogo espera a tecla; a fumaça do iglu continua saindo
       this.celebration.update(dt);
+      if (this.advancePending) {
+        this.waitNext += dt;
+        if (this.nextReady()) {
+          this.advancePending = false;
+          this.endCelebration();
+          return;
+        }
+      }
       this.smokeT -= dt;
       if (this.smokeT <= 0) {
         this.smokeT = 0.28;
@@ -405,6 +434,10 @@ export class Game {
           this.state = 'trophy';
           this.banner = null;
           this.sfx.play('trophy');
+        } else if (!this.nextReady()) {
+          // Ainda tirando as fotos 3D da próxima fase: segura o fim da fase
+          this.bonusTimer = 0.1;
+          this.waitNext += 0.1;
         } else {
           this.level++;
           this.startLevel();
@@ -581,6 +614,9 @@ export class Game {
     this.particles.puff(this.igloo.doorX, this.player.y + 2, 8);
     this.smokeT = 0.3;
     this.state = 'levelEnd';
+    this.preload?.request(this.level + 1);
+    this.waitNext = 0;
+    this.advancePending = false;
     this.bonusTotal = 0;
     this.bonusDone = false;
     this.bonusTimer = 0.6;
