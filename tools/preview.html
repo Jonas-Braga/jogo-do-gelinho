@@ -18,6 +18,7 @@
  ?modelo=0 / ?relevo=0 / ?frente=0 desligam o personagem 3D / o relevo / o primeiro plano (comparar e medir)
        ?poder=duck|boot  jogador com o poder (e o item na fileira)
        ?x=N      põe o jogador em X na costa (a câmera já chega lá: parallax)
+       ?caneca=1 (fase 11+) a primeira caneca de chocolate quente passa em 2 s
        ?jetski=1 na Praia, jet ski passando sem parar (clique para ligar o som) -->
   <canvas id="game"></canvas>
   <script type="module">
@@ -75,6 +76,8 @@
         dir = -dir;
       }, 1500);
     }
+    // ?caneca=1: a primeira caneca de chocolate quente passa logo (a segunda vem 14–24 s depois)
+    if (q.get('caneca')) game.critters.heatTimer = 2;
     if (q.get('parado')) game.update = () => {};
     game.start();
     window.__game = game;
