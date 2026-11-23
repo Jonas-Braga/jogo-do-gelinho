@@ -84,7 +84,7 @@ o visual deve ser totalmente novo.
 
 &#x20; 11 em diante, além da boia): por 5 s fica imune; o bicho que encosta leva um
 
-&#x20; chute, voa longe e vale 50 × fase; o urso é jogado para longe e fica tonto 2 s.
+&#x20; chute, voa longe e vale metade do peixe (100); o urso é jogado para longe e fica tonto 2 s.
 
 \- \*\*Progressão:\*\* a velocidade aumenta a cada fase. Em fases alternadas, as
 
@@ -94,7 +94,11 @@ o visual deve ser totalmente novo.
 
 \- \*\*Pontuação e vidas:\*\* pontos por placa ativada, por peixe e por bônus de
 
-&#x20; temperatura. Vida extra a cada 5.000 pontos. Começa com 3 vidas.
+&#x20; temperatura. A placa e o grau de bônus valem 10, 20, ... até 100 e na fase seguinte recomeça em 10
+&#x20; (fase 11 = 10, fase 20 = 100, fase 21 = 10). \*\*Chocolate quente\*\* (fases normais
+&#x20; da 11 em diante): passam até 2 canecas por fase; cada uma esquenta 10° (sem passar
+&#x20; de 45°), e o tempo a mais vira bônus de temperatura. Vida extra a cada 5.000
+&#x20; pontos. Começa com 3 vidas.
 
 
 

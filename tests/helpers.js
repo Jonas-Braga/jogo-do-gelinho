@@ -25,6 +25,7 @@ export function silence(g) {
   g.critters.timers = g.critters.timers.map(() => Infinity);
   g.critters.bonusQueue = [];
   g.critters.powerQueue = [];
+  g.critters.heatQueue = [];
   g.bear.active = false;
 }
 

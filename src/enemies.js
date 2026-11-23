@@ -1,6 +1,7 @@
 import { W, ROW_Y } from './config.js';
 import { BONUS, BONUS_KINDS } from './bonus.js';
 import { POWERS, POWER_KINDS } from './powers.js';
+import { HEAT, HEAT_KINDS } from './heat.js';
 
 // Largura de colisão de cada tipo. Os bichos das fases especiais têm o tamanho dos
 // que substituem (morcego, disco voador e gaivota = ganso; cobra, bichinho lunar e
@@ -16,6 +17,7 @@ export const SIZE = {
   ptero: 44, raptor: 40, ammonite: 34,
   bag: BONUS.size, heart: BONUS.size,
   duck: POWERS.size, boot: POWERS.size,
+  cocoa: HEAT.size,
 };
 const SPACING = 52;
 const PLAYER_HALF = 12;
@@ -53,6 +55,9 @@ export class Critters {
     // fase, em hora sorteada; com dois, em ordem sorteada e nunca juntos
     this.powerQueue = shuffle([...(params.powers || [])]);
     this.powerTimer = rand(POWERS.firstMin, POWERS.firstMax);
+    // Chocolate quente (fases normais a partir da 11): até 2 canecas, uma de cada vez
+    this.heatQueue = Array(params.heat || 0).fill('cocoa');
+    this.heatTimer = rand(HEAT.firstMin, HEAT.firstMax);
   }
 
   // A entrada da fileira está livre? (nenhum bicho perto da borda por onde o prêmio
@@ -71,6 +76,11 @@ export class Critters {
   // Solta o próximo item de poder (boia ou chuteira), do mesmo jeito dos prêmios
   spawnPower() {
     return this.spawnItem(this.powerQueue, { power: true });
+  }
+
+  // Solta a próxima caneca de chocolate quente, do mesmo jeito
+  spawnHeat() {
+    return this.spawnItem(this.heatQueue, { heat: true });
   }
 
   spawnItem(queue, flags) {
@@ -130,6 +140,12 @@ export class Critters {
         this.powerTimer = this.spawnPower() ? rand(POWERS.gapMin, POWERS.gapMax) : 0.5;
       }
     }
+    if (this.heatQueue?.length) {
+      this.heatTimer -= dt;
+      if (this.heatTimer <= 0) {
+        this.heatTimer = this.spawnHeat() ? rand(HEAT.gapMin, HEAT.gapMax) : 0.5;
+      }
+    }
     for (const c of this.list) {
       if (c.kicked) {
         // Chutado: voa girando para longe e cai na água lá adiante
@@ -173,6 +189,9 @@ export class Critters {
       } else if (POWER_KINDS.includes(c.kind)) {
         c.dead = true;
         game.onPower(c);
+      } else if (HEAT_KINDS.includes(c.kind)) {
+        c.dead = true;
+        game.onHeat(c);
       } else if (pl.power === 'boot') {
         // Com a chuteira: imune, e quem encosta leva um chute e voa longe
         const away = Math.sign(-dx) || pl.facing;

@@ -79,3 +79,44 @@ export const heart = {
   },
   apply() {},
 };
+
+// Caneca de chocolate quente (fases normais a partir da 11; src/heat.js): apoio no
+// centro do fundo, boca em y = 22, alça do lado direito como no 2D. A fumaça, o
+// brilho e o anel d'água continuam 2D por cima/por baixo.
+export const cocoa = {
+  box: { left: -26, right: 26, top: 32, bottom: -8 },
+  res: 3,
+  elevation: 0.3,
+  poses: () => [{ key: 'cocoa' }],
+  build({ THREE, mat, group, mesh, lathe }) {
+    const red = mat('#D8443A', 0.3, { emissive: '#3A0A06', emissiveIntensity: 0.25 });
+    const white = mat('#FFFFFF', 0.4);
+    const choc = mat('#6A3A1E', 0.35);
+    const foam = mat('#FFF4E6', 0.8);
+    const root = group();
+    // Corpo torneado: paredes com espessura (fora, borda arredondada, dentro) e fundo
+    const body = lathe([[0, 0], [9.6, 0], [10.6, 1.2], [11, 20], [11.2, 21.6], [10.4, 22.4], [9.4, 21.4], [9.2, 3], [0, 3]], red, 40);
+    root.add(body);
+    // Faixa branca em volta
+    root.add(lathe([[11.06, 8.2], [11.12, 11.6]], white, 40));
+    const band = root.children[root.children.length - 1];
+    band.material = mat('#FFFFFF', 0.4, { side: THREE.DoubleSide });
+    // Chocolate quase na boca, com bolhinhas de espuma
+    const top = mesh(new THREE.CircleGeometry(9.25, 32), choc, 0, 19.5, 0);
+    top.rotation.x = -Math.PI / 2;
+    root.add(top);
+    for (const [x, z, r] of [[-3, 1, 2], [1.5, -1.5, 2.4], [4.5, 2.2, 1.6], [-1, -4, 1.5], [0.5, 3.5, 1.8]]) {
+      const b = mesh(new THREE.SphereGeometry(r, 12, 8), foam, x, 19.6, z);
+      b.scale.set(1, 0.45, 1);
+      root.add(b);
+    }
+    // Alça: meio anel do lado direito
+    const handle = mesh(new THREE.TorusGeometry(6, 1.7, 10, 20, Math.PI), red, 11, 11, 0);
+    handle.rotation.z = -Math.PI / 2;
+    root.add(handle);
+    // Virada um pouco para mostrar a alça e a frente
+    root.rotation.y = -0.35;
+    return { root };
+  },
+  apply() {},
+};

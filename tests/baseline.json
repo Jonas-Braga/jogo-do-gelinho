@@ -422,7 +422,7 @@
   "Poderes · boia de patinho e chuteira dourada › boiando, os bichos não empurram o personagem",
   "Poderes · boia de patinho e chuteira dourada › pegar a chuteira: poder por 5 s, aviso \"CHUTEIRA! 5 s\"",
   "Poderes · boia de patinho e chuteira dourada › com a chuteira, o bicho que encosta leva um chute: não empurra e voa longe",
-  "Poderes · boia de patinho e chuteira dourada › cada bicho chutado vale 50 × fase, uma vez só",
+  "Poderes · boia de patinho e chuteira dourada › cada bicho chutado vale metade do peixe, uma vez só",
   "Poderes · boia de patinho e chuteira dourada › sem a chuteira os bichos continuam empurrando; a chuteira não chuta peixe",
   "Poderes · boia de patinho e chuteira dourada › com a chuteira, o urso não assusta: é jogado para longe e fica tonto por 2 s",
   "Poderes · boia de patinho e chuteira dourada › sem a chuteira o urso continua assustando o jogador",
@@ -562,5 +562,17 @@
   "Água com aspecto de líquido › reflexo do cenário na água (como nos exemplos do usuário) em todas as fases com água; a lava não reflete; sem canvas de verdade não faz nada",
   "Água com aspecto de líquido › num aparelho lento (volume desligado pelo fps baixo) volta para a ondulação de traços",
   "Câmera: deslocamento maior para os lados › a câmera vai mais longe para cada lado (pedido do usuário: ~1 cm a mais), com o parallax de sempre",
-  "Personagem anda até a borda visível da tela › em toda profundidade (costa e fileiras), andando para um lado ele para com a figura a PLAYER.edge da borda que se vê (sem parede invisível antes)"
+  "Personagem anda até a borda visível da tela › em toda profundidade (costa e fileiras), andando para um lado ele para com a figura a PLAYER.edge da borda que se vê (sem parede invisível antes)",
+  "Pontos: placa e grau de 10 a 100, recomeçando a cada 10 fases › a placa vale 10 × fase até a fase 10 e depois recomeça em 10",
+  "Pontos: placa e grau de 10 a 100, recomeçando a cada 10 fases › nunca passa de 100 e sempre é múltiplo de 10",
+  "Pontos: placa e grau de 10 a 100, recomeçando a cada 10 fases › o grau de bônus segue o mesmo ciclo de 10 a 100",
+  "Pontos: placa e grau de 10 a 100, recomeçando a cada 10 fases › acender uma fileira numa fase avançada dá os pontos do ciclo",
+  "Pontos: chute da chuteira vale metade do peixe › o chute vale 50% do peixe em qualquer fase (não cresce com a fase)",
+  "Chocolate quente: +10° (fases normais a partir da 11) › passa da fase 11 em diante, até 2 por fase; antes da 11 e nas especiais não",
+  "Chocolate quente: +10° (fases normais a partir da 11) › passam exatamente 2 canecas por fase, separadas, e não voltam",
+  "Chocolate quente: +10° (fases normais a partir da 11) › com os bichos passando de verdade, as 2 canecas aparecem",
+  "Chocolate quente: +10° (fases normais a partir da 11) › pegar a caneca esquenta 10°, com aviso \"+10°\" e som",
+  "Chocolate quente: +10° (fases normais a partir da 11) › não passa da temperatura inicial (45°)",
+  "Chocolate quente: +10° (fases normais a partir da 11) › os graus ganhos viram bônus de temperatura no fim da fase",
+  "Chocolate quente: +10° (fases normais a partir da 11) › existe o som e o desenho da caneca (2D) funciona virada para os dois lados"
 ]

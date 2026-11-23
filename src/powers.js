@@ -16,7 +16,7 @@ export const POWERS = {
   size: 32,         // largura de colisão
   swimSpeed: 110,   // nadando com a boia (px/s)
   swimDepth: 24,    // quanto do corpo fica dentro d'água (px)
-  kickPoints: 50,   // pontos por bicho chutado (× fase)
+  kickShare: 0.5,   // cada bicho chutado vale metade do peixe
   kickTime: 0.3,    // duração do movimento de chute (s)
   kickVx: 900,      // o bicho chutado voa nesta velocidade...
   kickVy: -520,     // ...subindo assim (px/s)...

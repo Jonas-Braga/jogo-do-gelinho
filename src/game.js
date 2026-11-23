@@ -20,6 +20,7 @@ import { HAUNT } from './halloween.js';
 import { LAVA } from './dino.js';
 import { BONUS } from './bonus.js';
 import { POWERS, POWER_NAMES } from './powers.js';
+import { HEAT } from './heat.js';
 
 // Cores das partículas de pouso por cenário: poeira na costa, lascas ao pousar
 // numa placa e brilhos da fileira que acende (padrão = neve e gelo)
@@ -527,13 +528,23 @@ export class Game {
 
   // Bicho chutado (chuteira dourada): voa longe e vale pontos
   onKick(c) {
-    const pts = POWERS.kickPoints * this.level;
+    const pts = Math.round(this.params.fishPoints * POWERS.kickShare);
     this.addScore(pts);
     const y = this.rows[c.row].y;
     this.particles.text(c.x, y - 60, `+${pts}`, '#FFE066');
     this.particles.puff(c.x, y - 14, 10, '#FFE98A');
     this.sfx.play('kick');
     this.shake = Math.max(this.shake, 0.15);
+  }
+
+  // Pegou o chocolate quente: esquenta 10° (sem passar da temperatura inicial)
+  onHeat(c) {
+    const y = this.rows[c.row].y;
+    const before = this.temp;
+    this.temp = Math.min(HEAT.max, this.temp + HEAT.degrees);
+    this.particles.text(c.x, y - 70, `+${this.temp - before}°`, '#FFA25A');
+    this.particles.puff(c.x, y - 14, 14, '#FFC9A0');
+    this.sfx.play('heat');
   }
 
   // Urso chutado: é jogado para longe e fica tonto (não vale pontos)

@@ -252,7 +252,7 @@ suite('Fases especiais · prêmios (sacos de dinheiro e corações)', () => {
     for (const lv of [4, 6, 29]) {
       const g = makeGame({ level: lv });
       g.onLand(1);
-      expect(g.score, `fase normal ${lv}`).toBe(10 * lv);
+      expect(g.score, `fase normal ${lv}`).toBe(g.params.floePoints);
     }
   });
 
@@ -274,9 +274,11 @@ suite('Fases especiais · prêmios (sacos de dinheiro e corações)', () => {
     }
     const n = makeGame({ level: 29 });
     n.temp = 30;
+    const perDegree = n.params.degreePoints; // fase 29: 90 (ciclo de 10 a 100)
+    expect(perDegree).toBe(90);
     n.onEntered();
     step(n, 4);
-    expect(n.score, 'fase normal: bônus de 10 × fase por grau').toBe(30 * 10 * 29);
+    expect(n.score, 'fase normal: bônus por grau (ciclo de 10 a 100)').toBe(30 * perDegree);
   });
 
   test('fases especiais: peixes e sacos de dinheiro continuam dando pontos', () => {

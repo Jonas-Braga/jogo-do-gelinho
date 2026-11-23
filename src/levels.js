@@ -1,6 +1,7 @@
 import { RULES, PLAYER } from './config.js';
 import { specialFor } from './specials.js';
 import { POWERS, powersFor } from './powers.js';
+import { HEAT, heatFor } from './heat.js';
 
 // Parâmetros por fase: velocidade, tipo de placa, inimigos, urso e pontuação.
 //
@@ -12,6 +13,13 @@ import { POWERS, powersFor } from './powers.js';
 const ENEMY_CYCLE = ['goose', 'crab', 'clam'];
 const BASE_SPEED = 62;     // velocidade das placas na fase 1 (px/s)
 const ESCAPE_MARGIN = 0.8; // inimigos/urso no máximo a 80% da velocidade de caminhada
+
+// Pontos por placa acesa e por grau de bônus: sobem de 10 em 10 até 100 e recomeçam em 10 na fase seguinte
+export const FLOE_POINTS_MAX = 100;
+export function floePoints(level) {
+  const steps = FLOE_POINTS_MAX / 10;
+  return 10 * (((level - 1) % steps) + 1);
+}
 
 export function levelParams(level) {
   const L = level - 1;
@@ -44,8 +52,10 @@ export function levelParams(level) {
     bearSpeed: Math.min(85 + (level - 4) * 12, maxChaser) * pace,
 
     // Pontuação
-    floePoints: 10 * level,
-    degreePoints: 10 * level,
+    // Placa: 10, 20, ... 100 e volta a 10 a cada 10 fases (fase 11 = 10, fase 20 = 100),
+    // para os pulos não valerem tanto nas fases avançadas e as vidas extras não sobrarem
+    floePoints: floePoints(level),
+    degreePoints: floePoints(level), // grau de bônus: mesmo ciclo de 10 a 100
     fishPoints: 200,
 
     // Fase especial (a cada 5 fases, quando já há um tema criado), ou null
@@ -53,6 +63,9 @@ export function levelParams(level) {
 
     // Poderes que passam uma vez na fase (boia de patinho, chuteira dourada)
     powers: powersFor(level, specialFor(level)),
+
+    // Canecas de chocolate quente (+10°) que passam na fase (fases normais a partir da 11)
+    heat: heatFor(level, specialFor(level)),
   };
 }
 
@@ -66,7 +79,7 @@ export function levelIntro(level) {
   else if (level === 4) sub = 'Cuidado: um urso apareceu na costa!';
   else if (level === RULES.auroraFrom) sub = 'Uma aurora boreal ilumina o céu';
   else if (level === POWERS.from) sub = 'Novidade: pegue a boia de patinho e pule na água por 5 s!';
-  else if (level === POWERS.bootFrom) sub = 'Novidade: a chuteira dourada chuta os bichos para longe!';
+  else if (level === POWERS.bootFrom) sub = 'Novidade: a chuteira dourada chuta os bichos e o chocolate quente esquenta 10°!';
   else if (level === 2) sub = 'Placas fragmentadas: cuidado com os vãos!';
   else if (levelParams(level).fragmented) sub = 'Placas fragmentadas e mais rápidas';
   else sub = 'As placas estão mais rápidas';

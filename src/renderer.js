@@ -38,6 +38,7 @@ import {
 } from './dino.js';
 import { drawHud } from './hud.js';
 import { drawMoneyBag, drawHeart, bonusArt } from './bonus.js';
+import { drawCocoa } from './heat.js';
 import { drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront, drawDizzy, powerArt } from './powers.js';
 
 const CRITTER_DRAW = {
@@ -49,6 +50,7 @@ const CRITTER_DRAW = {
   ptero: drawPtero, raptor: drawRaptor, ammonite: drawAmmonite,
   bag: drawMoneyBag, heart: drawHeart,
   duck: drawDuckFloat, boot: drawGoldenBoot,
+  cocoa: drawCocoa,
 };
 
 // Construções das fases especiais (o iglu se desenha sozinho)

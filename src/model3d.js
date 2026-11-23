@@ -13,7 +13,7 @@ import { floeSubject, variantOf, PAD as FLOE_PAD, TOP as FLOE_TOP, H as FLOE_H }
 import { dome as iglooDome, porch as iglooPorch, BLOCKS as IGLOO_BLOCKS } from './m3d/igloo.js';
 import { duck as duckItem, boot as bootItem } from './m3d/powers.js';
 import { sleigh as sleighModel, tree as treeModel, TREE_H } from './m3d/christmas.js';
-import { bag as bagModel, heart as heartModel } from './m3d/bonus.js';
+import { bag as bagModel, heart as heartModel, cocoa as cocoaModel } from './m3d/bonus.js';
 import { snake, bat, piranha, logSubject, LOG, pine as pineModel, PINE_H, mushroom as mushroomModel, cabin as cabinModel } from './m3d/forest.js';
 import { CABIN, CABIN_PIECES, drawCabinDoor } from './forest.js';
 import {
@@ -58,7 +58,7 @@ export const SUBJECTS = {
   // Dinossauros
   'player-caveman': player.withOutfit('caveman'), trex, ptero, raptor, ammonite, egg: eggModel, cave: caveModel, caveTusks, fern: fernModel, nest: nestModel,
   // Prêmios das fases especiais (iguais em todas)
-  bag: bagModel, heart: heartModel,
+  bag: bagModel, heart: heartModel, cocoa: cocoaModel,
   // Cenários de fundo (uma foto do tamanho do fundo 2D)
   'bg-ice': iceScenery, 'bg-forest': forestScenery, 'bg-space': spaceScenery, 'bg-beach': beachScenery, 'bg-halloween': halloweenScenery, 'bg-dino': dinoScenery,
 };

@@ -188,6 +188,13 @@ export const SOUNDS = {
       s.tone({ type: 'triangle', f0: NOTE(n), dur: 0.1, vol: 0.11, t: i * 0.045 }));
     s.tone({ type: 'sine', f0: 900, f1: 1800, dur: 0.2, vol: 0.08, t: 0.28 });
   },
+  heat(s) {
+    // Chocolate quente: "glup" de gole, suspiro quente subindo e um brilho
+    s.tone({ type: 'sine', f0: 320, f1: 180, dur: 0.12, vol: 0.18 });
+    s.tone({ type: 'sine', f0: 300, f1: 160, dur: 0.12, vol: 0.15, t: 0.14 });
+    s.noise({ dur: 0.45, vol: 0.06, filter: 'bandpass', f0: 900, f1: 2400, t: 0.2 });
+    [67, 72, 76, 79].forEach((n, i) => s.tone({ type: 'triangle', f0: NOTE(n), dur: 0.12, vol: 0.09, t: 0.3 + i * 0.06 }));
+  },
   quack(s) {
     // Caiu na água com a boia de patinho: "plof" e dois "quá" de borracha
     s.noise({ dur: 0.25, vol: 0.22, filter: 'lowpass', f0: 2200, f1: 400 });

@@ -398,16 +398,16 @@ suite('Poderes · boia de patinho e chuteira dourada', () => {
     expect(g.critters.list.includes(c)).toBe(false);
   });
 
-  test('cada bicho chutado vale 50 × fase, uma vez só', () => {
+  test('cada bicho chutado vale metade do peixe, uma vez só', () => {
     const g = makeGame({ level: 12 });
     g.player.givePower('boot');
     const before = g.score;
     touch(g, 'goose', 15);
-    expect(g.score - before).toBe(POWERS.kickPoints * 12);
+    expect(g.score - before).toBe(g.params.fishPoints * POWERS.kickShare);
     g.critters.update(1 / 120);
     g.critters.update(1 / 120);
-    expect(g.score - before).toBe(600);
-    expect(g.particles.texts.some((x) => x.str === '+600')).toBe(true);
+    expect(g.score - before).toBe(100);
+    expect(g.particles.texts.some((x) => x.str === '+100')).toBe(true);
   });
 
   test('sem a chuteira os bichos continuam empurrando; a chuteira não chuta peixe', () => {
