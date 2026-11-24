@@ -628,5 +628,9 @@
   "Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da tela › cada placa na tela tem espuma na linha d'água e um rastro em V para trás (mais comprido mais rápido)",
   "Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da tela › pousando numa placa a água reage: onda em volta da placa toda e gotinhas nas duas pontas",
   "Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da tela › modo só 3D: as placas não têm mais a sombra escura 2D; o halo da fileira acesa é luz 3D e o rastro vem na passada do chão",
-  "Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da tela › bichos na água fazem ondas (no lugar do anel parado); peixe no ar não faz"
+  "Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da tela › bichos na água fazem ondas (no lugar do anel parado); peixe no ar não faz",
+  "Urso modelado no Blender (referências do usuário) › polar e marrom exportados do Blender: esqueleto com pele (pernas com joelho, cabeça, mandíbula, rabo) e cor no pelo",
+  "Urso modelado no Blender (referências do usuário) › rosto das referências: olhos com branco, íris, pupila e brilho, sobrancelhas, nariz, sorriso, orelhas com miolo, boca que abre de verdade; 4 garras e almofada em cada pata",
+  "Urso modelado no Blender (referências do usuário) › mesmo passo e mesmas fotos; a pata da frente sobe bem na passada (como na referência \"andando\")",
+  "Urso modelado no Blender (referências do usuário) › o estúdio baixa o modelo antes de fotografar; sem o arquivo, fica o urso procedural"
 ]

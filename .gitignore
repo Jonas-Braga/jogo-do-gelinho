@@ -2,6 +2,7 @@
 frostbite1.jpeg
 # Referências de água (imagens de bancos de imagem, de terceiros): NÃO publicar
 referencia de agua/
+referencia de urso/
 
 # Sistema / editores
 .DS_Store
@@ -16,3 +17,6 @@ __pycache__/
 *.pyc
 *.log
 .claude/
+
+# Cópias de segurança do Blender
+*.blend1

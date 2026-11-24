@@ -137,6 +137,7 @@ export function want(name) {
 }
 
 let busy = false;
+const prepared = new WeakSet();
 // Alguma foto sendo tirada (ou na fila)? O jogo fica mais lento nesses momentos
 export const photosBusy = () => busy || (model.state === 'ready' && queue.length > 0);
 
@@ -145,6 +146,20 @@ function pump() {
   busy = true;
   const name = queue.shift();
   const subject = subjectOf(name);
+  // Modelos feitos no Blender (.glb) são baixados antes da primeira foto; se o arquivo
+  // não vier, o próprio modelo decide a reserva (build sem o .glb)
+  if (subject.prepare && !prepared.has(subject)) {
+    Promise.resolve()
+      .then(() => subject.prepare())
+      .catch((e) => console.info(`[gelinho] modelo "${name}" do Blender não carregou`, e?.message || e))
+      .finally(() => {
+        prepared.add(subject);
+        busy = false;
+        queue.unshift(name);
+        pump();
+      });
+    return;
+  }
   const gen = model.studio.shoot(subject);
   const t0 = performance.now();
   const step = () => {

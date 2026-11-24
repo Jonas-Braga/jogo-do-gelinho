@@ -1434,7 +1434,8 @@ suite('"Ursos" 3D revisados: corpo contínuo', () => {
       expect(bb.min.z).toBeLessThan(-46);
       expect(bb.max.z).toBeGreaterThan(44);
       expect(bb.max.y).toBeGreaterThan(64);
-      expect(bb.max.y).toBeLessThan(70);
+      // Urso no estilo das referências do usuário (corpão alto): até 95 (antes 70, aprovado)
+      expect(bb.max.y).toBeLessThan(95);
     });
   }
 });
@@ -3548,6 +3549,119 @@ suite('Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da
       const lit = (arr) => { let n = 0; for (let i = 0; i < arr.length; i += 4) if (arr[i] > 60) n++; return n; };
       expect(lit(d)).toBeGreaterThan(40);
       expect(lit(e)).toBeGreaterThan(40);
+    });
+  }
+});
+
+suite('Urso modelado no Blender (referências do usuário)', () => {
+  // Lê o .glb exportado pelo blender/build_bear.py (no Node pelo disco, no navegador pela rede)
+  const glbOf = async (v) => {
+    const { parseGLB } = await import('../../src/m3d/glb.js');
+    if (isNode) {
+      const fs = await import('node:fs');
+      const b = fs.readFileSync(new URL(bear3d.glbUrl(v)));
+      return parseGLB(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+    }
+    return parseGLB(await (await fetch(bear3d.glbUrl(v))).arrayBuffer());
+  };
+  const BONES = ['body', 'neck', 'head', 'jaw', 'tail', ...['FL', 'FR', 'BL', 'BR'].flatMap((k) => [`up_${k}`, `low_${k}`, `foot_${k}`])];
+
+  test('polar e marrom exportados do Blender: esqueleto com pele (pernas com joelho, cabeça, mandíbula, rabo) e cor no pelo', async () => {
+    for (const v of ['polar', 'brown']) {
+      const { json } = await glbOf(v);
+      const names = json.nodes.map((n) => n.name);
+      for (const b of BONES) expect(names.includes(b), `${v}: osso ${b}`).toBe(true);
+      const skin = json.skins[0];
+      for (const b of BONES) expect(skin.joints.map((j) => json.nodes[j].name).includes(b), `${v}: ${b} deforma`).toBe(true);
+      const body = json.nodes.find((n) => n.name === 'SM_Bear');
+      expect(body.skin != null, v).toBe(true);
+      const prim = json.meshes[body.mesh].primitives[0];
+      for (const a of ['POSITION', 'NORMAL', 'COLOR_0', 'JOINTS_0', 'WEIGHTS_0']) expect(prim.attributes[a] != null, `${v}: ${a}`).toBe(true);
+      // Leve o bastante para baixar no celular
+      const tris = json.accessors[prim.indices].count / 3;
+      expect(tris, v).toBeLessThan(80000);
+    }
+  });
+
+  test('rosto das referências: olhos com branco, íris, pupila e brilho, sobrancelhas, nariz, sorriso, orelhas com miolo, boca que abre de verdade; 4 garras e almofada em cada pata', async () => {
+    for (const v of ['polar', 'brown']) {
+      const { json } = await glbOf(v);
+      const byName = Object.fromEntries(json.nodes.map((n, i) => [n.name, i]));
+      const childrenOf = (n) => (json.nodes[byName[n]].children || []).map((i) => json.nodes[i].name);
+      const head = childrenOf('head');
+      for (const s of ['L', 'R']) {
+        for (const p of ['EyeWhite', 'Iris', 'Pupil', 'EyeShine', 'Brow', 'Ear', 'EarIn']) expect(head.includes(p + s), `${v}: ${p}${s}`).toBe(true);
+      }
+      for (const p of ['Nose', 'Smile1', 'Smile-1', 'Fang1', 'Fang-1']) expect(head.includes(p), `${v}: ${p}`).toBe(true);
+      // Boca de verdade: o miolo escuro (com a língua pintada) estica entre a cabeça e a
+      // mandíbula (malha com pele); os dentinhos de baixo vão com a mandíbula
+      const bag = json.nodes.find((n) => n.name === 'MouthBag');
+      expect(bag && bag.skin != null, `${v}: miolo da boca com pele`).toBe(true);
+      const bagMats = json.meshes[bag.mesh].primitives.map((p) => json.materials[p.material].name);
+      expect(bagMats.includes('M_MouthIn') && bagMats.includes('M_Tongue'), `${v}: boca e língua`).toBe(true);
+      for (const p of ['ToothLow1', 'ToothLow-1']) expect(childrenOf('jaw').includes(p), `${v}: ${p}`).toBe(true);
+      for (const k of ['FL', 'FR', 'BL', 'BR']) {
+        const foot = childrenOf(`foot_${k}`);
+        expect(foot.filter((n) => n.startsWith('Claw')).length, `${v}: garras ${k}`).toBe(4);
+        expect(foot.includes(`Pad${k}`), `${v}: almofada ${k}`).toBe(true);
+      }
+      // Marrom de verdade e polar quase branco (cores do pelo nos vértices; materiais lineares)
+      const fur = json.materials.find((m) => m.name === 'M_FurSolid').pbrMetallicRoughness.baseColorFactor;
+      if (v === 'brown') expect(fur[0]).toBeGreaterThan(fur[2] * 2);
+      else expect(Math.min(fur[0], fur[1], fur[2])).toBeGreaterThan(0.5);
+    }
+  });
+
+  test('mesmo passo e mesmas fotos; a pata da frente sobe bem na passada (como na referência "andando")', () => {
+    expect(bear3d.box.top).toBeGreaterThanOrEqual(125); // cabeça grande e o gorro do Natal cabem na foto
+    expect(bear3d.poses().length).toBe(bear3d.FRAMES * 2 * 3);
+    expect(bear3d.STANCE).toBe(0.6);
+    const front = { front: true, hip: { z: 18 } };
+    const back = { front: false, hip: { z: -27 } };
+    expect(bear3d.footAt(front, 0.8).y - bear3d.footAt(front, 0.1).y).toBeGreaterThan(12);
+    expect(bear3d.footAt(front, 0.8).y).toBeGreaterThan(bear3d.footAt(back, 0.8).y);
+  });
+
+  test('o estúdio baixa o modelo antes de fotografar; sem o arquivo, fica o urso procedural', () => {
+    for (const name of ['bear', 'bear-santa', 'bear-brown']) expect(typeof SUBJECTS[name].prepare, name).toBe('function');
+    expect(bear3d.glbUrl('santa')).toBe(bear3d.glbUrl('polar'));
+    expect(bear3d.glbUrl('brown').endsWith('assets/models/bear-brown.glb')).toBe(true);
+  });
+
+  if (!isNode) {
+    test('no navegador: o urso do Blender anda sem soltar as garras, a boca abre perseguindo e a foto sai cheia', async () => {
+      const { loadModel, want, sprite } = await import('../../src/model3d.js');
+      loadModel();
+      const t0 = Date.now();
+      while (model.state !== 'ready' && model.state !== 'failed' && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
+      const kit = model.studio.kit;
+      const THREE = kit.THREE;
+      for (const v of ['polar', 'brown', 'santa']) {
+        await bear3d.prepare(v);
+        const rig = bear3d.build(kit, v);
+        expect(rig.glb, v).toBe(true);
+        expect(rig.brows.length, v).toBe(2);
+        if (v === 'santa') expect(rig.hatTip, v).toBeTruthy();
+        for (const p of bear3d.poses().filter((p, i) => i % 5 === 0)) {
+          bear3d.apply(rig, p);
+          rig.root.updateMatrixWorld(true);
+          for (const leg of rig.legs) {
+            const f = leg.foot.getWorldPosition(new THREE.Vector3());
+            const claw = rig.nodes[`Pad${leg.key}`].children[0];
+            claw.geometry.computeBoundingBox();
+            const c = claw.localToWorld(claw.geometry.boundingBox.getCenter(new THREE.Vector3()));
+            expect(c.distanceTo(f), `${v} ${p.key} ${leg.key}`).toBeLessThan(14);
+          }
+          expect(rig.nodes.Fang1.visible, p.key).toBe(p.mouth > 0);
+        }
+      }
+      want('bear');
+      while (!sprite('bear', 'walk0R0') && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
+      const c = sprite('bear', 'walk0R0');
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let solid = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 200) solid++;
+      expect(solid).toBeGreaterThan(c.width * c.height * 0.15);
     });
   }
 });
