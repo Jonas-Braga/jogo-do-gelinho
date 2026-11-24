@@ -1,7 +1,7 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
   rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, drawBoat3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
-  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy, water3D, sky3D, particles3D, drawSkyFlyers3D,
+  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy, water3D, sky3D, particles3D, drawSkyFlyers3D, drawDoor3D,
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
@@ -39,6 +39,7 @@ import {
 import { drawHud } from './hud.js';
 import { drawMoneyBag, drawHeart, bonusArt } from './bonus.js';
 import { fireArt } from './particles.js';
+import { doorArt } from './art.js';
 import { weatherItems, smokeItems, volcanoItems, fireflyItems, SMOKE_COLORS } from './m3d/particles3d.js';
 import { drawCocoa } from './heat.js';
 import { drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront, drawDizzy, powerArt } from './powers.js';
@@ -249,6 +250,8 @@ export class Renderer {
     dinoArt.fern = this.hook(drawFern3D);
     dinoArt.nest = this.hook(drawNest3D);
     dinoArt.tusks = this.hook(drawCaveTusks3D);
+    // Portas e cortinas 3D (interior, folha e batente) nas fases já convertidas
+    doorArt.draw = this.normal3d ? this.hook(drawDoor3D) : null;
     // Modo só 3D: fumaça dos vulcões e chamas das tochas são partículas 3D ao vivo
     dinoArt.smoke = this.only3d ? (c, tt) => { this.pass3d(c, tt, (push) => volcanoItems(push, tt)); return true; } : null;
     fireArt.draw = this.only3d ? (c, x, base, h, w, seed, tt) => { this.particles3d()?.flame(c, tt, x, base, h, w, seed); return true; } : null;

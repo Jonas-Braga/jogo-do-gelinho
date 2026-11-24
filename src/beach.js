@@ -5,6 +5,7 @@
 // lugar do urso. Só o visual muda (e o ritmo, como em toda fase especial).
 import { W, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
 import { fireArt } from './particles.js';
+import { doorArt } from './art.js';
 
 const SS = 2;
 const TAU = Math.PI * 2;
@@ -996,7 +997,8 @@ function doorRect() {
   return { x: d.x - d.w, y: d.bottom - d.h, w: d.w * 2, h: d.h };
 }
 
-function drawDoorFrame(ctx) {
+function drawDoorFrame(ctx, igloo, t) {
+  if (doorArt.draw?.(ctx, 'hut', 'frame', igloo, t)) return;
   const r = doorRect();
   ctx.fillStyle = '#8A6A30';
   ctx.fillRect(r.x - 5, r.y - 6, 5, r.h + 6);
@@ -1010,8 +1012,9 @@ function drawDoorFrame(ctx) {
 }
 
 // Cortina de folhas de coqueiro que desce e fecha a porta: k = 0 aberta, 1 fechada
-function drawLeafCurtain(ctx, k, t) {
+function drawLeafCurtain(ctx, k, t, igloo) {
   if (k <= 0) return;
+  if (doorArt.draw?.(ctx, 'hut', 'leaf', igloo, t)) return;
   const r = doorRect();
   const h = r.h * k;
   ctx.save();
@@ -1092,17 +1095,20 @@ export function drawHutDoor(ctx, igloo, t) {
   ctx.save();
   ctx.globalAlpha = Math.min(1, a * 3);
   ctx.translate(0, -(1 - easeOutBack(a)) * 30);
-  const dg = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
-  dg.addColorStop(0, '#2A1E10');
-  dg.addColorStop(1, '#4A3820');
-  ctx.fillStyle = dg;
-  ctx.fillRect(r.x, r.y, r.w, r.h);
+  const in3d = !!doorArt.draw?.(ctx, 'hut', 'inside', igloo, t);
+  if (!in3d) {
+    const dg = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
+    dg.addColorStop(0, '#2A1E10');
+    dg.addColorStop(1, '#4A3820');
+    ctx.fillStyle = dg;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+  }
   if (igloo.lit) {
-    ctx.fillStyle = `rgba(255, 200, 120, ${0.55 + Math.sin(t * 5) * 0.08})`;
+    ctx.fillStyle = `rgba(255, 200, 120, ${in3d ? 0.16 + Math.sin(t * 5) * 0.16 : 0.55 + Math.sin(t * 5) * 0.08})`;
     ctx.fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 2);
   }
-  drawLeafCurtain(ctx, igloo.curtain, t);
-  drawDoorFrame(ctx);
+  drawLeafCurtain(ctx, igloo.curtain, t, igloo);
+  drawDoorFrame(ctx, igloo, t);
   ctx.restore();
 }
 
@@ -1115,8 +1121,8 @@ export function drawHutDoorFront(ctx, igloo, t) {
     ctx.fillStyle = `rgba(30, 20, 8, ${0.4 * igloo.shade})`;
     ctx.fillRect(r.x, r.y, r.w, r.h);
   }
-  drawLeafCurtain(ctx, igloo.curtain, t);
-  drawDoorFrame(ctx);
+  drawLeafCurtain(ctx, igloo.curtain, t, igloo);
+  drawDoorFrame(ctx, igloo, t);
   ctx.restore();
 }
 

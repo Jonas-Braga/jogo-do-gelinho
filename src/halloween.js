@@ -5,6 +5,7 @@
 // lugar do iglu, fantasminhas, aranhas e olhos boiando, balas de Halloween no lugar
 // dos peixes e um lobisomem no lugar do urso. Só o visual muda (e o ritmo).
 import { W, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
+import { doorArt } from './art.js';
 
 const SS = 2;
 const TAU = Math.PI * 2;
@@ -1521,7 +1522,8 @@ function doorRect() {
 }
 
 // Batente em arco pontudo (gótico) em volta da porta
-function drawDoorFrame(ctx) {
+function drawDoorFrame(ctx, igloo, t) {
+  if (doorArt.draw?.(ctx, 'haunted', 'frame', igloo, t)) return;
   const r = doorRect();
   ctx.strokeStyle = '#1A1224';
   ctx.lineWidth = 6;
@@ -1538,8 +1540,9 @@ function drawDoorFrame(ctx) {
 }
 
 // Porta de tábuas que fecha girando na dobradiça: k = 0 aberta, 1 fechada
-function drawDoorLeaf(ctx, k) {
+function drawDoorLeaf(ctx, k, igloo, t) {
   if (k <= 0) return;
+  if (doorArt.draw?.(ctx, 'haunted', 'leaf', igloo, t)) return;
   const r = doorRect();
   const w = r.w * k;
   const g = ctx.createLinearGradient(r.x, 0, r.x + w, 0);
@@ -1627,6 +1630,7 @@ export function drawHauntedDoor(ctx, igloo, t) {
   ctx.save();
   ctx.globalAlpha = Math.min(1, a * 3);
   ctx.translate(0, -(1 - easeOutBack(a)) * 30);
+  const in3d = !!doorArt.draw?.(ctx, 'haunted', 'inside', igloo, t);
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(r.x, r.y + r.h);
@@ -1635,18 +1639,20 @@ export function drawHauntedDoor(ctx, igloo, t) {
   ctx.quadraticCurveTo(r.x + r.w, r.y - 8, r.x + r.w, r.y + 8);
   ctx.lineTo(r.x + r.w, r.y + r.h);
   ctx.closePath();
-  const dg = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
-  dg.addColorStop(0, '#0E0814');
-  dg.addColorStop(1, '#22182E');
-  ctx.fillStyle = dg;
-  ctx.fill();
+  if (!in3d) {
+    const dg = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
+    dg.addColorStop(0, '#0E0814');
+    dg.addColorStop(1, '#22182E');
+    ctx.fillStyle = dg;
+    ctx.fill();
+  }
   if (igloo.lit) {
-    ctx.fillStyle = `rgba(255, 190, 100, ${0.5 + Math.sin(t * 5) * 0.08})`;
+    ctx.fillStyle = `rgba(255, 190, 100, ${in3d ? 0.16 + Math.sin(t * 5) * 0.16 : 0.5 + Math.sin(t * 5) * 0.08})`;
     ctx.fill();
   }
   ctx.restore();
-  drawDoorLeaf(ctx, igloo.curtain);
-  drawDoorFrame(ctx);
+  drawDoorLeaf(ctx, igloo.curtain, igloo, t);
+  drawDoorFrame(ctx, igloo, t);
   ctx.restore();
 }
 
@@ -1659,7 +1665,7 @@ export function drawHauntedDoorFront(ctx, igloo, t) {
     ctx.fillStyle = `rgba(14, 8, 20, ${0.45 * igloo.shade})`;
     ctx.fillRect(r.x, r.y - 8, r.w, r.h + 8);
   }
-  drawDoorLeaf(ctx, igloo.curtain);
-  drawDoorFrame(ctx);
+  drawDoorLeaf(ctx, igloo.curtain, igloo, t);
+  drawDoorFrame(ctx, igloo, t);
   ctx.restore();
 }

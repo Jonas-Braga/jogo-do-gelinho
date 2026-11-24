@@ -8,6 +8,7 @@
 // do rio no lugar da neve. Só o visual muda (e o ritmo, como toda especial).
 import { W, H, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
 import { fireArt } from './particles.js';
+import { doorArt } from './art.js';
 
 const SS = 2;
 const TAU = Math.PI * 2;
@@ -1462,13 +1463,17 @@ export function doorStone(k) {
   return { x, y: d.bottom - STONE_R + 2, r: STONE_R, angle: -(1 - k) * travel / STONE_R };
 }
 
-function drawDoorStone(ctx, k) {
+function drawDoorStone(ctx, k, igloo, t) {
   const s = doorStone(k);
   ctx.save();
   ctx.fillStyle = 'rgba(20, 10, 5, 0.35)';
   ctx.beginPath();
   ctx.ellipse(s.x + 3, s.y + s.r - 1, s.r * 0.9, 5, 0, 0, TAU);
   ctx.fill();
+  if (doorArt.draw?.(ctx, 'cave', 'leaf', igloo, t)) {
+    ctx.restore();
+    return;
+  }
   ctx.translate(s.x, s.y);
   ctx.rotate(s.angle);
   const g = ctx.createRadialGradient(-s.r * 0.35, -s.r * 0.4, 3, 0, 0, s.r * 1.1);
@@ -1568,17 +1573,20 @@ export function drawCaveDoor(ctx, igloo, t) {
   ctx.save();
   ctx.globalAlpha = Math.min(1, a * 3);
   ctx.translate(0, -(1 - easeOutBack(a)) * 30);
+  const in3d = !!doorArt.draw?.(ctx, 'cave', 'inside', igloo, t);
   mouthPath(ctx);
-  const dg = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
-  dg.addColorStop(0, '#0E0806');
-  dg.addColorStop(1, '#2A1A10');
-  ctx.fillStyle = dg;
-  ctx.fill();
-  if (igloo.lit) {
-    ctx.fillStyle = `rgba(255, 170, 70, ${0.5 + Math.sin(t * 6) * 0.1})`;
+  if (!in3d) {
+    const dg = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
+    dg.addColorStop(0, '#0E0806');
+    dg.addColorStop(1, '#2A1A10');
+    ctx.fillStyle = dg;
     ctx.fill();
   }
-  drawDoorStone(ctx, igloo.curtain);
+  if (igloo.lit) {
+    ctx.fillStyle = `rgba(255, 170, 70, ${in3d ? 0.18 + Math.sin(t * 6) * 0.18 : 0.5 + Math.sin(t * 6) * 0.1})`;
+    ctx.fill();
+  }
+  drawDoorStone(ctx, igloo.curtain, igloo, t);
   ctx.restore();
   return true;
 }
@@ -1596,7 +1604,7 @@ export function drawCaveDoorFront(ctx, igloo, t) {
     ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.restore();
   }
-  drawDoorStone(ctx, igloo.curtain);
+  drawDoorStone(ctx, igloo.curtain, igloo, t);
   ctx.translate(IGLOO.x, IGLOO.baseY);
   if (!(dinoArt.on && dinoArt.tusks?.(ctx))) {
     drawTusk(ctx, -1);

@@ -3,6 +3,7 @@
 // piranhas, folhas caindo no lugar da neve. Só o visual muda: as regras, a
 // colisão e a dificuldade são as mesmas da fase normal.
 import { W, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
+import { doorArt } from './art.js';
 
 const SS = 2;
 
@@ -762,7 +763,8 @@ function doorRect() {
   return { x: d.x - d.w, y: d.bottom - d.h, w: d.w * 2, h: d.h };
 }
 
-function drawDoorFrame(ctx) {
+function drawDoorFrame(ctx, igloo, t) {
+  if (doorArt.draw?.(ctx, 'cabin', 'frame', igloo, t)) return;
   const r = doorRect();
   ctx.fillStyle = '#4A2C16';
   ctx.fillRect(r.x - 6, r.y - 7, 6, r.h + 7);
@@ -773,8 +775,9 @@ function drawDoorFrame(ctx) {
 }
 
 // Porta de tábuas: k = 0 aberta (encostada na parede), 1 fechada
-function drawDoorLeaf(ctx, k) {
+function drawDoorLeaf(ctx, k, igloo, t) {
   if (k <= 0) return;
+  if (doorArt.draw?.(ctx, 'cabin', 'leaf', igloo, t)) return;
   const r = doorRect();
   const w = r.w * k;
   ctx.save();
@@ -870,17 +873,20 @@ export function drawCabinDoor(ctx, igloo, t) {
   ctx.save();
   ctx.globalAlpha = Math.min(1, a * 3);
   ctx.translate(0, -(1 - easeOutBack(a)) * 30);
-  const dg = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
-  dg.addColorStop(0, '#1A120B');
-  dg.addColorStop(1, '#33261A');
-  ctx.fillStyle = dg;
-  ctx.fillRect(r.x, r.y, r.w, r.h);
+  const in3d = !!doorArt.draw?.(ctx, 'cabin', 'inside', igloo, t);
+  if (!in3d) {
+    const dg = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
+    dg.addColorStop(0, '#1A120B');
+    dg.addColorStop(1, '#33261A');
+    ctx.fillStyle = dg;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+  }
   if (igloo.lit) {
     const k = 0.55 + Math.sin(t * 5) * 0.08;
-    ctx.fillStyle = `rgba(255, 200, 120, ${k})`;
+    ctx.fillStyle = `rgba(255, 200, 120, ${in3d ? (k - 0.47) * 2 : k})`;
     ctx.fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 2);
   }
-  drawDoorLeaf(ctx, igloo.curtain);
+  drawDoorLeaf(ctx, igloo.curtain, igloo, t);
   if (igloo.lit && igloo.curtain >= 1) {
     // Luz quente escapando pelas frestas da porta fechada
     ctx.save();
@@ -891,7 +897,7 @@ export function drawCabinDoor(ctx, igloo, t) {
     ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 1);
     ctx.restore();
   }
-  drawDoorFrame(ctx);
+  drawDoorFrame(ctx, igloo, t);
   ctx.restore();
 }
 
@@ -905,8 +911,8 @@ export function drawCabinDoorFront(ctx, igloo, t) {
     ctx.fillStyle = `rgba(20, 12, 6, ${0.4 * igloo.shade})`;
     ctx.fillRect(r.x, r.y, r.w, r.h);
   }
-  drawDoorLeaf(ctx, igloo.curtain);
-  drawDoorFrame(ctx);
+  drawDoorLeaf(ctx, igloo.curtain, igloo, t);
+  drawDoorFrame(ctx, igloo, t);
   ctx.restore();
 }
 

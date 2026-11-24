@@ -1,4 +1,5 @@
 import { IGLOO, RULES, SHORE_Y } from './config.js';
+import { doorArt } from './art.js';
 import { CABIN_PIECES, CABIN_VENT, RIVER } from './forest.js';
 import { BASE_PIECES, BASE_VENT, DUST } from './space.js';
 import { HUT_PIECES, HUT_VENT, SEA } from './beach.js';
@@ -258,13 +259,16 @@ export class Igloo {
     ctx.fill();
 
     // Abertura escura (interior)
-    const dg = ctx.createLinearGradient(0, DOOR.bottom - DOOR.h, 0, DOOR.bottom);
-    dg.addColorStop(0, '#0B1E28');
-    dg.addColorStop(1, '#22404D');
-    ctx.fillStyle = dg;
-    this.archPath(ctx, DOOR.rx, DOOR.h);
-    ctx.fill();
-    if (this.lit) this.drawGlow(ctx, t);
+    const in3d = !!doorArt.draw?.(ctx, 'igloo', 'inside', this, t);
+    if (!in3d) {
+      const dg = ctx.createLinearGradient(0, DOOR.bottom - DOOR.h, 0, DOOR.bottom);
+      dg.addColorStop(0, '#0B1E28');
+      dg.addColorStop(1, '#22404D');
+      ctx.fillStyle = dg;
+      this.archPath(ctx, DOOR.rx, DOOR.h);
+      ctx.fill();
+    }
+    if (this.lit) this.drawGlow(ctx, t, in3d);
 
     this.drawCurtain(ctx, t);
     if (this.lit && this.curtain >= 1) {
@@ -339,6 +343,7 @@ export class Igloo {
   drawCurtain(ctx, t) {
     const k = this.curtain;
     if (k <= 0) return;
+    if (doorArt.draw?.(ctx, 'igloo', 'leaf', this, t)) return;
     const top = DOOR.bottom - DOOR.h;
     const h = DOOR.h * k + 2;
     ctx.save();
@@ -377,7 +382,8 @@ export class Igloo {
   }
 
   // Luz quente vazando pelas frestas da cortina
-  drawGlow(ctx, t) {
+  // (in3d: o interior 3D aceso já tem a luz; aqui só o halo e o tremeluzir)
+  drawGlow(ctx, t, in3d = false) {
     const k = 0.5 + Math.sin(t * 5) * 0.08;
     const cy = DOOR.bottom - DOOR.h * 0.4;
     const lg = ctx.createRadialGradient(DOOR.x, cy, 4, DOOR.x, cy, 70);
@@ -387,7 +393,7 @@ export class Igloo {
     ctx.beginPath();
     ctx.arc(DOOR.x, cy, 70, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = `rgba(255, 205, 130, ${k + 0.25})`;
+    ctx.fillStyle = `rgba(255, 205, 130, ${in3d ? (k - 0.42) * 2 : k + 0.25})`;
     this.archPath(ctx, DOOR.rx - 2, DOOR.h - 2);
     ctx.fill();
   }

@@ -4,6 +4,7 @@
 // estrelinhas douradas no lugar dos peixes e um alienígena no lugar do urso.
 // Só o visual muda: as regras, a colisão e a dificuldade são as mesmas.
 import { W, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
+import { doorArt } from './art.js';
 
 const SS = 2;
 const TAU = Math.PI * 2;
@@ -1145,7 +1146,18 @@ const doorPath = (ctx, r, inset = 0) => {
 };
 
 // Batente de metal com faixa de aviso amarela e preta
-function drawDoorFrame(ctx, lit, t) {
+function drawDoorFrame(ctx, lit, t, igloo) {
+  if (doorArt.draw?.(ctx, 'base', 'frame', igloo, t)) {
+    // A luz da câmara de ar pisca por cima da lâmpada 3D
+    if (lit) {
+      const r = doorRect();
+      ctx.fillStyle = `rgba(110, 255, 150, ${0.25 + Math.sin(t * 4) * 0.2})`;
+      ctx.beginPath();
+      ctx.arc(r.x + r.w + 10, r.y + 8, 5, 0, TAU);
+      ctx.fill();
+    }
+    return;
+  }
   const r = doorRect();
   ctx.save();
   ctx.strokeStyle = '#6A6F82';
@@ -1179,8 +1191,9 @@ function drawDoorFrame(ctx, lit, t) {
 }
 
 // Porta de correr em duas folhas: k = 0 aberta, 1 fechada
-function drawDoorLeaves(ctx, k) {
+function drawDoorLeaves(ctx, k, igloo, t) {
   if (k <= 0) return;
+  if (doorArt.draw?.(ctx, 'base', 'leaf', igloo, t)) return;
   const r = doorRect();
   const half = (r.w / 2) * k;
   ctx.save();
@@ -1269,18 +1282,21 @@ export function drawBaseDoor(ctx, igloo, t) {
   ctx.save();
   ctx.globalAlpha = Math.min(1, a * 3);
   ctx.translate(0, -(1 - easeOutBack(a)) * 30);
-  const dg = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
-  dg.addColorStop(0, '#0E1024');
-  dg.addColorStop(1, '#262A44');
-  ctx.fillStyle = dg;
-  doorPath(ctx, r);
-  ctx.fill();
+  const in3d = !!doorArt.draw?.(ctx, 'base', 'inside', igloo, t);
+  if (!in3d) {
+    const dg = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
+    dg.addColorStop(0, '#0E1024');
+    dg.addColorStop(1, '#262A44');
+    ctx.fillStyle = dg;
+    doorPath(ctx, r);
+    ctx.fill();
+  }
   if (igloo.lit) {
-    ctx.fillStyle = `rgba(255, 200, 120, ${0.55 + Math.sin(t * 5) * 0.08})`;
+    ctx.fillStyle = `rgba(255, 200, 120, ${in3d ? 0.16 + Math.sin(t * 5) * 0.16 : 0.55 + Math.sin(t * 5) * 0.08})`;
     doorPath(ctx, r, 2);
     ctx.fill();
   }
-  drawDoorLeaves(ctx, igloo.curtain);
+  drawDoorLeaves(ctx, igloo.curtain, igloo, t);
   if (igloo.lit && igloo.curtain >= 1) {
     // Luz quente escapando pela fresta do meio
     ctx.save();
@@ -1294,7 +1310,7 @@ export function drawBaseDoor(ctx, igloo, t) {
     ctx.stroke();
     ctx.restore();
   }
-  drawDoorFrame(ctx, igloo.lit, t);
+  drawDoorFrame(ctx, igloo.lit, t, igloo);
   ctx.restore();
 }
 
@@ -1312,8 +1328,8 @@ export function drawBaseDoorFront(ctx, igloo, t) {
     ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.restore();
   }
-  drawDoorLeaves(ctx, igloo.curtain);
-  drawDoorFrame(ctx, igloo.lit, t);
+  drawDoorLeaves(ctx, igloo.curtain, igloo, t);
+  drawDoorFrame(ctx, igloo.lit, t, igloo);
   ctx.restore();
 }
 

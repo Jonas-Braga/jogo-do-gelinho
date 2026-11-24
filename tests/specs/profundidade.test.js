@@ -33,6 +33,19 @@ import { pumpkinSprite3D, drawHaunted3D } from '../../src/model3d.js';
 import { HAUNTED_PIECES, halloweenArt, drawHalloweenDecor, SHORE_PUMPKINS } from '../../src/halloween.js';
 import { basaltSprite3D, drawCave3D } from '../../src/model3d.js';
 import { CAVE_PIECES, dinoArt, drawDinoDecor, drawCaveDoorFront, TREE_FERNS } from '../../src/dino.js';
+import { doorArt } from '../../src/art.js';
+import { drawDoor3D } from '../../src/model3d.js';
+
+// Liga o gancho das portas 3D (como o renderizador faz nas fases em 3D) só durante fn
+function withDoors3D(fn) {
+  const before = doorArt.draw;
+  doorArt.draw = drawDoor3D;
+  try {
+    return fn();
+  } finally {
+    doorArt.draw = before;
+  }
+}
 
 // Contexto 2D falso que registra as chamadas
 function recordingCtx() {
@@ -772,7 +785,7 @@ suite('Floresta em 3D', () => {
     });
   });
 
-  test('cabana 3D: peças assentadas numa foto, a que cai por cima, e a porta 2D por cima de tudo', () => {
+  test('cabana 3D: peças assentadas numa foto, a que cai por cima, e a porta 3D por cima de tudo', () => {
     const keys = new Set(SUBJECTS.cabin.poses().map((p) => p.key));
     for (let n = 1; n < CABIN_PIECES.length; n++) expect(keys.has(`n${n}`)).toBe(true);
     withFake((asked) => {
@@ -784,12 +797,12 @@ suite('Floresta em 3D', () => {
       expect(drawCabin3D(ctx, g.igloo, 0)).toBe(true);
       expect(asked.includes('cabin:n5')).toBe(true);
       expect(asked.includes('cabin:b5')).toBe(true);
-      // Pronta: a porta (abertura, folha, batente) é o desenho 2D
+      // Pronta: a porta (abertura, folha, batente) é o modelo 3D da porta
       for (let i = 0; i < 16; i++) g.igloo.add();
       g.igloo.update(5);
-      const r = recordingCtx();
-      drawCabin3D(r.ctx, g.igloo, 0);
-      expect(r.calls.filter((c) => c[0] === 'fillRect').length).toBeGreaterThan(3);
+      g.igloo.curtain = 1;
+      withDoors3D(() => drawCabin3D(recordingCtx().ctx, g.igloo, 0));
+      for (const k of ['in0', 'k12', 'frame']) expect(asked.includes(`door-cabin:${k}`), k).toBe(true);
     });
   });
 });
@@ -858,7 +871,7 @@ suite('Espaço em 3D', () => {
     });
   });
 
-  test('base lunar 3D: peças assentadas numa foto, a que cai por cima, luz acesa com alguém dentro e a porta 2D por cima', () => {
+  test('base lunar 3D: peças assentadas numa foto, a que cai por cima, luz acesa com alguém dentro e a porta 3D por cima', () => {
     const keys = new Set(SUBJECTS.base.poses().map((p) => p.key));
     for (let n = 1; n < BASE_PIECES.length; n++) expect(keys.has(`n${n}`)).toBe(true);
     for (let i = 0; i < BASE_PIECES.length - 1; i++) expect(keys.has(`b${i}`)).toBe(true);
@@ -872,17 +885,16 @@ suite('Espaço em 3D', () => {
       expect(drawBase3D(ctx, g.igloo, 0)).toBe(true);
       expect(asked.includes('base:n5')).toBe(true);
       expect(asked.includes('base:b5')).toBe(true);
-      // Pronta e com o astronauta lá dentro: foto acesa e a porta 2D (abertura, folhas, batente)
+      // Pronta e com o astronauta lá dentro: foto acesa e a porta 3D (abertura acesa,
+      // folhas fechadas e o batente com a luz verde)
       for (let i = 0; i < 16; i++) g.igloo.add();
       g.igloo.update(5);
       g.igloo.lit = true;
+      g.igloo.curtain = 1;
       asked.length = 0;
-      const r = recordingCtx();
-      drawBase3D(r.ctx, g.igloo, 0);
+      withDoors3D(() => drawBase3D(recordingCtx().ctx, g.igloo, 0));
       expect(asked.includes('base:lit')).toBe(true);
-      // abertura e batente da porta (roundRect) e a faixa de aviso (fillRect)
-      expect(r.calls.filter((c) => c[0] === 'roundRect').length).toBeGreaterThan(1);
-      expect(r.calls.some((c) => c[0] === 'fillRect')).toBe(true);
+      for (const k of ['in1', 'k12', 'frame1']) expect(asked.includes(`door-base:${k}`), k).toBe(true);
     });
   });
 
@@ -979,7 +991,7 @@ suite('Praia em 3D', () => {
     });
   });
 
-  test('cabana 3D: peças assentadas numa foto, a que cai por cima, janela acesa, chamas 2D das tochas e a porta 2D por cima', () => {
+  test('cabana 3D: peças assentadas numa foto, a que cai por cima, janela acesa, chamas 2D das tochas e a porta 3D por cima', () => {
     const keys = new Set(SUBJECTS.hut.poses().map((p) => p.key));
     for (let n = 1; n < HUT_PIECES.length; n++) expect(keys.has(`n${n}`)).toBe(true);
     for (let i = 0; i < HUT_PIECES.length - 1; i++) expect(keys.has(`b${i}`)).toBe(true);
@@ -997,12 +1009,13 @@ suite('Praia em 3D', () => {
       g.igloo.update(5);
       g.igloo.lit = true;
       asked.length = 0;
+      g.igloo.curtain = 1;
       const r = recordingCtx();
-      drawHut3D(r.ctx, g.igloo, 0);
+      withDoors3D(() => drawHut3D(r.ctx, g.igloo, 0));
       expect(asked.includes('hut:lit')).toBe(true);
-      // Chamas (2 brilhos com gradiente) e a porta: abertura, luz e batente (fillRect)
+      // Chamas (2 brilhos com gradiente) e a porta 3D: interior aceso, cortina e batente
       expect(r.calls.filter((c) => c[0] === 'createRadialGradient').length).toBe(2);
-      expect(r.calls.filter((c) => c[0] === 'fillRect').length).toBeGreaterThan(3);
+      for (const k of ['in1', 'k12', 'frame']) expect(asked.includes(`door-hut:${k}`), k).toBe(true);
     });
   });
 
@@ -2798,6 +2811,163 @@ suite('Água 3D sem xadrez: marolas espaçadas', () => {
         dy += Math.abs(lum(x, y + 1) - lum(x, y));
       }
       expect(dy).toBeGreaterThan(dx * 1.3);
+    });
+  }
+});
+
+suite('Cena em 3D · etapa 4: portas e cortinas 3D', () => {
+  const withFake = (fn) => {
+    const was = { ...model };
+    const asked = [];
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: (_, k) => (asked.push(String(k)), img) });
+      return fn(asked, img);
+    } finally {
+      Object.assign(model, was);
+    }
+  };
+
+  test('toda casa tem o modelo da porta (interior apagado/aceso, folha em 13 passos e batente) e ele entra nas fotos da fase', async () => {
+    const { DOOR_MODELS, DOOR_SUBJECTS, LEAF_STEPS, STONE_STEPS } = await import('../../src/m3d/doors.js');
+    const { levelModels } = await import('../../src/model3d.js');
+    const styles = new Set(['igloo', ...Object.values(SPECIALS).map((sp) => sp.house).filter(Boolean)]);
+    for (const st of styles) {
+      const name = DOOR_MODELS[st];
+      expect(!!name, `casa ${st}`).toBe(true);
+      const keys = new Set(SUBJECTS[name].poses().map((p) => p.key));
+      expect(keys.has('in0') && keys.has('in1'), name).toBe(true);
+      if (st !== 'cave') {
+        for (let i = 0; i <= LEAF_STEPS; i++) expect(keys.has(`k${i}`), `${name} k${i}`).toBe(true);
+        expect(keys.has(st === 'base' ? 'frame1' : 'frame') || st === 'igloo', `${name} batente`).toBe(true);
+      }
+    }
+    const stone = new Set(DOOR_SUBJECTS['door-stone'].poses().map((p) => p.key));
+    expect(stone.size).toBe(STONE_STEPS);
+    expect(levelModels(1)).toContain('door-igloo');
+    expect(levelModels(10)).toContain('door-cabin');
+    expect(levelModels(15)).toContain('door-base');
+    expect(levelModels(20)).toContain('door-hut');
+    expect(levelModels(25)).toContain('door-haunted');
+    expect(levelModels(30)).toContain('door-stone');
+  });
+
+  test('a folha acompanha a cortina da casa (aberta → fechada) e o interior/batente acendem com alguém dentro', async () => {
+    const { drawDoor3D } = await import('../../src/model3d.js');
+    withFake((asked) => {
+      const g = makeGame({ level: 10 });
+      for (let i = 0; i < 16; i++) g.igloo.add();
+      const ctx = recordingCtx().ctx;
+      g.igloo.curtain = 0.5;
+      expect(drawDoor3D(ctx, 'cabin', 'leaf', g.igloo, 0)).toBe(true);
+      expect(asked).toContain('door-cabin:k6');
+      g.igloo.curtain = 1;
+      drawDoor3D(ctx, 'cabin', 'leaf', g.igloo, 0);
+      expect(asked).toContain('door-cabin:k12');
+      drawDoor3D(ctx, 'cabin', 'inside', g.igloo, 0);
+      expect(asked).toContain('door-cabin:in0');
+      g.igloo.lit = true;
+      drawDoor3D(ctx, 'cabin', 'inside', g.igloo, 0);
+      drawDoor3D(ctx, 'base', 'frame', g.igloo, 0);
+      expect(asked).toContain('door-cabin:in1');
+      expect(asked).toContain('door-base:frame1');
+    });
+  });
+
+  test('a pedra da caverna rola: a foto mais perto do ângulo da pedra 2D e o resto do giro em 2D', async () => {
+    const { stonePose, STONE_STEPS } = await import('../../src/m3d/doors.js');
+    const { drawDoor3D } = await import('../../src/model3d.js');
+    const { doorStone } = await import('../../src/dino.js');
+    const step = (Math.PI * 2) / STONE_STEPS;
+    expect(stonePose(0).key).toBe('r0');
+    expect(Math.abs(stonePose(0).rest)).toBe(0);
+    expect(stonePose(-step).key).toBe('r1');
+    expect(stonePose(step).key).toBe(`r${STONE_STEPS - 1}`);
+    for (const a of [-0.3, -2.7, -9.1, 4]) expect(Math.abs(stonePose(a).rest)).toBeLessThan(step / 2 + 1e-9);
+    withFake((asked) => {
+      const g = makeGame({ level: 30 });
+      for (let i = 0; i < 16; i++) g.igloo.add();
+      g.igloo.curtain = 0.3;
+      const f = recordingCtx();
+      expect(drawDoor3D(f.ctx, 'cave', 'leaf', g.igloo, 0)).toBe(true);
+      expect(asked).toContain(`door-stone:${stonePose(doorStone(0.3).angle).key}`);
+      const tr = f.calls.find((c) => c[0] === 'translate');
+      expect(tr[1]).toBe(doorStone(0.3).x);
+    });
+  });
+
+  test('com as portas 3D ligadas, as casas pulam o desenho 2D da abertura, da folha e do batente (a luz continua por cima)', async () => {
+    const { doorArt } = await import('../../src/art.js');
+    const { drawCabinDoor } = await import('../../src/forest.js');
+    const { drawBaseDoor } = await import('../../src/space.js');
+    const { drawHutDoor } = await import('../../src/beach.js');
+    const { drawHauntedDoor } = await import('../../src/halloween.js');
+    const { drawCaveDoor } = await import('../../src/dino.js');
+    const before = doorArt.draw;
+    try {
+      const parts = [];
+      doorArt.draw = (ctx, style, part) => (parts.push(`${style}:${part}`), true);
+      const houses = [[10, drawCabinDoor, 'cabin'], [15, drawBaseDoor, 'base'], [20, drawHutDoor, 'hut'], [25, drawHauntedDoor, 'haunted'], [30, drawCaveDoor, 'cave']];
+      for (const [level, fn, style] of houses) {
+        const g = makeGame({ level });
+        for (let i = 0; i < 16; i++) g.igloo.add();
+        g.igloo.update(5);
+        g.igloo.curtain = 0.6;
+        const f = recordingCtx();
+        fn(f.ctx, g.igloo, 0);
+        expect(parts).toContain(`${style}:inside`);
+        expect(parts).toContain(`${style}:leaf`);
+        if (style !== 'cave') expect(parts).toContain(`${style}:frame`);
+        // Nenhum degradê da abertura 2D
+        expect(f.calls.some((c) => c[0] === 'createLinearGradient'), style).toBe(false);
+      }
+      // Iglu: abertura e cortina pelo gancho (a moldura já era 3D)
+      const g = makeGame({ level: 1 });
+      for (let i = 0; i < 16; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.igloo.curtain = 0.5;
+      g.igloo.drawPorch(recordingCtx().ctx, 0);
+      expect(parts).toContain('igloo:inside');
+      expect(parts).toContain('igloo:leaf');
+    } finally {
+      doorArt.draw = before;
+    }
+  });
+
+  test('o renderizador liga o gancho das portas só nas fases em 3D (sem 3D, as portas 2D de sempre)', async () => {
+    const { doorArt } = await import('../../src/art.js');
+    const before = { ...model };
+    try {
+      model.state = 'ready';
+      model.sprites = {};
+      const g = makeGame({ level: 10 });
+      g.renderer.use3d = true;
+      g.renderer.ctx = recordingCtx().ctx;
+      g.renderer.draw(g);
+      expect(typeof doorArt.draw).toBe('function');
+    } finally {
+      Object.assign(model, before);
+      resetArt();
+    }
+    expect(doorArt.draw).toBe(null);
+  });
+
+  if (!isNode) {
+    test('no navegador: as fotos da porta fechada, do interior aceso e do batente têm conteúdo', async () => {
+      const { loadModel, want, sprite } = await import('../../src/model3d.js');
+      loadModel();
+      want('door-cabin');
+      const t0 = Date.now();
+      while (!sprite('door-cabin', 'k12') && model.state !== 'failed' && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
+      for (const key of ['k12', 'in1', 'frame']) {
+        const c = sprite('door-cabin', key);
+        expect(!!c, key).toBe(true);
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        let solid = 0;
+        for (let i = 3; i < d.length; i += 4) if (d[i] > 200) solid++;
+        expect(solid, key).toBeGreaterThan(500);
+      }
     });
   }
 });

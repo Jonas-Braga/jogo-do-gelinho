@@ -7,8 +7,9 @@
 import { Sky3D } from './m3d/sky3d.js';
 import { Water3D } from './m3d/water3d.js';
 import { Particles3D } from './m3d/particles3d.js';
+import { DOOR_MODELS, DOOR_SUBJECTS, stonePose, LEAF_STEPS } from './m3d/doors.js';
 import { prepareSurface } from './water.js';
-import { DEPTH, W, IGLOO, BLOCK_W } from './config.js';
+import { DEPTH, W, IGLOO, BLOCK_W, SHORE_Y } from './config.js';
 import { levelParams } from './levels.js';
 import { Studio } from './m3d/kit.js';
 import * as player from './m3d/player.js';
@@ -36,7 +37,7 @@ import { HAUNTED, HAUNTED_PIECES, drawHauntedDoor, drawWindowSilhouette, drawWin
 import {
   trex, ptero, raptor, ammonite, egg as eggModel, basaltSubject, BASALT, cave as caveModel, caveTusks, fern as fernModel, nest as nestModel,
 } from './m3d/dino.js';
-import { CAVE, CAVE_PIECES, drawCaveDoor, drawCaveTorchFlame } from './dino.js';
+import { CAVE, CAVE_PIECES, drawCaveDoor, drawCaveTorchFlame, doorStone as doorStoneAt } from './dino.js';
 import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
@@ -66,6 +67,8 @@ export const SUBJECTS = {
   bag: bagModel, heart: heartModel, cocoa: cocoaModel,
   // Cenários de fundo (uma foto do tamanho do fundo 2D)
   'bg-ice': iceScenery, 'bg-forest': forestScenery, 'bg-space': spaceScenery, 'bg-beach': beachScenery, 'bg-halloween': halloweenScenery, 'bg-dino': dinoScenery,
+  // Portas e cortinas de cada casa (e a pedra da caverna)
+  ...DOOR_SUBJECTS,
 };
 // Fases especiais já convertidas ao 3D (as outras seguem inteiras em 2D)
 export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia', 'halloween', 'dinossauros']);
@@ -116,6 +119,10 @@ function subjectOf(name) {
   return null;
 }
 
+// A porta anda junto com a casa: pedir a foto de uma casa pede também a da porta
+const WITH_HOUSE = {
+  igloo: ['door-igloo'], cabin: ['door-cabin'], base: ['door-base'], hut: ['door-hut'], haunted: ['door-haunted'], cave: ['door-cave', 'door-stone'],
+};
 export function want(name) {
   loadModel();
   if (status[name] || !subjectOf(name)) return;
@@ -123,6 +130,7 @@ export function want(name) {
   // Cenários de fundo passam na frente (é a maior imagem da tela)
   if (name.startsWith('bg-')) queue.unshift(name);
   else queue.push(name);
+  for (const n of WITH_HOUSE[name] || []) want(n);
   pump();
 }
 
@@ -512,6 +520,41 @@ export function drawIglooFrame3D(ctx) {
   ctx.save();
   ctx.translate(DOOR.x, DOOR.bottom);
   blit(ctx, img, iglooPorch.box);
+  ctx.restore();
+  return true;
+}
+
+// ---------------------------------------------------------------- Portas e cortinas
+// Gancho das portas (doorArt de src/art.js): interior, folha (pela cortina 0..1 da casa)
+// ou batente da casa no estilo dado, na posição da porta 2D. false = sem foto ainda.
+const DOOR_AT = { x: IGLOO.x, bottom: SHORE_Y + 1 };
+export function drawDoor3D(ctx, style, part, igloo, t) {
+  const name = DOOR_MODELS[style];
+  if (!name) return false;
+  want(name);
+  if (style === 'cave' && part === 'leaf') {
+    // Pedra que rola: foto girada mais perto do ângulo e o resto do giro em 2D
+    want('door-stone');
+    const s = doorStoneAt(igloo.curtain);
+    const pose = stonePose(s.angle);
+    const img = sprite('door-stone', pose.key);
+    if (!img) return false;
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(pose.rest);
+    blit(ctx, img, SUBJECTS['door-stone'].box);
+    ctx.restore();
+    return true;
+  }
+  let key;
+  if (part === 'inside') key = igloo.lit ? 'in1' : 'in0';
+  else if (part === 'frame') key = style === 'base' ? (igloo.lit ? 'frame1' : 'frame0') : 'frame';
+  else key = `k${Math.round(Math.max(0, Math.min(1, igloo.curtain)) * LEAF_STEPS)}`;
+  const img = sprite(name, key);
+  if (!img) return false;
+  ctx.save();
+  ctx.translate(DOOR_AT.x, DOOR_AT.bottom);
+  blit(ctx, img, SUBJECTS[name].box);
   ctx.restore();
   return true;
 }
@@ -1126,7 +1169,10 @@ function beachFinish(g) {
 // o jogo pedir antes (durante a contagem do bônus) e só começar a fase com tudo pronto.
 const FLOE_PREFIX = { ice: 'floe', forest: 'log', space: 'rock', beach: 'board', halloween: 'pumpkin', dino: 'basalt' };
 const FRAG_W = 36; // largura dos pedaços das placas fragmentadas (src/floes.js)
-const HOUSE_MODELS = { igloo: ['igloo', 'porch'], cabin: ['cabin'], base: ['base'], hut: ['hut'], haunted: ['haunted'], cave: ['cave', 'caveTusks'] };
+const HOUSE_MODELS = {
+  igloo: ['igloo', 'porch', 'door-igloo'], cabin: ['cabin', 'door-cabin'], base: ['base', 'door-base'], hut: ['hut', 'door-hut'],
+  haunted: ['haunted', 'door-haunted'], cave: ['cave', 'caveTusks', 'door-cave', 'door-stone'],
+};
 const DECOR_MODELS = {
   natal: ['xtree', 'sleigh'],
   floresta: ['pine', 'mushroom'],
