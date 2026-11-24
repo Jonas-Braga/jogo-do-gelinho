@@ -55,6 +55,8 @@
       game.renderer.camX = (game.player.x - W / 2) * DEPTH.sway.amount;
     }
     game.renderer.use3d = q.get('modelo') !== '0';
+    // Como o jogo de verdade: só 3D (?so3d=0 volta a mostrar o 2D enquanto não há foto)
+    game.renderer.only3d = game.renderer.use3d && q.get('so3d') !== '0';
     if (q.get('relevo') === '0') DEPTH.relief = null;
     if (q.get('frente') === '0') DEPTH.foreground = false;
     // ?poder=duck|boot: o jogador já com o poder (e o item boiando na primeira fileira)

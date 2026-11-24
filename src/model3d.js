@@ -4,7 +4,8 @@
 // Cada modelo é fotografado só quando aparece pela primeira vez, aos poucos (algumas
 // poses por quadro) para não travar o jogo. Enquanto a foto não fica pronta, ou sem
 // internet/WebGL, vale o desenho 2D de sempre.
-import { prepareSurface, surfaceReady } from './water.js';
+import { Water3D } from './m3d/water3d.js';
+import { prepareSurface } from './water.js';
 import { DEPTH, W, IGLOO, BLOCK_W } from './config.js';
 import { levelParams } from './levels.js';
 import { Studio } from './m3d/kit.js';
@@ -1156,7 +1157,8 @@ export function levelModels(level) {
 }
 
 // Pede as fotos de uma fase (as que já existem não são refeitas)
-// e a textura da água (superfície do líquido) do cenário da fase
+// e a textura 2D da água do cenário (só para as ferramentas sem o modo só 3D: a fase
+// não espera por ela; no jogo a água é a 3D ao vivo)
 const sceneryOf = (level) => levelParams(level).special?.scenery || 'ice';
 export function prefetchLevel(level) {
   prepareSurface(sceneryOf(level));
@@ -1165,6 +1167,25 @@ export function prefetchLevel(level) {
 
 // Todas as fotos da fase prontas? Sem 3D (Node, sem WebGL, Three.js indisponível)
 // não há o que esperar.
+// Água 3D ao vivo (src/m3d/water3d.js): criada quando o Three.js fica pronto
+const live = { water: null, waterFailed: false };
+export function water3D() {
+  if (live.water || live.waterFailed || model.state !== 'ready') return live.water;
+  try {
+    live.water = new Water3D(model.studio.THREE);
+  } catch (e) {
+    live.waterFailed = true;
+    console.info('[gelinho] água 3D indisponível', e?.message || e);
+  }
+  return live.water;
+}
+// A água 3D já pode ser desenhada? (sem 3D não há o que esperar)
+export function water3DReady() {
+  if (!M.enabled || typeof window === 'undefined' || !window.WebGLRenderingContext) return true;
+  if (model.state === 'failed') return true;
+  return !!water3D() || live.waterFailed;
+}
+
 // O aparelho consegue mostrar o 3D? (falso sem WebGL ou se o Three.js não carregou)
 export function model3dAvailable() {
   if (!M.enabled || typeof window === 'undefined' || !window.WebGLRenderingContext) return false;
@@ -1172,7 +1193,7 @@ export function model3dAvailable() {
 }
 
 export function levelReady(level) {
-  if (!surfaceReady(sceneryOf(level))) return false;
+  if (!water3DReady()) return false;
   if (!M.enabled || typeof window === 'undefined' || !window.WebGLRenderingContext) return true;
   if (model.state === 'failed') return true;
   return levelModels(level).every((n) => status[n] === 'done');

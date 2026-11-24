@@ -1,7 +1,7 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
   rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, drawBoat3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
-  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy,
+  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy, water3D,
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
@@ -144,6 +144,8 @@ export class Renderer {
     // foto pronta simplesmente não aparece, e a tela inicial espera as fotos da fase 1
     // (os testes deixam desligado e continuam com o desenho 2D)
     this.only3d = false;
+    this.water3d = water3D; // trocável nos testes
+    this.photosBusy = photosBusy;
     this.hooked = new Map();
   }
 
@@ -168,7 +170,7 @@ export class Renderer {
   // pausas espera o fps médio se recuperar (2 s) antes de voltar a contar.
   watchFps(game, dt) {
     if (!volume.enabled || !(game.fps > 0) || game.time < 4) return;
-    if (game.state !== 'play' || photosBusy()) {
+    if (game.state !== 'play' || this.photosBusy()) {
       this.slow = 0;
       this.slowRelief = 0;
       this.settle = 2;
@@ -308,13 +310,20 @@ export class Renderer {
     // No espaço o "reflexo do céu" na poeira é o roxo do horizonte
     // No espaço e no Halloween o "reflexo do céu" na água é a cor do horizonte noturno
     const reflect = space ? { hor: [120, 80, 220] } : halloween ? { hor: HAUNT.sky } : dino ? { hor: LAVA.sky } : sky;
+    const sunStrength = lt.strength * (0.45 + 0.55 * clamp01(this.skyF + (sp ? 0.4 : 0)));
+    // Sol (ou lua, ou Terra) para a luz da água 3D: mesma posição do céu
+    this.sun = { color: lt.path, strength: sunStrength, x: 300, y: 60 + (1 - this.skyF) * 110 };
     swayLayer(ctx, (shore + 1) / 2, () => {
       this.drawWater(ctx, t, reflect, WATERS[scenery] || ICE_WATER, scenery || 'ice');
       if (dino) drawLavaBubbles(ctx, t);
     });
-    drawWaterDepth(ctx, horizon, (lt.glow ?? 1) * (reflects(scenery || 'ice') ? 0.35 : 1));
-    // O caminho de luz acompanha o sol (camada do céu)
-    swayLayer(ctx, far, () => drawSunPath(ctx, t, 300, lt.path, lt.strength * (0.45 + 0.55 * clamp01(this.skyF + (sp ? 0.4 : 0)))));
+    // Água 3D: o brilho do horizonte, o fundo escuro da frente e o caminho de luz já
+    // saem do shader (nada disso em 2D por cima)
+    if (!this.only3d) {
+      drawWaterDepth(ctx, horizon, (lt.glow ?? 1) * (reflects(scenery || 'ice') ? 0.35 : 1));
+      // O caminho de luz acompanha o sol (camada do céu)
+      swayLayer(ctx, far, () => drawSunPath(ctx, t, 300, lt.path, sunStrength));
+    }
     game.particles.drawRipples(ctx);
     this.drawEntities(ctx, game, t);
     game.particles.drawPuffs(ctx);
@@ -422,6 +431,16 @@ export class Renderer {
 
   // Água gelada, o rio esverdeado da floresta ou a poeira estelar do espaço
   drawWater(ctx, t, sky, pal = ICE_WATER, kind = 'ice') {
+    // Modo só 3D: a água é a camada 3D ao vivo (src/m3d/water3d.js); sem ela pronta,
+    // nada (nunca a água 2D)
+    if (this.only3d) {
+      const w = this.water3d();
+      const sun = this.sun || { color: [255, 240, 210], strength: 1, x: 300, y: 80 };
+      this.water3dDrawn = !!(w && w.draw(ctx, t, {
+        kind, pal, horizon: sky.hor, sunColor: sun.color, sunStrength: sun.strength, sunX: sun.x, sunY: sun.y,
+      }));
+      return;
+    }
     const top = WATER_TOP + 10;
     const g = ctx.createLinearGradient(0, top, 0, H);
     const c = pal.water;

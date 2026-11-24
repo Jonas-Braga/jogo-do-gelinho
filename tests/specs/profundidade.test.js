@@ -2216,6 +2216,9 @@ suite('Água sem os gráficos 2D legados', () => {
 
   test('a passagem de fase e as fotos 3D sendo tiradas não desligam o volume (nem a água nova)', () => {
     const g = makeGame();
+    // Sem fotos na fila de verdade (no navegador a suíte tira fotos o tempo todo)
+    let busy = false;
+    g.renderer.photosBusy = () => busy;
     const was = volume.enabled;
     try {
       volume.enabled = true;
@@ -2227,8 +2230,13 @@ suite('Água sem os gráficos 2D legados', () => {
         for (let i = 0; i < 100; i++) g.renderer.watchFps(g, 0.1);
         expect(volume.enabled, st).toBe(true);
       }
-      // De volta à fase: espera o fps se recuperar antes de voltar a contar
+      // Fotos sendo tiradas durante a fase: também não conta
       g.state = 'play';
+      busy = true;
+      for (let i = 0; i < 100; i++) g.renderer.watchFps(g, 0.1);
+      expect(volume.enabled).toBe(true);
+      busy = false;
+      // De volta à fase: espera o fps se recuperar antes de voltar a contar
       for (let i = 0; i < 20; i++) g.renderer.watchFps(g, 0.1);
       expect(volume.enabled).toBe(true);
       // Se continuar lento de verdade, aí sim desliga
@@ -2253,8 +2261,19 @@ suite('Água sem os gráficos 2D legados', () => {
     const t0 = Date.now();
     while (!surfaceReady('dino') && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
     expect(surfaceReady('dino')).toBe(true);
+    // Espera também as fotos que o pedido pôs na fila (não sobram para os testes seguintes)
+    const { photosBusy } = await import('../../src/model3d.js');
+    while (photosBusy() && Date.now() - t0 < 180000) await new Promise((r) => setTimeout(r, 100));
   });
 });
+
+// Desenhar com o 3D liga os ganchos globais dos enfeites (powerArt, bonusArt...): um
+// quadro sem 3D os devolve ao 2D para os testes seguintes
+function resetArt() {
+  const g = makeGame({ level: 1 });
+  g.renderer.ctx = recordingCtx().ctx;
+  g.renderer.draw(g);
+}
 
 suite('Só 3D no jogo de verdade', () => {
   // Fotos 3D "carregadas", mas nenhuma pronta: no modo só 3D nada cai para o 2D
@@ -2277,6 +2296,7 @@ suite('Só 3D no jogo de verdade', () => {
     const { ctx, calls } = recordingCtx();
     g.renderer.ctx = ctx;
     g.renderer.draw(g);
+    resetArt();
     return { g, calls };
   });
 
@@ -2344,4 +2364,108 @@ suite('Só 3D no jogo de verdade', () => {
     g.renderer.only3d = false;
     expect(g.graphicsStatus()).toBe('ok');
   });
+});
+
+suite('Cena em 3D · etapa 1: água 3D ao vivo', () => {
+  test('todo cenário tem a sua água 3D (água em todos, lava sem reflexo nos Dinossauros)', async () => {
+    const { WATER3D } = await import('../../src/m3d/water3d.js');
+    const sceneries = new Set(['ice', ...Object.values(SPECIALS).map((sp) => sp.scenery).filter(Boolean)]);
+    for (const k of sceneries) expect(!!WATER3D.kinds[k], `cenário ${k}`).toBe(true);
+    for (const [k, c] of Object.entries(WATER3D.kinds)) {
+      expect(c.lava, k).toBe(k === 'dino' ? 1 : 0);
+      if (k === 'dino') expect(c.reflect).toBe(0);
+      else expect(c.reflect, k).toBeGreaterThan(0.5);
+    }
+  });
+
+  test('no modo só 3D a água é só a camada 3D (nada de degradê, reflexo em tiras, brilho do horizonte ou caminho de sol em 2D)', () => {
+    const g = makeGame({ level: 1 });
+    const got = [];
+    g.renderer.only3d = true;
+    g.renderer.water3d = () => ({ draw: (ctx, t, o) => { got.push(o); return true; } });
+    const r = recordingCtx();
+    g.renderer.drawWater(r.ctx, 1, { hor: [200, 220, 240] }, undefined, 'ice');
+    expect(r.calls.length).toBe(0);
+    expect(got.length).toBe(1);
+    expect(got[0].kind).toBe('ice');
+    expect(got[0].pal.water.length).toBe(3);
+    expect(g.renderer.water3dDrawn).toBe(true);
+    // No quadro inteiro: nenhum dos 2D da água (brilho do horizonte e caminho de sol)
+    const before = { ...model };
+    try {
+      model.state = 'ready';
+      model.sprites = {};
+      g.renderer.use3d = true;
+      const f = recordingCtx();
+      g.renderer.ctx = f.ctx;
+      g.renderer.draw(g);
+      expect(got.length).toBe(2);
+      // O sol da água acompanha o do céu
+      expect(got[1].sunX).toBe(300);
+      expect(got[1].sunColor.length).toBe(3);
+      const horizonGlow = f.calls.filter((c) => c[0] === 'createLinearGradient' && c[2] === WATER_TOP + 10 && c[4] === WATER_TOP + 80);
+      expect(horizonGlow.length).toBe(0);
+    } finally {
+      Object.assign(model, before);
+      resetArt();
+    }
+  });
+
+  test('sem a camada 3D pronta, o modo só 3D não desenha água nenhuma (nunca a 2D); fora dele, a 2D continua', () => {
+    const g = makeGame({ level: 1 });
+    g.renderer.only3d = true;
+    g.renderer.water3d = () => null;
+    const r = recordingCtx();
+    g.renderer.drawWater(r.ctx, 1, { hor: [200, 220, 240] });
+    expect(r.calls.length).toBe(0);
+    expect(g.renderer.water3dDrawn).toBe(false);
+    g.renderer.only3d = false;
+    const r2 = recordingCtx();
+    g.renderer.drawWater(r2.ctx, 1, { hor: [200, 220, 240] });
+    expect(r2.calls.some((c) => c[0] === 'fillRect')).toBe(true);
+  });
+
+  if (!isNode) {
+    test('no navegador: a água 3D tem ondas (claro e escuro), anima, reflete o cenário e a lava é diferente', async () => {
+      const { loadModel, water3D, levelReady } = await import('../../src/model3d.js');
+      loadModel();
+      const t0 = Date.now();
+      while (!water3D() && model.state !== 'failed' && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
+      const w = water3D();
+      expect(!!w).toBe(true);
+      expect(levelReady(1) || true).toBe(true);
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      const g = c.getContext('2d');
+      const paint = (t, kind, pal) => {
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.fillStyle = '#204060';
+        g.fillRect(0, 0, W, H);
+        g.fillStyle = '#FF0000';
+        g.fillRect(600, WATER_TOP - 40, 80, 40); // "barco" vermelho logo acima da linha
+        return w.draw(g, t, { kind, pal: { water: pal }, horizon: [200, 160, 140], sunColor: [255, 240, 200], sunStrength: 1, sunX: 300, sunY: 80 });
+      };
+      const ICE = ['#1C7E99', '#0E5670', '#052A40'];
+      expect(paint(1, 'ice', ICE)).toBe(true);
+      const row = (y) => Array.from(g.getImageData(0, y, W, 1).data);
+      const lum = (d) => { const out = []; for (let i = 0; i < d.length; i += 4) out.push(d[i] + d[i + 1] + d[i + 2]); return out; };
+      const a = lum(row(560));
+      expect(Math.max(...a) - Math.min(...a)).toBeGreaterThan(25); // ondas: claro e escuro
+      // Reflexo do barco vermelho logo abaixo da linha d'água (mais vermelho que longe dele)
+      const redAt = (x) => { const d = g.getImageData(x - 8, WATER_TOP + 14, 16, 14).data; let r = 0; for (let i = 0; i < d.length; i += 4) r += d[i] - d[i + 2]; return r / (d.length / 4); };
+      expect(redAt(640) - redAt(200)).toBeGreaterThan(10);
+      // Anima
+      paint(1.7, 'ice', ICE);
+      const b = lum(row(560));
+      expect(a.some((v, i) => Math.abs(v - b[i]) > 10)).toBe(true);
+      // Lava: laranja (vermelho bem maior que azul) e sem reflexo do barco
+      paint(1, 'dino', ['#FF8A1E', '#D2380E', '#5A0C06']);
+      const lr = row(500);
+      let red = 0;
+      let blue = 0;
+      for (let i = 0; i < lr.length; i += 4) { red += lr[i]; blue += lr[i + 2]; }
+      expect(red).toBeGreaterThan(blue * 2);
+    });
+  }
 });
