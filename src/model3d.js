@@ -4,6 +4,7 @@
 // Cada modelo é fotografado só quando aparece pela primeira vez, aos poucos (algumas
 // poses por quadro) para não travar o jogo. Enquanto a foto não fica pronta, ou sem
 // internet/WebGL, vale o desenho 2D de sempre.
+import { prepareSurface, surfaceReady } from './water.js';
 import { DEPTH, W, IGLOO, BLOCK_W } from './config.js';
 import { levelParams } from './levels.js';
 import { Studio } from './m3d/kit.js';
@@ -123,6 +124,9 @@ export function want(name) {
 }
 
 let busy = false;
+// Alguma foto sendo tirada (ou na fila)? O jogo fica mais lento nesses momentos
+export const photosBusy = () => busy || (model.state === 'ready' && queue.length > 0);
+
 function pump() {
   if (busy || model.state !== 'ready' || !model.studio || !queue.length) return;
   busy = true;
@@ -1152,13 +1156,17 @@ export function levelModels(level) {
 }
 
 // Pede as fotos de uma fase (as que já existem não são refeitas)
+// e a textura da água (superfície do líquido) do cenário da fase
+const sceneryOf = (level) => levelParams(level).special?.scenery || 'ice';
 export function prefetchLevel(level) {
+  prepareSurface(sceneryOf(level));
   for (const n of levelModels(level)) want(n);
 }
 
 // Todas as fotos da fase prontas? Sem 3D (Node, sem WebGL, Three.js indisponível)
 // não há o que esperar.
 export function levelReady(level) {
+  if (!surfaceReady(sceneryOf(level))) return false;
   if (!M.enabled || typeof window === 'undefined' || !window.WebGLRenderingContext) return true;
   if (model.state === 'failed') return true;
   return levelModels(level).every((n) => status[n] === 'done');

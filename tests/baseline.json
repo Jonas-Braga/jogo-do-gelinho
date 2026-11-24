@@ -558,9 +558,9 @@
   "Áudio · motor do jet ski na Praia › o som segue o jet ski: lado da tela, mais alto perto do meio, mudo fora da tela, mais agudo chegando que indo embora",
   "Áudio · motor do jet ski na Praia › na fase 20 o motor liga quando o jet ski passa e desliga quando ele some; nas outras fases nunca; no fim de jogo e na pausa fica mudo",
   "Áudio · motor do jet ski na Praia › voz contínua no Web Audio simulado: liga uma vez só, acompanha o volume e silencia com null",
-  "Água com aspecto de líquido › toda fase tem a sua superfície (água em todas, lava nos Dinossauros) e sem canvas de verdade continua a ondulação antiga",
+  "Água com aspecto de líquido › toda fase tem a sua superfície (água em todas, lava nos Dinossauros) e a ondulação antiga de traços não existe mais",
   "Água com aspecto de líquido › reflexo do cenário na água (como nos exemplos do usuário) em todas as fases com água; a lava não reflete; sem canvas de verdade não faz nada",
-  "Água com aspecto de líquido › num aparelho lento (volume desligado pelo fps baixo) volta para a ondulação de traços",
+  "Água com aspecto de líquido › num aparelho lento (volume desligado pelo fps baixo) a água continua a nova, sem traços nem brilhos em cruz",
   "Câmera: deslocamento maior para os lados › a câmera vai mais longe para cada lado (pedido do usuário: ~1 cm a mais), com o parallax de sempre",
   "Personagem anda até a borda visível da tela › em toda profundidade (costa e fileiras), andando para um lado ele para com a figura a PLAYER.edge da borda que se vê (sem parede invisível antes)",
   "Pontos: placa e grau de 10 a 100, recomeçando a cada 10 fases › a placa vale 10 × fase até a fase 10 e depois recomeça em 10",
@@ -581,5 +581,8 @@
   "Fotos 3D da fase seguinte prontas antes de ela começar › ao entrar no iglu, o jogo pede as fotos da fase seguinte",
   "Fotos 3D da fase seguinte prontas antes de ela começar › com as fotos ainda sendo tiradas, a fase seguinte espera (com o aviso \"Preparando a próxima fase…\")",
   "Fotos 3D da fase seguinte prontas antes de ela começar › se as fotos demorarem demais (12 s), a fase começa assim mesmo",
-  "Fotos 3D da fase seguinte prontas antes de ela começar › na comemoração do troféu, a tecla espera as fotos e a fase segue sozinha quando ficam prontas"
+  "Fotos 3D da fase seguinte prontas antes de ela começar › na comemoração do troféu, a tecla espera as fotos e a fase segue sozinha quando ficam prontas",
+  "Água sem os gráficos 2D legados › o caminho de luz do sol na água é um brilho suave, sem os traços do 2D antigo",
+  "Água sem os gráficos 2D legados › a passagem de fase e as fotos 3D sendo tiradas não desligam o volume (nem a água nova)",
+  "Água sem os gráficos 2D legados › a textura da água é preparada junto com as fotos da fase (sem canvas de verdade não há o que esperar)"
 ]

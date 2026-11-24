@@ -1,7 +1,7 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
   rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, drawBoat3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
-  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D,
+  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy,
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
@@ -104,7 +104,6 @@ const AURORA = [
   { base: 26, h: 54, freq: 0.004, speed: 0.12, top: [255, 120, 210], bottom: [110, 240, 200], ph: 4.2 },
 ];
 
-const mod = (a, n) => ((a % n) + n) % n;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
 function hexToRgb(h) {
@@ -137,12 +136,6 @@ export class Renderer {
     this.ctx = ctx;
     this.bg = makeBackground();
     this.skyF = 1;
-    this.glints = Array.from({ length: 70 }, () => ({
-      x: Math.random() * W,
-      y: WATER_TOP + 20 + Math.random() * (H - WATER_TOP - 20),
-      ph: Math.random() * Math.PI * 2,
-      sp: 1.5 + Math.random() * 2.5,
-    }));
     this.bokeh = new Bokeh();
     this.foreground = new Foreground();
     this.lastT = 0;
@@ -150,8 +143,22 @@ export class Renderer {
   }
 
   // Volume desligado sozinho se o aparelho não aguentar (fps baixo por alguns segundos)
+  // Não conta enquanto a fase não está rolando (passagem de fase, comemoração) nem
+  // enquanto as fotos 3D estão sendo tiradas: essas quedas são passageiras e antes
+  // desligavam o volume (e a água nova) pelo resto da partida. Depois de uma dessas
+  // pausas espera o fps médio se recuperar (2 s) antes de voltar a contar.
   watchFps(game, dt) {
     if (!volume.enabled || !(game.fps > 0) || game.time < 4) return;
+    if (game.state !== 'play' || photosBusy()) {
+      this.slow = 0;
+      this.slowRelief = 0;
+      this.settle = 2;
+      return;
+    }
+    if (this.settle > 0) {
+      this.settle -= dt;
+      return;
+    }
     // Primeiro degrau: sem o relevo (o mais caro)
     if (volume.relief && DEPTH.relief) {
       this.slowRelief = game.fps < DEPTH.relief.minFps ? (this.slowRelief || 0) + dt : 0;
@@ -274,7 +281,7 @@ export class Renderer {
       this.drawWater(ctx, t, reflect, WATERS[scenery] || ICE_WATER, scenery || 'ice');
       if (dino) drawLavaBubbles(ctx, t);
     });
-    drawWaterDepth(ctx, horizon, (lt.glow ?? 1) * (volume.enabled && reflects(scenery || 'ice') ? 0.35 : 1));
+    drawWaterDepth(ctx, horizon, (lt.glow ?? 1) * (reflects(scenery || 'ice') ? 0.35 : 1));
     // O caminho de luz acompanha o sol (camada do céu)
     swayLayer(ctx, far, () => drawSunPath(ctx, t, 300, lt.path, lt.strength * (0.45 + 0.55 * clamp01(this.skyF + (sp ? 0.4 : 0)))));
     game.particles.drawRipples(ctx);
@@ -395,51 +402,21 @@ export class Renderer {
 
     // Reflexo do céu perto da superfície (bem mais fraco quando há o reflexo de verdade
     // do cenário, senão ele some numa névoa clara)
-    const mirror = volume.enabled && reflects(kind);
+    const mirror = reflects(kind);
     const r = ctx.createLinearGradient(0, top, 0, top + 140);
     r.addColorStop(0, rgb(sky.hor, mirror ? 0.12 : kind === 'dino' ? 0.14 : 0.35));
     r.addColorStop(1, rgb(sky.hor, 0));
     ctx.fillStyle = r;
     ctx.fillRect(0, top, W, 140);
     // Reflexo do cenário na água (montanhas, costa e barranco espelhados), antes das ondas
-    if (volume.enabled) drawReflection(ctx, t, kind);
+    drawReflection(ctx, t, kind);
     // Sombra do paredão de gelo (ou do barranco) na água
     ctx.fillStyle = pal.bank;
     ctx.fillRect(0, top, W, 6);
 
-    // Superfície de líquido realista (src/water.js); enquanto não fica pronta (ou sem
-    // canvas de verdade), a ondulação de traços; num aparelho lento (fps baixo, que já
-    // desliga o volume dos personagens) volta para os traços, que pesam menos
-    const liquid = volume.enabled && drawLiquidSurface(ctx, t, kind);
-    ctx.save();
-    ctx.lineCap = 'round';
-    for (let j = 0, y = top + 10; !liquid && y < H; j++, y += 12 + j * 0.9) {
-      const depth = (y - top) / (H - top);
-      const rc = pal.ripple.join(', ');
-      ctx.strokeStyle = `rgba(${rc}, ${0.2 * (1 - depth) + 0.04})`;
-      // Perspectiva: ondinhas curtas e finas ao fundo, longas e grossas na frente
-      ctx.lineWidth = 0.7 + depth * 1.6;
-      const dir = j % 2 ? 1 : -1;
-      const len = (16 + (j % 3) * 12) * (0.45 + depth * 1.1);
-      ctx.beginPath();
-      for (let i = 0; i < 9; i++) {
-        const x = mod(i * 167 + j * 61 + dir * t * (14 + j), W + 120) - 60;
-        const yy = y + Math.sin(t * 1.6 + i + j) * 1.5;
-        ctx.moveTo(x, yy);
-        ctx.quadraticCurveTo(x + len / 2, yy - 1.5, x + len, yy);
-      }
-      ctx.stroke();
-    }
-    // Brilhos especulares
-    ctx.fillStyle = '#FFFFFF';
-    for (const s of this.glints) {
-      const a = Math.max(0, Math.sin(t * s.sp + s.ph)) ** 6;
-      if (a < 0.05) continue;
-      ctx.globalAlpha = a * 0.8;
-      ctx.fillRect(s.x - 3, s.y, 6, 1);
-      ctx.fillRect(s.x - 0.5, s.y - 1.5, 1, 4);
-    }
-    ctx.restore();
+    // Superfície de líquido (src/water.js), sempre: a ondulação antiga de traços e os
+    // brilhos em cruz do desenho 2D foram removidos (sem canvas de verdade, só o degradê)
+    drawLiquidSurface(ctx, t, kind);
   }
 
   drawEntities(ctx, game, t) {

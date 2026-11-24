@@ -258,7 +258,7 @@ suite('Áudio · motor do jet ski na Praia', () => {
     expect(g.sfx.engine).not.toBe(null);
     expect(g.sfx.history).toContain('jetski');
     stepUntil(g, () => !g.boats.list.some((v) => v.kind === 'jetski'), 30);
-    step(g, 0.05);
+    g.update(STEP); // logo depois de ele sumir (um novo pode entrar em seguida)
     expect(g.sfx.engine).toBe(null);
     g.state = 'gameOver';
     g.boats.list.push({ kind: 'jetski', dir: 1, x: 600, y: 179, t: 0 });

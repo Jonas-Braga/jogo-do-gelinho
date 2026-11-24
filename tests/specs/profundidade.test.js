@@ -2007,7 +2007,9 @@ suite('Cenários de fundo em 3D: Dinossauros', () => {
 });
 
 suite('Água com aspecto de líquido', () => {
-  test('toda fase tem a sua superfície (água em todas, lava nos Dinossauros) e sem canvas de verdade continua a ondulação antiga', async () => {
+  test('toda fase tem a sua superfície (água em todas, lava nos Dinossauros) e a ondulação antiga de traços não existe mais', async () => {
+    // Regra mudada a pedido do usuário (remover os gráficos 2D legados): a ondulação
+    // antiga de traços não existe mais; sem canvas de verdade fica só o degradê
     const { SURFACE, drawLiquidSurface } = await import('../../src/water.js');
     const sceneries = new Set(['ice', ...Object.values(SPECIALS).map((sp) => sp.scenery).filter(Boolean)]);
     for (const k of sceneries) expect(!!SURFACE.kinds[k], `cenário ${k}`).toBe(true);
@@ -2016,11 +2018,11 @@ suite('Água com aspecto de líquido', () => {
       const { ctx, calls } = recordingCtx();
       expect(drawLiquidSurface(ctx, 1, 'ice')).toBe(false);
       expect(calls.length).toBe(0);
-      // O renderizador desenha os traços da ondulação no lugar
+      // O renderizador não desenha mais os traços da ondulação antiga
       const g = makeGame({ level: 1 });
       const r = recordingCtx();
       g.renderer.drawWater(r.ctx, 1, { hor: [200, 220, 240] });
-      expect(r.calls.filter((c) => c[0] === 'quadraticCurveTo').length).toBeGreaterThan(50);
+      expect(r.calls.filter((c) => c[0] === 'quadraticCurveTo').length).toBe(0);
     }
   });
 
@@ -2056,14 +2058,17 @@ suite('Água com aspecto de líquido', () => {
     }
   });
 
-  test('num aparelho lento (volume desligado pelo fps baixo) volta para a ondulação de traços', () => {
+  test('num aparelho lento (volume desligado pelo fps baixo) a água continua a nova, sem traços nem brilhos em cruz', () => {
+    // Regra mudada a pedido do usuário: mesmo com o volume desligado a água continua a
+    // nova (nada de traços nem dos brilhos em cruz do 2D antigo)
     const was = volume.enabled;
     try {
       volume.enabled = false;
       const g = makeGame({ level: 1 });
       const r = recordingCtx();
       g.renderer.drawWater(r.ctx, 1, { hor: [200, 220, 240] });
-      expect(r.calls.filter((c) => c[0] === 'quadraticCurveTo').length).toBeGreaterThan(50);
+      expect(r.calls.filter((c) => c[0] === 'quadraticCurveTo').length).toBe(0);
+      expect(r.calls.filter((c) => c[0] === 'fillRect').length).toBeLessThan(6);
     } finally {
       volume.enabled = was;
     }
@@ -2195,5 +2200,57 @@ suite('Personagem anda até a borda visível da tela', () => {
     step(g, 10);
     release(g, 'left');
     expect(onScreen(g.player.x, SHORE_Y)).toBeLessThan(PLAYER.edge + 1);
+  });
+});
+
+suite('Água sem os gráficos 2D legados', () => {
+  test('o caminho de luz do sol na água é um brilho suave, sem os traços do 2D antigo', async () => {
+    const { drawSunPath } = await import('../../src/depth.js');
+    const { ctx, calls } = recordingCtx();
+    drawSunPath(ctx, 1, 300, [255, 240, 200], 1);
+    // Um único preenchimento com degradê (antes eram dezenas de tracinhos)
+    expect(calls.filter((c) => c[0] === 'fillRect').length).toBe(1);
+    expect(calls.some((c) => c[0] === 'createRadialGradient')).toBe(true);
+  });
+
+  test('a passagem de fase e as fotos 3D sendo tiradas não desligam o volume (nem a água nova)', () => {
+    const g = makeGame();
+    const was = volume.enabled;
+    try {
+      volume.enabled = true;
+      g.time = 10;
+      g.fps = DEPTH.minFps - 10;
+      // Fps baixo fora da fase rolando (contagem do bônus, troféu, passagem): não conta
+      for (const st of ['levelEnd', 'trophy', 'entering']) {
+        g.state = st;
+        for (let i = 0; i < 100; i++) g.renderer.watchFps(g, 0.1);
+        expect(volume.enabled, st).toBe(true);
+      }
+      // De volta à fase: espera o fps se recuperar antes de voltar a contar
+      g.state = 'play';
+      for (let i = 0; i < 20; i++) g.renderer.watchFps(g, 0.1);
+      expect(volume.enabled).toBe(true);
+      // Se continuar lento de verdade, aí sim desliga
+      for (let i = 0; i < 40; i++) g.renderer.watchFps(g, 0.1);
+      expect(volume.enabled).toBe(false);
+    } finally {
+      volume.enabled = was;
+    }
+  });
+
+  test('a textura da água é preparada junto com as fotos da fase (sem canvas de verdade não há o que esperar)', async () => {
+    const { prepareSurface, surfaceReady } = await import('../../src/water.js');
+    const { levelReady, prefetchLevel } = await import('../../src/model3d.js');
+    if (isNode) {
+      prepareSurface('ice');
+      expect(surfaceReady('ice')).toBe(true);
+      expect(levelReady(1)).toBe(true);
+      return;
+    }
+    // No navegador: pedir a fase gera a textura em segundo plano até ficar pronta
+    prefetchLevel(30);
+    const t0 = Date.now();
+    while (!surfaceReady('dino') && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
+    expect(surfaceReady('dino')).toBe(true);
   });
 });

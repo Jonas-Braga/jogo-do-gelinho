@@ -398,23 +398,25 @@ export function drawWaterDepth(ctx, hor, glow = 1) {
   ctx.fillRect(0, H - 200, W, 200);
 }
 
-// Caminho de luz do sol (ou da lua) na água: estreito ao fundo, largo na frente
+// Caminho de luz do sol (ou da lua) na água: um brilho suave e alongado, estreito ao
+// fundo e largo na frente, que pulsa de leve (sem os traços do desenho 2D antigo; os
+// pontinhos de brilho ficam por conta da superfície do líquido, src/water.js)
 export function drawSunPath(ctx, t, sx, color, strength = 1) {
   const top = WATER_TOP + 12;
+  const a = strength * (0.2 + 0.03 * Math.sin(t * 1.3));
+  if (a <= 0.01) return;
+  const x = sx + (DEPTH.vanishX - sx) * 0.08;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 46; i++) {
-    const k = i / 45;                    // 0 = horizonte, 1 = frente
-    const y = top + k * k * (H - top);
-    const s = depthScale(Math.min(NEAR_Y, y));
-    const spread = 14 + k * 150;
-    const x = sx + (DEPTH.vanishX - sx) * (1 - s) * 0.4 + Math.sin(i * 12.9898 + t * 1.8) * spread * 0.6;
-    const len = (10 + k * 46) * (0.6 + 0.4 * Math.sin(i * 7.3 + t * 2.3));
-    const a = strength * (0.5 - k * 0.32) * (0.55 + 0.45 * Math.sin(t * 3 + i * 1.7));
-    if (a <= 0.02) continue;
-    ctx.fillStyle = rgba(color, a);
-    ctx.fillRect(x - len / 2, y, len, 1 + k * 1.6);
-  }
+  // Brilho elíptico esticado na vertical (bordas suaves em todos os lados)
+  ctx.translate(x, top);
+  ctx.scale(1, 2.4);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 150);
+  g.addColorStop(0, rgba(color, a));
+  g.addColorStop(0.4, rgba(color, a * 0.4));
+  g.addColorStop(1, rgba(color, 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(-150, 0, 300, (H - top) / 2.4);
   ctx.restore();
 }
 

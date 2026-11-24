@@ -9,8 +9,10 @@
 // reflexo do céu do tema continuam valendo) e os brilhos somados por cima ("lighter").
 // A lava usa outra receita: placas de crosta escura que andam devagar com as fendas
 // incandescentes entre elas (o relevo dela escurece multiplicando: "overlay" não
-// consegue escurecer o laranja da lava). Sem canvas de verdade (testes no Node) não faz nada e o
-// renderizador desenha a ondulação antiga.
+// consegue escurecer o laranja da lava). A textura de cada cenário é gerada antes de a
+// fase começar (`prepareSurface`, chamada pelo pré-carregamento das fases), então a água
+// já nasce com a superfície. Sem canvas de verdade (testes no Node) não faz nada e fica
+// só o degradê do tema (não há mais a ondulação antiga de traços).
 import { W, H, WATER_TOP, DEPTH } from './config.js';
 
 export const SURFACE = {
@@ -161,24 +163,44 @@ function toCanvas(img) {
 const surfaces = {};
 export const surfaceState = (kind) => (surfaces[kind]?.canvases ? 'ready' : surfaces[kind] ? 'baking' : 'none');
 
-function surfaceFor(ctx, kind) {
-  // Só num canvas de verdade (um contexto falso de teste nunca gera nem guarda nada)
-  if (typeof document === 'undefined' || typeof DOMMatrix === 'undefined' || !SURFACE.kinds[kind]) return null;
-  if (!(ctx?.canvas?.width > 0) || typeof ctx.createPattern !== 'function') return null;
+const canBake = () => typeof document !== 'undefined' && typeof DOMMatrix !== 'undefined';
+
+// Gera alguns quadros da textura (até `ms` milissegundos); true quando está pronta
+function bakeSome(kind, ms) {
   let s = surfaces[kind];
   if (!s) s = surfaces[kind] = { gen: bake(kind) };
-  if (!s.canvases) {
-    // Gera alguns quadros por vez enquanto a fase roda (até lá vale a ondulação antiga)
-    const t0 = performance.now();
-    while (performance.now() - t0 < 6) {
-      const r = s.gen.next();
-      if (r.done) {
-        s.canvases = r.value;
-        break;
-      }
-    }
-    if (!s.canvases) return null;
+  const t0 = performance.now();
+  while (!s.canvases && performance.now() - t0 < ms) {
+    const r = s.gen.next();
+    if (r.done) s.canvases = r.value;
   }
+  return !!s.canvases;
+}
+
+// Gera a textura de um cenário em segundo plano (aos poucos, sem travar o jogo)
+export function prepareSurface(kind) {
+  if (!canBake() || !SURFACE.kinds[kind] || surfaces[kind]?.canvases || surfaces[kind]?.timer) return;
+  const step = () => {
+    if (bakeSome(kind, 8)) {
+      surfaces[kind].timer = null;
+      return;
+    }
+    surfaces[kind].timer = setTimeout(step, 0);
+  };
+  surfaces[kind] = surfaces[kind] || { gen: bake(kind) };
+  surfaces[kind].timer = setTimeout(step, 0);
+}
+
+// A textura do cenário está pronta? (sem canvas de verdade não há o que esperar)
+export const surfaceReady = (kind) => !canBake() || !SURFACE.kinds[kind] || !!surfaces[kind]?.canvases;
+
+function surfaceFor(ctx, kind) {
+  // Só num canvas de verdade (um contexto falso de teste nunca gera nem guarda nada)
+  if (!canBake() || !SURFACE.kinds[kind]) return null;
+  if (!(ctx?.canvas?.width > 0) || typeof ctx.createPattern !== 'function') return null;
+  // Se ainda não ficou pronta (fase aberta direto, sem pré-carregamento), termina aqui
+  if (!bakeSome(kind, 6)) return null;
+  const s = surfaces[kind];
   // Os padrões são criados para cada canvas que desenha (a textura fica guardada)
   s.patterns ||= new WeakMap();
   let frames = s.patterns.get(ctx);
