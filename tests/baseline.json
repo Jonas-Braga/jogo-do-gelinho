@@ -269,7 +269,7 @@
   "Fases especiais · Praia (fase 20) › a cabana de palha aparece só na praia; iglu nas outras fases e na tela inicial",
   "Fases especiais · Praia (fase 20) › HUD conta as peças da cabana e fala em prancha; a pausa também",
   "Fases especiais · Praia (fase 20) › cabana pronta: o surfista entra pela cortina de folhas e a fase termina",
-  "Fases especiais · Praia (fase 20) › pranchas de surfe e boias no lugar das placas de gelo",
+  "Fases especiais · Praia (fase 20) › pranchas de surfe no lugar das placas de gelo (uma prancha inteira por grupo)",
   "Fases especiais · Praia (fase 20) › coqueiros e guarda-sol na areia, longe da cabana",
   "Fases especiais · Praia (fase 20) › personagem vestido de surfista só na praia",
   "Fases especiais · Praia (fase 20) › roupa de surfista em todas as poses (de costas, fugindo, pulando, afundando, congelando)",
@@ -607,5 +607,14 @@
   "Cena em 3D · etapa 4: portas e cortinas 3D › a folha acompanha a cortina da casa (aberta → fechada) e o interior/batente acendem com alguém dentro",
   "Cena em 3D · etapa 4: portas e cortinas 3D › a pedra da caverna rola: a foto mais perto do ângulo da pedra 2D e o resto do giro em 2D",
   "Cena em 3D · etapa 4: portas e cortinas 3D › com as portas 3D ligadas, as casas pulam o desenho 2D da abertura, da folha e do batente (a luz continua por cima)",
-  "Cena em 3D · etapa 4: portas e cortinas 3D › o renderizador liga o gancho das portas só nas fases em 3D (sem 3D, as portas 2D de sempre)"
+  "Cena em 3D · etapa 4: portas e cortinas 3D › o renderizador liga o gancho das portas só nas fases em 3D (sem 3D, as portas 2D de sempre)",
+  "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › a câmera vai ~2 cm mais longe para cada lado (até ~96 px do jogo) e o personagem chega às duas bordas visíveis em toda linha",
+  "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › fugindo do urso, o personagem só \"sai da tela\" depois de passar a borda visível da costa",
+  "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › andando na costa ficam pegadas alternando os pés; parado ou pulando, não",
+  "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › as pegadas somem da mais antiga para a mais nova",
+  "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › peixe saltando espirra água ao sair e ao voltar (gotas e anel); estrelinha, bala e ovo não",
+  "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › modo só 3D: pegadas, anéis e bolhas de lava no chão; lascas, brilhos, bolhas e gotas por cima; textos em relevo",
+  "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › sem o modo só 3D, as pegadas e os efeitos pequenos continuam no desenho 2D",
+  "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › praia: uma prancha de surfe só por grupo (o tamanho das 3 placas), sem abrir e fechar",
+  "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › Halloween: o cenário 3D tem duas cordilheiras (a do fundo atrás da da frente)"
 ]

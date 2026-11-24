@@ -79,7 +79,7 @@ export const DEPTH = {
     minFps: 50,        // abaixo disso por 2 s, só o relevo é desligado (aparelho fraco)
   },
   // Câmera que acompanha o jogador de leve: o fundo anda menos que a frente (parallax)
-  sway: { amount: 0.07, far: 0.25, shore: 0.45, fore: 1.6, ease: 3 },
+  sway: { amount: 0.15, far: 0.25, shore: 0.45, fore: 1.6, ease: 3 },
   foreground: true,    // faixa desfocada de primeiro plano na beira de baixo
   // Piloto da etapa 2: personagem da fase normal em 3D (Three.js), fotografado em
   // sprites quando o jogo abre (src/model3d.js). Sem internet/WebGL fica o 2D.

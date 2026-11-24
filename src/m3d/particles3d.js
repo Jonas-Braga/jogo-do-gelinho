@@ -13,8 +13,9 @@
 // - chama: fogo de ruído subindo e se torcendo, núcleo amarelo, bordas laranja e halo
 // Quem decide o que desenhar são as funções puras daqui (`weatherItems`, `smokeItems`,
 // `volcanoItems`, `fireflyItems`): elas recebem `push` e funcionam também no Node.
-import { W, H, SHORE_TOP, DEPTH } from '../config.js';
-import { depthScale, swayAt } from '../depth.js';
+import { W, H, SHORE_TOP, WATER_TOP, DEPTH } from '../config.js';
+import { depthScale, swayAt, camera } from '../depth.js';
+import { PRINT_COLORS, printAlpha } from '../particles.js';
 
 export const PARTICLES3D = {
   pad: 64,          // a camada passa um pouco das bordas (a câmera balança)
@@ -26,7 +27,7 @@ export const PARTICLES3D = {
 };
 
 // Tipos (o shader escolhe o desenho por eles)
-export const P3 = { snow: 0, leaf: 1, ember: 2, dust: 3, smoke: 4, glow: 5, flame: 6 };
+export const P3 = { snow: 0, leaf: 1, ember: 2, dust: 3, smoke: 4, glow: 5, flame: 6, ring: 7, shard: 8, bubble: 9, text: 10, print: 11 };
 
 // Cores (as mesmas do 2D)
 export const LEAF_COLORS = ['#D9822B', '#C4462A', '#E3B23C', '#7FA33A', '#A65A2A'];
@@ -173,16 +174,109 @@ export function fireflyItems(push, t, dusk) {
   }
 }
 
+// Efeitos pequenos no chão e na água (atrás dos personagens): pegadas na costa, anéis na
+// água e, na lava, as bolhas que incham e estouram (mesmos tempos e lugares do 2D)
+export function groundItems(push, parts, t, scenery = 'ice') {
+  if (!parts) return;
+  const pc = PRINT_COLORS[scenery] || PRINT_COLORS.ice;
+  const printC = [pc[0] / 255, pc[1] / 255, pc[2] / 255];
+  for (const pr of parts.prints || []) {
+    const p = project(pr.x, pr.y);
+    push(P3.print, p.x, pr.y, 7 * p.s, 2.8 * p.s, 0, [printC[0], printC[1], printC[2], printAlpha(pr.t)], pr.side, 0, pr.dir);
+  }
+  const rc = parts.liquid?.ripple || [207, 239, 250];
+  for (const r of parts.ripples || []) {
+    if (r.t < 0) continue;
+    const k = r.t;
+    const sc = r.s || 1;
+    const p = project(r.x, r.y);
+    push(P3.ring, p.x, r.y, (10 + k * 60) * sc * p.s, (3 + k * 12) * sc * p.s, 0, rgba01(rc, 0.75 * (1 - k)), k, 0, 0);
+  }
+  if (parts.liquid && scenery === 'dino') lavaBubbleItems(push, t);
+}
+
+// Bolhas de lava inchando e estourando (as mesmas de drawLavaBubbles, src/dino.js),
+// na camada da água
+export function lavaBubbleItems(push, t) {
+  const shift = -(camera.x || 0) * ((DEPTH.sway.shore + 1) / 2);
+  for (let i = 0; i < 16; i++) {
+    const period = 2.2 + (i % 5) * 0.4;
+    const k = ((t + i * 0.73) % period) / period;
+    if (k > 0.5) continue;
+    const slot = Math.floor((t + i * 0.73) / period);
+    const x = ((i * 211 + slot * 397) % (W - 40)) + 20 + shift;
+    const y = WATER_TOP + 40 + ((i * 53 + slot * 31) % (H - WATER_TOP - 60));
+    const u = k / 0.5;
+    if (u < 0.8) {
+      const r = 2 + u * 6;
+      // Cúpula de lava acesa (meia esfera saindo da superfície)
+      push(P3.snow, x, y - r * 0.4, r, r, 0, rgba01([255, 170, 70], 0.95), i, 0, 0.8);
+    } else {
+      const pp = (u - 0.8) / 0.2;
+      push(P3.ring, x, y, 8 + pp * 8, 2 + pp * 2, 0, rgba01([255, 210, 110], 1 - pp), pp, 0, 0);
+      for (const sd of [-1, 1]) push(P3.snow, x + sd * (4 + pp * 8), y - 6 - pp * 6 + pp * pp * 8, 1.4, 1.4, 0, rgba01([255, 170, 60], 1 - pp), i, 0, 0.9);
+    }
+  }
+}
+
+// Efeitos por cima dos personagens: lascas de gelo, brilhos da fileira, bolhas de quem
+// afunda e as gotas dos respingos (cada um na perspectiva da linha onde está)
+export function fxItems(push, parts) {
+  if (!parts) return;
+  const bub = parts.liquid?.bubble;
+  for (const f of parts.fx || []) {
+    if (f.t < 0) continue;
+    const k = f.t / f.life;
+    if (f.kind === 'chip') {
+      const p = project(f.x, f.y);
+      push(P3.shard, p.x, f.y, f.r * 1.6 * p.s, f.r * 1.1 * p.s, f.rot, rgba01(f.color || '#E8F7FC', 1 - k), f.rot, 0, 0);
+    } else if (f.kind === 'spark') {
+      const p = project(f.x, f.y);
+      const tw = 0.6 + 0.4 * Math.sin(f.t * 25 + f.ph);
+      const r = f.r * (1 - k * 0.5) * 2.6 * p.s;
+      push(P3.dust, p.x, f.y, r, r, 0, rgba01(f.color, (1 - k) * tw), f.ph, 0, 0);
+    } else if (f.kind === 'bubble') {
+      const p = project(f.x, f.y);
+      push(P3.bubble, p.x, f.y, f.r * 1.2 * p.s, f.r * 1.2 * p.s, 0, bub ? [1, 0.7, 0.35, 0.85] : [0.86, 0.96, 1, 0.85], f.ph, 0, 0);
+    }
+  }
+  const dc = rgba01(parts.liquid?.splash || '#CFEFFA');
+  for (const d of parts.drops || []) {
+    const fl = d.floor ?? d.y;
+    const p = project(d.x, fl);
+    const r = d.r * p.s * 1.15;
+    push(P3.snow, p.x, d.y, r, r, 0, [dc[0], dc[1], dc[2], 1 - d.t / d.life], 0, 0, parts.liquid ? 0.6 : 0.15);
+  }
+}
+
+// Textos de pontos ("+200", "+1 VIDA"...) em relevo: glyph(str) devolve o retângulo do
+// texto no atlas da camada ({ uv: [u0, v0, u1, v1], w, h } em px do atlas)
+export const TEXT = { atlasFont: 34, screenFont: 22 };
+export function textItems(push, parts, glyph) {
+  if (!parts || !glyph) return;
+  for (const tx of parts.texts || []) {
+    const k = tx.t / 1.1;
+    const a = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+    const sc = (tx.t < 0.12 ? 0.6 + (tx.t / 0.12) * 0.4 : 1) * (TEXT.screenFont / TEXT.atlasFont);
+    const g = glyph(tx.str);
+    if (!g) continue;
+    const p = project(tx.x, tx.y);
+    push(P3.text, p.x, tx.y - g.h * sc * 0.3, (g.w * sc) / 2, (g.h * sc) / 2, 0, rgba01(tx.color || '#FFFFFF', a), 0, 0, 0, g.uv);
+  }
+}
+
 // ---------------------------------------------------------------- Shader
 const VERT = `
 attribute vec3 aPos;   // x, y, giro
 attribute vec2 aSize;  // meia largura, meia altura
 attribute vec4 aCol;
 attribute vec4 aInfo;  // tipo, fase, desfoque, extra
+attribute vec4 aUvr;   // retângulo no atlas de textos (u0, v0, u1, v1)
 uniform vec4 uView;    // x0, y0, x1, y1 da camada
 varying vec2 vUv;
 varying vec4 vCol;
 varying vec4 vInfo;
+varying vec4 vUvr;
 varying float vRot;
 void main() {
   vec2 q = position.xy * 2.0;
@@ -194,6 +288,7 @@ void main() {
   vUv = vec2(q.x, -q.y);  // y para baixo, como na tela
   vCol = aCol;
   vInfo = aInfo;
+  vUvr = aUvr;
   vRot = aPos.z;
 }`;
 
@@ -202,8 +297,11 @@ precision highp float;
 varying vec2 vUv;
 varying vec4 vCol;
 varying vec4 vInfo;
+varying vec4 vUvr;
 varying float vRot;
 uniform float uTime;
+uniform sampler2D uText;
+uniform vec2 uTexel;
 uniform vec3 uLight;  // direção da luz (x para a direita, y para cima, z para a câmera)
 uniform vec3 uSun, uAmb;
 
@@ -233,6 +331,8 @@ void main() {
     vec3 lit = vCol.rgb * (uAmb + uSun * dif * 0.85) + uSun * spec * 0.45;
     vec3 flat_ = vCol.rgb * (uAmb + uSun * 0.55);
     vec3 c = mix(lit, flat_, blur);
+    // Lava (ex > 0): acesa por dentro
+    c += vCol.rgb * ex * (0.6 + 0.4 * n.z);
     float edge = 1.0 - smoothstep(1.0 - (0.22 + 0.75 * blur), 1.0, r);
     edge *= 1.0 + blur * 0.4 * smoothstep(0.45, 0.9, r);
     float a = vCol.a * edge;
@@ -300,6 +400,68 @@ void main() {
     float core = exp(-r * r * 40.0);
     float v = (g * 0.7 + core * ex) * vCol.a * (1.0 - smoothstep(0.85, 1.0, r));
     o = vec4(mix(vCol.rgb, vec3(1.0), core * 0.5) * v, 0.0);
+  } else if (kind > 6.5 && kind < 7.5) {
+    // ---- Anel na água: a crista da onda, mais clara do lado de cima (pega o céu)
+    float rr = length(q);
+    float band = 1.0 - smoothstep(0.0, 0.14, abs(rr - 0.86));
+    if (band < 0.01) discard;
+    float lit = 0.65 + 0.45 * smoothstep(0.3, -0.9, q.y) + 0.25 * max(0.0, -q.x * uLight.x);
+    float a = vCol.a * band;
+    o = vec4(vCol.rgb * lit * a, a);
+  } else if (kind > 7.5 && kind < 8.5) {
+    // ---- Lasca de gelo: losango facetado (4 faces com luz diferente) e brilho
+    float d = abs(q.x) + abs(q.y);
+    if (d > 1.0) discard;
+    vec2 f = sign(q + 1e-4);
+    vec3 n = normalize(vec3(f.x * 0.55, -f.y * 0.55, 1.0));
+    float c = cos(vRot), s = sin(vRot);
+    vec3 L = vec3(c * uLight.x - s * uLight.y, s * uLight.x + c * uLight.y, uLight.z);
+    float dif = max(dot(n, L), 0.0);
+    vec3 col = vCol.rgb * (uAmb * 0.8 + uSun * dif) + uSun * pow(dif, 12.0) * 0.6;
+    float a = vCol.a * (1.0 - smoothstep(0.85, 1.0, d));
+    o = vec4(col * a, a);
+  } else if (kind > 8.5 && kind < 9.5) {
+    // ---- Bolha: esfera transparente (borda mais visível) com o reflexo da luz
+    if (r > 1.0) discard;
+    float rim = smoothstep(0.55, 1.0, r) * (1.0 - smoothstep(0.92, 1.0, r));
+    vec2 hp = q - vec2(-0.35, -0.38);
+    float hi = exp(-dot(hp, hp) * 30.0);
+    float a = vCol.a * (0.12 + rim * 0.8 + hi);
+    vec3 col = mix(vCol.rgb, vec3(1.0), hi);
+    o = vec4(col * a, a);
+  } else if (kind > 9.5 && kind < 10.5) {
+    // ---- Texto em relevo: a letra do atlas com chanfro iluminado e contorno escuro
+    vec2 uv = mix(vUvr.xy, vUvr.zw, q * 0.5 + 0.5);
+    float a0 = texture2D(uText, uv).a;
+    float ex2 = 1.6;
+    float ax = texture2D(uText, uv + vec2(uTexel.x * ex2, 0.0)).a - texture2D(uText, uv - vec2(uTexel.x * ex2, 0.0)).a;
+    float ay = texture2D(uText, uv + vec2(0.0, uTexel.y * ex2)).a - texture2D(uText, uv - vec2(0.0, uTexel.y * ex2)).a;
+    float ol = 0.0;
+    for (int i = 0; i < 8; i++) {
+      float ang = float(i) * 0.7854;
+      ol = max(ol, texture2D(uText, uv + vec2(cos(ang), sin(ang)) * uTexel * 3.2).a);
+    }
+    vec3 n = normalize(vec3(-ax * 1.8, ay * 1.8, 1.0));
+    float dif = max(dot(n, uLight), 0.0);
+    float spec = pow(max(dot(reflect(-uLight, n), vec3(0.0, 0.0, 1.0)), 0.0), 18.0);
+    vec3 face = vCol.rgb * (0.5 + 0.75 * dif) + vec3(1.0) * spec * 0.5;
+    vec3 col = mix(vec3(0.02, 0.1, 0.16), face, a0);
+    float a = max(a0, ol * 0.7) * vCol.a;
+    o = vec4(col * a, a);
+  } else if (kind > 10.5 && kind < 11.5) {
+    // ---- Pegada: marca afundada (calcanhar e planta do pé), mais escura do lado da luz
+    // (a parede do buraco faz sombra) e a borda de lá um pouco mais clara
+    vec2 pq = vec2(q.x * sign(ex + 1e-4), q.y);
+    float heel = length((pq - vec2(-0.46, 0.0)) / vec2(0.5, 0.82));
+    float sole = length((pq - vec2(0.26, 0.0)) / vec2(0.7, 1.0));
+    float d = min(heel, sole);
+    if (d > 1.0) discard;
+    float inner = 1.0 - smoothstep(0.55, 1.0, d);
+    float side = clamp(0.5 - q.x * uLight.x * 0.6 + q.y * 0.4, 0.0, 1.0);
+    vec3 col = vCol.rgb * (0.55 + 0.45 * side);
+    col = mix(col * 1.25, col, inner);
+    float a = vCol.a * (0.35 + 0.4 * inner) * (1.0 - smoothstep(0.85, 1.0, d));
+    o = vec4(col * a, a);
   } else {
     // ---- Chama: fogo subindo e se torcendo
     float h = (0.8 - q.y) / 1.7;   // 0 na base, 1 na ponta
@@ -341,23 +503,25 @@ class Batch {
     this.size = attr('aSize', 2);
     this.col = attr('aCol', 4);
     this.info = attr('aInfo', 4);
+    this.uvr = attr('aUvr', 4);
     g.instanceCount = 0;
     this.geometry = g;
     this.n = 0;
-    this.push = (kind, x, y, hw, hh, rot, c, ph = 0, blur = 0, ex = 0) => {
+    this.push = (kind, x, y, hw, hh, rot, c, ph = 0, blur = 0, ex = 0, uv = null) => {
       if (this.n >= this.max) return;
       const i = this.n++;
       this.pos.array.set([x, y, rot || 0], i * 3);
       this.size.array.set([hw, hh], i * 2);
       this.col.array.set([c[0], c[1], c[2], c[3] ?? 1], i * 4);
       this.info.array.set([kind, ph, blur, ex], i * 4);
+      this.uvr.array.set(uv || [0, 0, 0, 0], i * 4);
     };
   }
 
   begin() { this.n = 0; }
 
   upload() {
-    for (const a of [this.pos, this.size, this.col, this.info]) a.needsUpdate = true;
+    for (const a of [this.pos, this.size, this.col, this.info, this.uvr]) a.needsUpdate = true;
     this.geometry.instanceCount = this.n;
   }
 }
@@ -379,7 +543,22 @@ export class Particles3D {
       uLight: { value: new THREE.Vector3(-0.5, 0.6, 0.6).normalize() },
       uSun: { value: new THREE.Vector3(1, 0.95, 0.85) },
       uAmb: { value: new THREE.Vector3(0.55, 0.62, 0.72) },
+      uText: { value: null },
+      uTexel: { value: new THREE.Vector2(1 / 1024, 1 / 256) },
     };
+    // Atlas dos textos de pontos (cada texto novo é escrito numa linha livre)
+    this.textCanvas = document.createElement('canvas');
+    this.textCanvas.width = 1024;
+    this.textCanvas.height = 256;
+    this.textTex = new THREE.CanvasTexture(this.textCanvas);
+    this.textTex.flipY = false;
+    this.textTex.colorSpace = THREE.NoColorSpace;
+    this.textTex.minFilter = THREE.LinearFilter;
+    this.textTex.generateMipmaps = false;
+    this.uniforms.uText.value = this.textTex;
+    this.glyphs = new Map();
+    this.cursor = { x: 4, y: 4 };
+    this.glyph = (str) => this.textGlyph(str);
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: FRAG, uniforms: this.uniforms,
       transparent: true, depthTest: false, depthWrite: false,
@@ -401,6 +580,39 @@ export class Particles3D {
     this.batch.upload();
     this.renderer.compile(this.scene, this.camera);
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // Retângulo de um texto no atlas (escreve se ainda não estiver lá)
+  textGlyph(str) {
+    const key = String(str);
+    let gl = this.glyphs.get(key);
+    if (gl) return gl;
+    const c = this.textCanvas;
+    const g = c.getContext('2d');
+    const fs = TEXT.atlasFont;
+    g.font = `800 ${fs}px system-ui, sans-serif`;
+    const w = Math.ceil(g.measureText(key).width) + 12;
+    const h = fs + 14;
+    if (this.cursor.x + w > c.width) {
+      this.cursor.x = 4;
+      this.cursor.y += h;
+    }
+    if (this.cursor.y + h > c.height) {
+      // Atlas cheio: recomeça do zero
+      g.clearRect(0, 0, c.width, c.height);
+      this.glyphs.clear();
+      this.cursor = { x: 4, y: 4 };
+    }
+    const { x, y } = this.cursor;
+    g.fillStyle = '#FFFFFF';
+    g.textBaseline = 'middle';
+    g.textAlign = 'left';
+    g.fillText(key, x + 6, y + h / 2);
+    this.cursor.x += w + 4;
+    this.textTex.needsUpdate = true;
+    gl = { uv: [x / c.width, y / c.height, (x + w) / c.width, (y + h) / c.height], w, h };
+    this.glyphs.set(key, gl);
+    return gl;
   }
 
   setLight(light) {

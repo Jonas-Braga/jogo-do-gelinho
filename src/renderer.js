@@ -1,7 +1,7 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
   rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, drawBoat3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
-  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy, water3D, sky3D, particles3D, drawSkyFlyers3D, drawDoor3D,
+  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy, water3D, sky3D, particles3D, drawSkyFlyers3D, drawDoor3D, liveFx,
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
@@ -38,9 +38,9 @@ import {
 } from './dino.js';
 import { drawHud } from './hud.js';
 import { drawMoneyBag, drawHeart, bonusArt } from './bonus.js';
-import { fireArt } from './particles.js';
+import { fireArt, PRINT_COLORS } from './particles.js';
 import { doorArt } from './art.js';
-import { weatherItems, smokeItems, volcanoItems, fireflyItems, SMOKE_COLORS } from './m3d/particles3d.js';
+import { weatherItems, smokeItems, volcanoItems, fireflyItems, groundItems, fxItems, textItems, SMOKE_COLORS } from './m3d/particles3d.js';
 import { drawCocoa } from './heat.js';
 import { drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront, drawDizzy, powerArt } from './powers.js';
 
@@ -108,8 +108,6 @@ const AURORA = [
 ];
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-// Efeitos que no modo só 3D são partículas 3D (não o desenho 2D)
-const SMOKE_3D = new Set(['smoke', 'vapor']);
 
 function hexToRgb(h) {
   return h.match(/\w\w/g).map((v) => parseInt(v, 16));
@@ -154,6 +152,12 @@ export class Renderer {
     this.particles3d = particles3D;
     this.photosBusy = photosBusy;
     this.hooked = new Map();
+  }
+
+  // Atlas de textos da camada 3D (falso nos testes: um retângulo qualquer)
+  glyph() {
+    const layer = this.particles3d();
+    return layer?.glyph || ((str) => ({ uv: [0, 0, 1, 1], w: String(str).length * 20, h: 48 }));
   }
 
   // Uma passada das partículas 3D ao vivo no contexto atual (fill(push) diz o que
@@ -252,6 +256,8 @@ export class Renderer {
     dinoArt.tusks = this.hook(drawCaveTusks3D);
     // Portas e cortinas 3D (interior, folha e batente) nas fases já convertidas
     doorArt.draw = this.normal3d ? this.hook(drawDoor3D) : null;
+    // Respingos dos peixes viram partículas 3D (sem os pinguinhos 2D da foto do bicho)
+    liveFx.on = this.only3d;
     // Modo só 3D: fumaça dos vulcões e chamas das tochas são partículas 3D ao vivo
     dinoArt.smoke = this.only3d ? (c, tt) => { this.pass3d(c, tt, (push) => volcanoItems(push, tt)); return true; } : null;
     fireArt.draw = this.only3d ? (c, x, base, h, w, seed, tt) => { this.particles3d()?.flame(c, tt, x, base, h, w, seed); return true; } : null;
@@ -364,7 +370,7 @@ export class Renderer {
     this.sun = { color: lt.path, strength: sunStrength, x: body.x, y: body.y };
     swayLayer(ctx, (shore + 1) / 2, () => {
       this.drawWater(ctx, t, reflect, WATERS[scenery] || ICE_WATER, scenery || 'ice');
-      if (dino) drawLavaBubbles(ctx, t);
+      if (dino && !this.only3d) drawLavaBubbles(ctx, t);
     });
     // Água 3D: o brilho do horizonte, o fundo escuro da frente e o caminho de luz já
     // saem do shader (nada disso em 2D por cima)
@@ -373,12 +379,22 @@ export class Renderer {
       // O caminho de luz acompanha o sol (camada do céu)
       swayLayer(ctx, far, () => drawSunPath(ctx, t, 300, lt.path, sunStrength));
     }
-    game.particles.drawRipples(ctx);
+    // Pegadas na costa, anéis na água e bolhas de lava (atrás dos personagens)
+    if (this.only3d) this.pass3d(ctx, t, (push) => groundItems(push, game.particles, t, scenery || 'ice'));
+    else {
+      game.particles.drawPrints(ctx, PRINT_COLORS[scenery || 'ice']);
+      game.particles.drawRipples(ctx);
+    }
     this.drawEntities(ctx, game, t);
     // Modo só 3D: fumaça, vapor e a poeira do encaixe vão para as partículas 3D
-    if (!this.only3d) game.particles.drawPuffs(ctx);
-    game.particles.drawFx(ctx, this.only3d ? SMOKE_3D : null);
-    game.particles.drawDrops(ctx);
+    // Lascas, brilhos, bolhas e gotas (no modo só 3D, partículas 3D; fumaça, vapor e a
+    // poeira do encaixe vão na passada final)
+    if (this.only3d) this.pass3d(ctx, t, (push) => fxItems(push, game.particles));
+    else {
+      game.particles.drawPuffs(ctx);
+      game.particles.drawFx(ctx);
+      game.particles.drawDrops(ctx);
+    }
     // Luz do sol (ou da lua) banhando a cena: quente do lado dela, fria do outro
     drawLighting(ctx, 300, lt.warm, lt.strength);
 
@@ -388,7 +404,7 @@ export class Renderer {
       ctx.fillStyle = `rgba(25, 30, 85, ${dusk * 0.3})`;
       ctx.fillRect(-20, -20, W + 40, H + 40);
     }
-    game.particles.drawTexts(ctx);
+    if (!this.only3d) game.particles.drawTexts(ctx);
     const parts = game.particles;
     if (this.only3d) {
       // Partículas 3D ao vivo: clima, flocos desfocados, fumaça e vapor (sem a camada
@@ -398,6 +414,7 @@ export class Renderer {
       const smoke = SMOKE_COLORS[game.igloo.style] || SMOKE_COLORS.igloo;
       this.particles3dDrawn = this.pass3d(ctx, t, (push) => {
         smokeItems(push, parts, t, smoke);
+        textItems(push, parts, this.glyph());
         weatherItems(push, parts, bokehOn ? this.bokeh.items : null, t);
       });
     } else if (game.particles.leaves) drawLeaves(ctx, game.particles.snow, t);

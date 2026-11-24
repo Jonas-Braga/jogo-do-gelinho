@@ -11,6 +11,7 @@ import { DOOR_MODELS, DOOR_SUBJECTS, stonePose, LEAF_STEPS } from './m3d/doors.j
 import { prepareSurface } from './water.js';
 import { DEPTH, W, IGLOO, BLOCK_W, SHORE_Y } from './config.js';
 import { levelParams } from './levels.js';
+import { floeWidth } from './floes.js';
 import { Studio } from './m3d/kit.js';
 import * as player from './m3d/player.js';
 import * as bear from './m3d/bear.js';
@@ -260,6 +261,9 @@ export function drawBear3D(ctx, b, t, outfit = 'polar') {
 }
 
 // ---------------------------------------------------------------- Bichos
+// Modo só 3D: os respingos dos peixes saltando são partículas 3D (src/game.js), então os
+// pinguinhos 2D ao lado da foto não são desenhados
+export const liveFx = { on: false };
 // Ponto de apoio de cada bicho na fileira (o mesmo do desenho 2D)
 const ANCHOR = {
   goose: (c, y, t) => ({ y: y - 30 + Math.sin(t * 3 + c.ph) * 3 }),
@@ -426,7 +430,7 @@ export function drawCritter3D(ctx, c, y, t, kind = c.kind) {
   blit(ctx, img, subject.box);
   ctx.restore();
   const sp = a.splash || { min: 6, off: 12, color: 'rgba(207, 239, 250, 0.7)' };
-  if (a.hop >= sp.min) {
+  if (a.hop >= sp.min && !liveFx.on) {
     // Respingos ao sair da água
     ctx.fillStyle = sp.color;
     for (let i = 0; i < 3; i++) {
@@ -1190,7 +1194,7 @@ export function levelModels(level) {
   const out = [];
   // O que aparece logo no primeiro quadro: fundo, placas, casa, personagem e enfeites
   if (SCENERY_3D[scenery]) out.push(SCENERY_3D[scenery]);
-  out.push(`${FLOE_PREFIX[scenery]}${p.fragmented ? FRAG_W : BLOCK_W}`);
+  out.push(`${FLOE_PREFIX[scenery]}${floeWidth(level)}`);
   out.push(...(HOUSE_MODELS[sp?.house || 'igloo'] || []));
   out.push(PLAYER_BY_OUTFIT[sp?.outfits?.player || 'parka']);
   out.push(...(DECOR_MODELS[sp?.decor] || []));

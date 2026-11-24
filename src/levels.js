@@ -36,6 +36,9 @@ export function levelParams(level) {
     // em qualquer fase. Nunca menor que na fase 1.
     airSpeed: PLAYER.walkSpeed * PLAYER.airControl * Math.max(1, speed / BASE_SPEED),
     fragmented: level % 2 === 0,          // fases pares: placas em pedaços que abrem e fecham
+    // Fase com uma peça inteira por grupo (praia: uma prancha de surfe só, sem abrir e
+    // fechar, mesmo nas fases pares)
+    singleFloe: specialFor(level)?.floes === 'single',
     breathSpeed: Math.min(1.1 + L * 0.06, 1.9),
 
     // Inimigos e peixes (fase especial pode trocar os bichos, sem mudar velocidade nem quantidade)

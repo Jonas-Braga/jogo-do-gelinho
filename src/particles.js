@@ -5,6 +5,19 @@ import { depthScale, projectX, swayAt } from './depth.js';
 // base, altura, largura, semente, t) e, se ele desenhou, pulam a chama 2D
 export const fireArt = { draw: null };
 
+// Pegadas na costa: uma a cada `step` px andados, alternando os pés; ficam inteiras um
+// instante e depois somem, a mais antiga primeiro
+export const PRINTS = { step: 22, life: 2.6, hold: 0.35, spread: 3.5 };
+// Cor das pegadas por cenário (a marca afundada no chão)
+export const PRINT_COLORS = {
+  ice: [112, 146, 172], forest: [44, 62, 30], space: [84, 82, 98], beach: [152, 118, 74], halloween: [26, 32, 28], dino: [62, 40, 26],
+};
+// Peixes que saltam da água (frequência do salto, a mesma do desenho): espirram água ao
+// sair e, mais forte, ao voltar
+export const FISH_HOP = { fish: 4, tfish: 3, piranha: 3.2 };
+// Opacidade de uma pegada com idade t
+export const printAlpha = (t) => (t < PRINTS.hold * PRINTS.life ? 1 : Math.max(0, 1 - (t - PRINTS.hold * PRINTS.life) / ((1 - PRINTS.hold) * PRINTS.life)));
+
 // Cada partícula é desenhada na perspectiva da linha onde está (como placas e bichos)
 function enterDepth(ctx, y) {
   ctx.save();
@@ -23,6 +36,7 @@ export class Particles {
     this.puffs = [];
     this.texts = [];
     this.fx = [];
+    this.prints = [];
     this.leaves = false;   // fase da floresta: folhas caindo no lugar da neve
     this.stardust = false; // fase do espaço: poeira estelar no lugar da neve
     this.calm = false;     // fase sem nada caindo do céu (praia)
@@ -54,6 +68,30 @@ export class Particles {
       });
     }
     this.ripples.push({ x, y, t: 0 }, { x, y, t: -0.15 });
+  }
+
+  // Respingo pequeno de peixe saindo (out) ou voltando para a água: gotinhas e um anel
+  fishSplash(x, y, back = true) {
+    const n = back ? 12 : 6;
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.9;
+      const s = (back ? 70 : 50) + Math.random() * (back ? 110 : 70);
+      this.drops.push({
+        x, y,
+        vx: Math.cos(a) * s * 0.55,
+        vy: Math.sin(a) * s,
+        r: 0.9 + Math.random() * 1.4,
+        life: 0.45 + Math.random() * 0.3,
+        t: 0,
+        floor: y + 3,
+      });
+    }
+    this.ripples.push({ x, y, t: 0, s: back ? 0.45 : 0.3 });
+  }
+
+  // Pegada (side: 0 pé esquerdo, 1 pé direito; dir: para onde anda)
+  footprint(x, y, dir, side) {
+    this.prints.push({ x, y: y + (side ? PRINTS.spread : -PRINTS.spread) * 0.5, dir, side, t: 0 });
   }
 
   // Nuvenzinha de neve (encaixe de bloco, bloco removido)
@@ -244,6 +282,8 @@ export class Particles {
     this.texts = this.texts.filter((s) => s.t < 1.1);
     for (const r of this.ripples) r.t += dt;
     this.ripples = this.ripples.filter((r) => r.t < 1);
+    for (const p of this.prints) p.t += dt;
+    this.prints = this.prints.filter((p) => p.t < PRINTS.life);
     this.updateFx(dt);
     for (const s of this.snow) {
       s.sway += dt;
@@ -261,10 +301,26 @@ export class Particles {
       ctx.strokeStyle = `rgba(${(this.liquid?.ripple || [207, 239, 250]).join(', ')}, ${0.7 * (1 - k)})`;
       ctx.lineWidth = 2;
       enterDepth(ctx, r.y);
+      const sc = r.s || 1;
       ctx.beginPath();
-      ctx.ellipse(r.x, r.y, 10 + k * 60, 3 + k * 12, 0, 0, Math.PI * 2);
+      ctx.ellipse(r.x, r.y, (10 + k * 60) * sc, (3 + k * 12) * sc, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // Pegadas (desenho 2D, sem o modo só 3D): marquinhas escuras na linha da costa
+  drawPrints(ctx, color = PRINT_COLORS.ice) {
+    if (!this.prints.length) return;
+    ctx.save();
+    ctx.fillStyle = `rgb(${color.join(',')})`;
+    for (const p of this.prints) {
+      ctx.globalAlpha = 0.55 * printAlpha(p.t);
+      const s = depthScale(p.y);
+      ctx.beginPath();
+      ctx.ellipse(projectX(p.x, p.y), p.y, 4.5 * s, 1.8 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.restore();
   }

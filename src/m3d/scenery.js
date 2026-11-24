@@ -788,7 +788,9 @@ export const beachScenery = {
 // mesmas posições do 2D) com o montinho da cova, gramado escuro com folhas secas e o
 // barranco de terra na beira do rio. Luar frio vindo da esquerda (onde fica a lua).
 export const HAUNT_HILLS = [
-  { zc: 230, depth: 200, top: [118, 150], base: 205, seed: 23, freq: 0.0055, tint: '#2E1C3E' },
+  { zc: 230, depth: 200, top: [118, 150], base: 205, seed: 23, freq: 0.0055, tint: '#3A2A4C' },
+  // Cordilheira do fundo: mais alta, mais clara e azulada pela névoa da noite
+  { zc: 70, depth: 160, top: [80, 118], base: 190, seed: 31, freq: 0.0042, tint: '#4A4272' },
 ];
 export const MANSION = { x: 805, base: SHORE_TOP - 26 };
 export const DEAD_TREES_FAR = [[560, 0.7], [690, 0.5], [930, 0.6], [1220, 0.8]];
@@ -855,11 +857,11 @@ export const halloweenScenery = {
   distance: 1300,
   poses: () => [{ key: 'main' }],
   stage: (studio) => studio.stageScenery({
-    target: [640, 0, 480], size: 950, fog: { color: '#2A1838', near: 950, far: 2000 },
-    sky: 0.55, skyColor: '#6A5A9A', ground: '#1E1A28', keyIntensity: 2.2, keyColor: '#CFC8FF',
+    target: [640, 0, 480], size: 950, fog: { color: '#34284E', near: 950, far: 2100 },
+    sky: 0.75, skyColor: '#8A7CC4', ground: '#262034', keyIntensity: 3.1, keyColor: '#D8D2FF',
     // Luar da esquerda e um pouco de frente: as lápides e o casarão aparecem (de costas
     // para a lua ficariam só silhuetas)
-    sun: [-0.62, 0.6, 0.45], exposure: 1.1,
+    sun: [-0.62, 0.6, 0.45], exposure: 1.2,
   }),
   build(kit) {
     const { THREE, group, mat } = kit;
@@ -867,15 +869,40 @@ export const halloweenScenery = {
     const vcol = (extra = {}) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0, ...extra });
     let seed = 1;
     const rnd = () => hash(seed++, 13, 211);
-    const bark = mat('#1E1420', 0.9);
-    // Morros escuros
+    const bark = mat('#2A1E2C', 0.9);
+    // Morros: o da frente e a cordilheira do fundo, com cristas de rocha (mais claras no
+    // alto e no íngreme) e manchas de mato seco
+    const rock = new THREE.Color('#6A6286');
+    const scrub = new THREE.Color('#2A3428');
+    HAUNT_HILLS.forEach((r, ri) => {
+      const tint = new THREE.Color(r.tint);
+      root.add(kit.mesh(heightField(THREE, {
+        x0: -160, x1: W + 160, z0: r.zc - r.depth / 2, z1: r.zc + r.depth / 2, dx: 6, dz: 5,
+        h: (x, z) => hillHeight(r, x, z) + (fbm(x * 0.06, z * 0.08, 241 + ri, 3) - 0.5) * 4,
+        colorAt: (c, x, y, z) => {
+          c.copy(tint).multiplyScalar(0.8 + fbm(x * 0.02, z * 0.03, 213 + ri, 3) * 0.35);
+          const high = Math.min(1, Math.max(0, (y - yAt(r.base, z)) / ((r.base - r.top[0]) / C)));
+          c.lerp(rock, Math.max(0, high - 0.45) * 0.9 * fbm(x * 0.05, z * 0.05, 243 + ri, 2));
+          if (ri === 0) c.lerp(scrub, Math.max(0, fbm(x * 0.03, z * 0.04, 245, 3) - 0.5) * 1.2);
+        },
+      }), vcol({ bumpMap: grainTexture(THREE, 23 + ri), bumpScale: 0.8 })));
+    });
     const r = HAUNT_HILLS[0];
-    const tint = new THREE.Color(r.tint);
-    root.add(kit.mesh(heightField(THREE, {
-      x0: -140, x1: W + 140, z0: r.zc - r.depth / 2, z1: r.zc + r.depth / 2, dx: 8, dz: 6,
-      h: (x, z) => hillHeight(r, x, z),
-      colorAt: (c, x, y, z) => c.copy(tint).multiplyScalar(0.85 + fbm(x * 0.02, z * 0.03, 213, 3) * 0.3),
-    }), vcol()));
+    const far = HAUNT_HILLS[1];
+    // Arvorezinhas secas na cordilheira do fundo
+    for (let i = 0; i < 16; i++) {
+      const x = 30 + i * 80 + rnd() * 40;
+      const z = far.zc - 30 + rnd() * 40;
+      root.add(deadTreeParts(kit, x, hillHeight(far, x, z) - 2, z, 0.45 + rnd() * 0.3, bark, 60 + i));
+    }
+    // Pedras nos morros
+    const boulders = [];
+    for (let i = 0; i < 70; i++) {
+      const x = rnd() * W;
+      const z = r.zc - r.depth * 0.35 + rnd() * r.depth * 0.7;
+      boulders.push({ x, y: hillHeight(r, x, z) - 1, z, s: 3 + rnd() * 5, sy: 0.6 + rnd() * 0.4, ry: rnd() * TAU, color: rnd() < 0.5 ? '#5A5470' : '#463E58' });
+    }
+    root.add(instanced(THREE, new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.9 }), boulders));
     // Árvores secas em cima dos morros
     DEAD_TREES_FAR.forEach(([x, s], i) => {
       const z = r.zc + 20;
@@ -903,11 +930,25 @@ export const halloweenScenery = {
     for (const [x, y, w, h] of [[-15, 14, 7, 8], [-36, 14, 7, 8], [26, 52, 6, 7], [2, 14, 6, 8]]) {
       house.add(kit.mesh(new THREE.BoxGeometry(w, h / C, 0.6), y > 40 && x < 0 ? wall : lit, x, y / C, x > 20 ? 13.2 : 17.2));
     }
+    // Molduras das janelas, janelas do andar de cima (uma acesa, outras escuras),
+    // chaminé, varanda com colunas e degraus, e faixa de madeira entre os andares
+    const trim = mat('#4A3A56', 0.8);
+    const darkWin = mat('#120C18', 0.5);
+    for (const [x, y, w, h, on] of [[-15, 14, 7, 8], [-36, 14, 7, 8], [2, 14, 6, 8], [-36, 34, 6, 7, 1], [-15, 34, 6, 7, 0], [2, 34, 6, 7, 0]]) {
+      house.add(kit.mesh(new THREE.BoxGeometry(w + 2.4, (h + 2.4) / C, 0.8), trim, x, y / C, 17));
+      if (on != null) house.add(kit.mesh(new THREE.BoxGeometry(w, h / C, 0.6), on ? lit : darkWin, x, y / C, 17.3));
+    }
+    house.add(kit.mesh(new THREE.BoxGeometry(72, 1.6 / C, 36), trim, -18, 25 / C, 0));
+    house.add(kit.mesh(new THREE.BoxGeometry(8, 26 / C, 8), wall, -44, hb + 10 / C, -6));
+    house.add(kit.mesh(new THREE.BoxGeometry(30, 2 / C, 10), roofM, -10, 20 / C, 22));
+    for (const x of [-22, 2]) house.add(kit.mesh(new THREE.CylinderGeometry(0.9, 0.9, 19 / C, 6), trim, x, 9.5 / C, 25));
+    for (let i = 0; i < 3; i++) house.add(kit.mesh(new THREE.BoxGeometry(14 + i * 4, 1.4 / C, 3), mat('#3A3446', 0.9), -10, (0.7 + i * 1.4) / C, 28 + (2 - i) * 2.5));
     // Gramado do cemitério: montinhos, mais escuro na frente
     const zBack = zAt(SNOW_BACK - 4);
     const zEdge = zAt(EDGE_TOP);
-    const cG1 = new THREE.Color('#4A5A4E');
-    const cG2 = new THREE.Color('#2C3A31');
+    const cG1 = new THREE.Color('#566A58');
+    const cG2 = new THREE.Color('#34443A');
+    const dirt = new THREE.Color('#5A4A44');
     const lawnH = (x, z) => {
       const k = (z - zBack) / (zEdge - zBack);
       let y = (fbm(x * 0.012, z * 0.03, 217, 4) - 0.45) * (8 - k * 5) * Math.min(1, (1 - k) * 6);
@@ -923,8 +964,51 @@ export const halloweenScenery = {
     root.add(kit.mesh(heightField(THREE, {
       x0: -40, x1: W + 40, z0: zBack, z1: zEdge, dx: 5, dz: 4,
       h: lawnH,
-      colorAt: (c, x, y, z) => c.copy(cG1).lerp(cG2, Math.min(1, (z - zBack) / (zEdge - zBack) + fbm(x * 0.03, z * 0.06, 219, 2) * 0.4)),
-    }), vcol({ bumpMap: grainTexture(THREE, 21), bumpScale: 0.5 })));
+      colorAt: (c, x, y, z) => {
+        c.copy(cG1).lerp(cG2, Math.min(1, (z - zBack) / (zEdge - zBack) + fbm(x * 0.03, z * 0.06, 219, 2) * 0.4));
+        // Trilha de terra batida e manchas de terra onde a grama não cresce
+        const pathZ = zBack + (zEdge - zBack) * (0.45 + Math.sin(x * 0.006) * 0.12);
+        const onPath = Math.max(0, 1 - Math.abs(z - pathZ) / 7) * (0.7 + fbm(x * 0.08, z * 0.1, 247, 2) * 0.5);
+        c.lerp(dirt, Math.min(1, onPath + Math.max(0, fbm(x * 0.025, z * 0.05, 249, 3) - 0.62) * 2));
+      },
+    }), vcol({ bumpMap: grainTexture(THREE, 21), bumpScale: 0.9 })));
+    // Capim em tufos (menos onde há trilha e covas), pedrinhas e moitas secas
+    const blade = new THREE.ConeGeometry(0.45, 4.5, 3);
+    blade.translate(0, 2.25, 0);
+    const tufts = [];
+    const pebbles = [];
+    const shrubs = [];
+    const nearGrave = (x, z) => GRAVES.some((gr) => Math.abs(x - gr.x) < gr.w * 0.8 && Math.abs(z - (zAt(gr.y) + 6)) < 14);
+    for (let i = 0; i < 1100; i++) {
+      const x = rnd() * W;
+      const z = zBack + 6 + rnd() * (zEdge - zBack - 10);
+      if (nearGrave(x, z)) continue;
+      const y = lawnH(x, z);
+      for (let b = 0; b < 3; b++) {
+        tufts.push({ x: x + (b - 1) * 0.9, y, z, s: 0.7 + rnd() * 0.8, rz: (b - 1) * 0.5, ry: rnd() * TAU, color: rnd() < 0.5 ? '#6A7A5C' : '#4C5C44' });
+      }
+    }
+    for (let i = 0; i < 220; i++) {
+      const x = rnd() * W;
+      const z = zBack + 6 + rnd() * (zEdge - zBack - 10);
+      pebbles.push({ x, y: lawnH(x, z), z, s: 0.8 + rnd() * 1.6, sy: 0.6, ry: rnd() * TAU, color: rnd() < 0.5 ? '#8A849A' : '#6E6880' });
+    }
+    for (let i = 0; i < 26; i++) {
+      const x = rnd() * W;
+      const z = zBack + 4 + rnd() * 20;
+      if (nearGrave(x, z) || Math.abs(x - IGLOO_X) < 160) continue;
+      shrubs.push({ x, y: lawnH(x, z), z, s: 5 + rnd() * 5, sy: 0.7, ry: rnd() * TAU, color: rnd() < 0.5 ? '#3A2E2A' : '#4A3A30' });
+    }
+    root.add(instanced(THREE, blade, new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.85 }), tufts, { shadow: false }));
+    root.add(instanced(THREE, new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.9 }), pebbles, { shadow: false }));
+    const shrubGeo = new THREE.IcosahedronGeometry(1, 1);
+    const sp = shrubGeo.getAttribute('position');
+    for (let v = 0; v < sp.count; v++) {
+      const k = 0.7 + hash(v, 7, 251) * 0.6;
+      sp.setXYZ(v, sp.getX(v) * k, Math.max(0, sp.getY(v)) * k, sp.getZ(v) * k);
+    }
+    shrubGeo.computeVertexNormals();
+    root.add(instanced(THREE, shrubGeo, new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.95 }), shrubs));
     // Cerca de ferro: postes com ponta de lança e duas travessas
     const iron = new THREE.MeshStandardMaterial({ color: '#141018', roughness: 0.45, metalness: 0.5 });
     const fz = zAt(FENCE.line);
@@ -941,6 +1025,12 @@ export const halloweenScenery = {
     for (const y of [postH * 0.2, postH * 0.75]) {
       const bar = kit.mesh(new THREE.BoxGeometry(FENCE.to - FENCE.from, 1.6, 1.2), iron, (FENCE.from + FENCE.to) / 2 + 4, y, fz);
       root.add(bar);
+    }
+    const pillar = mat('#6E6880', 0.92);
+    for (const x of [FENCE.from - 2, FENCE.to + 10]) {
+      root.add(kit.mesh(new THREE.BoxGeometry(9, postH + 6, 9), pillar, x, (postH + 6) / 2 - 1, fz));
+      root.add(kit.mesh(new THREE.BoxGeometry(12, 2.4, 12), pillar, x, postH + 6, fz));
+      root.add(kit.mesh(new THREE.SphereGeometry(3.4, 12, 8), pillar, x, postH + 9.5, fz));
     }
     // Lápides e cruzes (as mesmas do 2D), um pouco tortas
     const stoneSide = mat('#7C788E', 0.85);

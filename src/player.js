@@ -231,7 +231,10 @@ export class Player {
           this.moving = true;
           this.x += this.vx * dt;
         }
-        const gone = this.x < -40 || this.x > W + 40;
+        // Saiu da tela: passou 40 px da borda VISÍVEL na costa (a câmera acompanha o
+        // jogador e a costa é desenhada encolhida, então a borda fica além de 0..W)
+        const [lo, hi] = walkLimits(SHORE_Y, -40);
+        const gone = this.x < lo || this.x > hi;
         const bear = this.game.bear;
         if ((gone && (!bear.active || bear.offscreen)) || this.t > FLEE_MAX_TIME) this.die();
         break;

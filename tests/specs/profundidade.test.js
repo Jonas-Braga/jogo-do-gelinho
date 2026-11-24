@@ -2175,9 +2175,10 @@ suite('Água com aspecto de líquido', () => {
 
 suite('Câmera: deslocamento maior para os lados', () => {
   test('a câmera vai mais longe para cada lado (pedido do usuário: ~1 cm a mais), com o parallax de sempre', () => {
-    // Antes: 0,03 (até ~19 px do jogo para cada lado); agora ~45 px
+    // Antes: 0,03 (até ~19 px do jogo para cada lado); depois ~45 px; agora ~96 px
+    // (pedido do usuário: mais 2 cm para cada lado)
     expect(maxSway()).toBeGreaterThan(40);
-    expect(maxSway()).toBeLessThan(60);
+    expect(maxSway()).toBeLessThan(100);
     const was = camera.x;
     try {
       for (let i = 0; i < 300; i++) followCamera(W, 0.05);
@@ -2970,4 +2971,221 @@ suite('Cena em 3D · etapa 4: portas e cortinas 3D', () => {
       }
     });
   }
+});
+
+suite('Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera', () => {
+  const collect = (fn) => {
+    const items = [];
+    fn((kind, x, y, hw, hh, rot, c, ph, blur, ex, uv) => items.push({ kind, x, y, hw, hh, rot, c, ph, blur, ex, uv }));
+    return items;
+  };
+  const frame3d = (level, setup = () => {}) => {
+    const before = { ...model };
+    try {
+      model.state = 'ready';
+      model.sprites = {};
+      const g = makeGame({ level });
+      g.renderer.use3d = true;
+      g.renderer.only3d = true;
+      g.renderer.sky3d = () => null;
+      g.renderer.water3d = () => null;
+      const passes = [];
+      g.renderer.particles3d = () => ({
+        draw: (ctx, t, light, fill) => { passes.push(collect(fill)); return true; },
+        flame: () => true,
+      });
+      setup(g);
+      const f = recordingCtx();
+      g.renderer.ctx = f.ctx;
+      g.renderer.draw(g);
+      return { g, passes, calls: f.calls };
+    } finally {
+      Object.assign(model, before);
+      resetArt();
+    }
+  };
+
+  test('a câmera vai ~2 cm mais longe para cada lado (até ~96 px do jogo) e o personagem chega às duas bordas visíveis em toda linha', async () => {
+    const { walkLimits, depthScale, swayFactor } = await import('../../src/depth.js');
+    const { PLAYER } = await import('../../src/config.js');
+    expect(maxSway()).toBeGreaterThan(90);
+    expect(maxSway()).toBeLessThan(100);
+    const onScreen = (x, y) => {
+      const s = depthScale(y);
+      return DEPTH.vanishX + (x - DEPTH.vanishX) * s - (x - W / 2) * DEPTH.sway.amount * swayFactor(s);
+    };
+    for (const y of [SHORE_Y, ...ROW_Y]) {
+      const [lo, hi] = walkLimits(y, PLAYER.edge);
+      expect(Math.abs(onScreen(lo, y) - PLAYER.edge)).toBeLessThan(1e-6);
+      expect(Math.abs(onScreen(hi, y) - (W - PLAYER.edge))).toBeLessThan(1e-6);
+    }
+    // Andando na costa de uma ponta à outra, sem parar antes da borda visível
+    const { hold, release } = await import('../helpers.js');
+    const g = makeGame({ level: 1 });
+    hold(g, 'right');
+    step(g, 10);
+    release(g, 'right');
+    expect(onScreen(g.player.x, SHORE_Y)).toBeGreaterThan(W - PLAYER.edge - 1);
+    hold(g, 'left');
+    step(g, 12);
+    release(g, 'left');
+    expect(onScreen(g.player.x, SHORE_Y)).toBeLessThan(PLAYER.edge + 1);
+  });
+
+  test('fugindo do urso, o personagem só "sai da tela" depois de passar a borda visível da costa', async () => {
+    const { walkLimits } = await import('../../src/depth.js');
+    const g = makeGame({ level: 4 });
+    const p = g.player;
+    const [, hi] = walkLimits(SHORE_Y, -40);
+    expect(hi).toBeGreaterThan(W + 40);
+    p.state = 'flee';
+    p.t = 1;
+    p.vx = 0;
+    g.bear.active = false;
+    p.x = hi - 5;
+    p.update(0.001, g.input);
+    expect(p.state).toBe('flee');
+    p.x = hi + 5;
+    p.update(0.001, g.input);
+    expect(p.state).not.toBe('flee');
+  });
+
+  test('andando na costa ficam pegadas alternando os pés; parado ou pulando, não', async () => {
+    const { PRINTS } = await import('../../src/particles.js');
+    const { hold, release } = await import('../helpers.js');
+    const g = makeGame({ level: 1 });
+    step(g, 1);
+    expect(g.particles.prints.length).toBe(0);
+    hold(g, 'right');
+    step(g, 0.6);
+    release(g, 'right');
+    const n = g.particles.prints.length;
+    expect(n).toBeGreaterThan(3);
+    const sides = g.particles.prints.map((p) => p.side);
+    for (let i = 1; i < sides.length; i++) expect(sides[i]).not.toBe(sides[i - 1]);
+    expect(g.particles.prints.every((p) => p.dir === 1)).toBe(true);
+    // Somem sozinhas depois de PRINTS.life
+    step(g, PRINTS.life + 0.1);
+    expect(g.particles.prints.length).toBe(0);
+  });
+
+  test('as pegadas somem da mais antiga para a mais nova', async () => {
+    const { printAlpha, PRINTS } = await import('../../src/particles.js');
+    expect(printAlpha(0)).toBe(1);
+    expect(printAlpha(PRINTS.life * PRINTS.hold)).toBe(1);
+    let last = 1;
+    for (let t = PRINTS.life * PRINTS.hold; t <= PRINTS.life; t += 0.1) {
+      expect(printAlpha(t)).toBeLessThanOrEqual(last);
+      last = printAlpha(t);
+    }
+    expect(printAlpha(PRINTS.life)).toBe(0);
+    const g = makeGame({ level: 1 });
+    g.particles.footprint(500, SHORE_Y, 1, 0);
+    g.particles.update(1.2);
+    g.particles.footprint(522, SHORE_Y, 1, 1);
+    g.particles.update(0.3);
+    const [old, young] = g.particles.prints;
+    expect(printAlpha(old.t)).toBeLessThan(printAlpha(young.t));
+  });
+
+  test('peixe saltando espirra água ao sair e ao voltar (gotas e anel); estrelinha, bala e ovo não', () => {
+    const splashes = (level, kind) => {
+      const g = makeGame({ level });
+      g.critters.list.length = 0;
+      g.critters.list.push({ kind, row: 1, dir: 1, vx: 0, x: 600, w: 30, ph: 0 });
+      g.critters.update = () => {};
+      const calls = [];
+      const orig = g.particles.fishSplash.bind(g.particles);
+      g.particles.fishSplash = (...a) => (calls.push(a), orig(...a));
+      step(g, 4);
+      return { calls, g };
+    };
+    const ice = splashes(1, 'fish');
+    // sin(t·4) cruza o zero ~5 vezes em 4 s: sai e volta
+    expect(ice.calls.length).toBeGreaterThan(3);
+    expect(ice.calls.some((c) => c[2] === true) && ice.calls.some((c) => c[2] === false)).toBe(true);
+    expect(ice.calls[0][1]).toBe(ice.g.rows[1].y + 9);
+    expect(splashes(10, 'piranha').calls.length).toBeGreaterThan(2);
+    expect(splashes(20, 'fish').calls.length).toBeGreaterThan(1); // peixinho tropical
+    for (const lv of [15, 25, 30]) expect(splashes(lv, 'fish').calls.length, `fase ${lv}`).toBe(0);
+    const g = makeGame({ level: 1 });
+    g.particles.fishSplash(300, 400, true);
+    expect(g.particles.drops.length).toBeGreaterThan(5);
+    expect(g.particles.ripples.length).toBe(1);
+    expect(g.particles.ripples[0].s).toBeLessThan(1);
+  });
+
+  test('modo só 3D: pegadas, anéis e bolhas de lava no chão; lascas, brilhos, bolhas e gotas por cima; textos em relevo', async () => {
+    const { P3 } = await import('../../src/m3d/particles3d.js');
+    const { passes, calls } = frame3d(30, (g) => {
+      g.particles.snow = [];
+      g.time = 1.3;
+      g.particles.footprint(500, SHORE_Y, 1, 0);
+      g.particles.splash(600, ROW_Y[1]);
+      g.particles.update(0.05);
+      g.particles.chips(600, ROW_Y[2], 3);
+      g.particles.sparkle(600, ROW_Y[2], 2, '#FFEE88');
+      g.particles.fx.forEach((f) => { f.t = Math.max(0.01, f.t); });
+      g.particles.bubble(620, ROW_Y[3], ROW_Y[3] - 30);
+      g.particles.text(640, 300, '+200', '#FFD36B');
+    });
+    const all = passes.flat();
+    const kinds = new Set(all.map((i) => i.kind));
+    for (const k of ['print', 'ring', 'shard', 'dust', 'bubble', 'snow', 'text']) expect(kinds.has(P3[k]), k).toBe(true);
+    // Pegadas, anéis e bolhas de lava (cúpulas acesas) na mesma passada do chão, que vem
+    // antes da passada das lascas/gotas (depois dos personagens)
+    const ground = passes.findIndex((p) => p.some((i) => i.kind === P3.print));
+    const over = passes.findIndex((p) => p.some((i) => i.kind === P3.shard));
+    expect(ground).toBeGreaterThan(-1);
+    expect(over).toBeGreaterThan(ground);
+    expect(passes[ground].some((i) => i.kind === P3.ring)).toBe(true);
+    expect(passes[ground].some((i) => i.kind === P3.snow && i.ex > 0.5)).toBe(true);
+    const text = all.find((i) => i.kind === P3.text);
+    expect(text.uv.length).toBe(4);
+    // Nada desses efeitos em 2D: nem texto, nem bolinhas das gotas
+    expect(calls.some((c) => c[0] === 'fillText' && c[1] === '+200')).toBe(false);
+    expect(calls.some((c) => c[0] === 'strokeText')).toBe(false);
+  });
+
+  test('sem o modo só 3D, as pegadas e os efeitos pequenos continuam no desenho 2D', () => {
+    const g = makeGame({ level: 1 });
+    g.particles.footprint(500, SHORE_Y, 1, 0);
+    g.particles.text(640, 300, '+200', '#FFD36B');
+    const f = recordingCtx();
+    g.renderer.ctx = f.ctx;
+    g.renderer.draw(g);
+    expect(f.calls.some((c) => c[0] === 'fillText' && c[1] === '+200')).toBe(true);
+    expect(f.calls.some((c) => c[0] === 'ellipse')).toBe(true);
+  });
+
+  test('praia: uma prancha de surfe só por grupo (o tamanho das 3 placas), sem abrir e fechar', async () => {
+    const { createRows, floeWidth, SINGLE_W } = await import('../../src/floes.js');
+    const { levelModels } = await import('../../src/model3d.js');
+    const { BLOCK_W, BLOCK_GAP } = await import('../../src/config.js');
+    const { levelParams } = await import('../../src/levels.js');
+    expect(SINGLE_W).toBe(BLOCK_W * 3 + BLOCK_GAP * 2);
+    expect(levelParams(20).singleFloe).toBe(true);
+    expect(floeWidth(20)).toBe(SINGLE_W);
+    const rows = createRows(20);
+    for (const r of rows) {
+      expect(r.pieces.length).toBe(2);
+      expect(r.pieces.every((p) => p.w === SINGLE_W && p.n === 1)).toBe(true);
+      expect(r.frag).toBe(false);
+      const g0 = r.gap;
+      r.update(3);
+      expect(r.gap).toBe(g0);
+    }
+    expect(levelModels(20)).toContain(`board${SINGLE_W}`);
+    // As outras fases pares continuam fragmentadas
+    expect(createRows(18)[0].frag).toBe(true);
+    expect(levelParams(18).singleFloe).toBe(false);
+  });
+
+  test('Halloween: o cenário 3D tem duas cordilheiras (a do fundo atrás da da frente)', async () => {
+    const { HAUNT_HILLS } = await import('../../src/m3d/scenery.js');
+    expect(HAUNT_HILLS.length).toBe(2);
+    expect(HAUNT_HILLS[1].zc).toBeLessThan(HAUNT_HILLS[0].zc);
+    // A do fundo sobe mais na tela (aparece por cima da da frente)
+    expect(HAUNT_HILLS[1].top[0]).toBeLessThan(HAUNT_HILLS[0].top[0]);
+  });
 });

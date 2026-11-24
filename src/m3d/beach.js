@@ -566,7 +566,8 @@ function buildBoards(kit, w) {
     // Contorno visto de cima: bico (direita) mais fino, rabeta (esquerda) mais larga
     const half = (x) => {
       const u = x / w;
-      return 7.5 * Math.sin(Math.PI * Math.min(1, Math.max(0, u * 0.92 + 0.04))) ** 0.6 * (1 - 0.25 * u);
+      // A prancha comprida (praia: uma só por grupo) é um longboard mais largo
+      return (w > 150 ? 24 : 7.5) * Math.sin(Math.PI * Math.min(1, Math.max(0, u * 0.92 + 0.04))) ** 0.6 * (1 - 0.25 * u);
     };
     const shape = new THREE.Shape();
     const N = 30;

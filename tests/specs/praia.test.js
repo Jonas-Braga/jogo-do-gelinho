@@ -2,6 +2,7 @@
 // boias, cabana de palha, gaivotas, siris e águas-vivas, peixinhos tropicais,
 // surfista e caranguejo gigante). Só o visual muda (e o ritmo, como toda especial).
 import { suite, test, expect } from '../harness.js';
+import { SINGLE_W } from '../../src/floes.js';
 import { makeGame, step, stepUntil, enterIgloo } from '../helpers.js';
 import { specialFor } from '../../src/specials.js';
 import { levelParams, levelIntro } from '../../src/levels.js';
@@ -250,7 +251,7 @@ suite('Fases especiais · Praia (fase 20)', () => {
     expect(Math.abs(smoke.x - HUT_VENT.x)).toBeLessThan(10);
   });
 
-  test('pranchas de surfe e boias no lugar das placas de gelo', () => {
+  test('pranchas de surfe no lugar das placas de gelo (uma prancha inteira por grupo)', () => {
     const kinds = (g) => new Set(g.rows.flatMap((r) => r.pieces.flatMap((pc) => Object.keys(pc.sprites))));
     const b = makeGame({ level: 20 });
     b.rows[0].active = true;
@@ -259,10 +260,11 @@ suite('Fases especiais · Praia (fase 20)', () => {
     const n = makeGame({ level: 19 });
     drawn(n);
     expect(kinds(n).has('boardOff')).toBe(false);
-    // Fase par: pedaços curtos alternam boia e pranchinha
+    // Fase 20: cada grupo é uma prancha só, do tamanho das 3 placas (sem boias nem
+    // pedaços que abrem e fecham; pedido do usuário)
     const pieces = b.rows[0].pieces;
-    expect(pieces.some(isBuoy)).toBe(true);
-    expect(pieces.some((pc) => !isBuoy(pc))).toBe(true);
+    expect(pieces.some(isBuoy)).toBe(false);
+    expect(pieces.every((pc) => pc.w === SINGLE_W)).toBe(true);
     // Prancha comprida (fase ímpar) também é desenhada
     const long = { w: 82, k: 0, seed: 9, sprites: {} };
     expect(isBuoy(long)).toBe(false);

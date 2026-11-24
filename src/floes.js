@@ -82,10 +82,20 @@ export function floeOffset(piece, t) {
   return bob + dip;
 }
 
+// Largura de cada peça na fase: placa inteira, pedaço da fragmentada ou, na praia, uma
+// prancha só do tamanho do grupo de 3 placas
+export const SINGLE_W = BLOCK_W * 3 + BLOCK_GAP * 2;
+export function floeWidth(level) {
+  const p = levelParams(level);
+  return p.singleFloe ? SINGLE_W : p.fragmented ? FRAG.w : BLOCK_W;
+}
+
 export function createRows(level = 1) {
-  const { speed, fragmented, breathSpeed } = levelParams(level);
-  const n = fragmented ? FRAG.n : 3;
-  const w = fragmented ? FRAG.w : BLOCK_W;
+  const p = levelParams(level);
+  const { speed, breathSpeed } = p;
+  const fragmented = p.fragmented && !p.singleFloe;
+  const n = p.singleFloe ? 1 : fragmented ? FRAG.n : 3;
+  const w = floeWidth(level);
   let seed = 1 + level * 31;
   return ROW_Y.map((y, i) => {
     const pieces = [];

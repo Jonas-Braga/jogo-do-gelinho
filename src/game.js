@@ -1,8 +1,8 @@
-import { STEP, RULES, W, IGLOO } from './config.js';
+import { STEP, RULES, W, IGLOO, SHORE_Y } from './config.js';
 import { Input } from './input.js';
 import { createRows } from './floes.js';
 import { Player } from './player.js';
-import { Particles } from './particles.js';
+import { Particles, PRINTS, FISH_HOP } from './particles.js';
 import { Igloo } from './igloo.js';
 import { Renderer } from './renderer.js';
 import { Critters } from './enemies.js';
@@ -338,6 +338,42 @@ export class Game {
     requestAnimationFrame(this.frame);
   };
 
+  // Pegadas: andando na costa (de pé, no chão), uma marca a cada PRINTS.step px
+  trackSteps() {
+    const p = this.player;
+    const walking = p.state === 'stand' && p.row === -1 && p.moving && p.y === SHORE_Y;
+    if (!walking) {
+      this.stepX = null;
+      return;
+    }
+    if (this.stepX == null) {
+      this.stepX = p.x;
+      return;
+    }
+    if (Math.abs(p.x - this.stepX) >= PRINTS.step) {
+      this.stepFoot = this.stepFoot ? 0 : 1;
+      const dir = Math.sign(p.x - this.stepX) || p.facing || 1;
+      this.particles.footprint(p.x - dir * 4, SHORE_Y, dir, this.stepFoot);
+      this.stepX = p.x;
+    }
+  }
+
+  // Peixes saltando: espirram água ao sair e ao voltar (mesmo salto do desenho)
+  fishSplashes() {
+    const sc = this.special?.scenery || 'ice';
+    for (const c of this.critters.list) {
+      if (c.dead || c.kicked || c.power || c.bonus) continue;
+      const kind = c.kind === 'fish' ? (sc === 'beach' ? 'tfish' : sc === 'ice' || sc === 'forest' ? 'fish' : null) : c.kind;
+      const w = FISH_HOP[kind];
+      if (!w) continue;
+      const up = Math.sin(this.time * w + c.ph) > 0;
+      if (c.hopUp != null && up !== c.hopUp && c.x > -20 && c.x < W + 20) {
+        this.particles.fishSplash(c.x, this.rows[c.row].y + 9, !up);
+      }
+      c.hopUp = up;
+    }
+  }
+
   update(dt) {
     this.time += dt;
     this.shake = Math.max(0, this.shake - dt * 1.6);
@@ -397,6 +433,8 @@ export class Game {
     if (this.special?.sleigh && this.sleigh.update(dt)) this.sfx.play('sleigh');
     if (this.special?.boats) this.boats.update(dt);
     this.player.update(dt, this.input);
+    this.trackSteps();
+    this.fishSplashes();
     if (this.state === 'play' || this.state === 'entering') {
       this.critters.update(dt);
       this.bear.update(dt);

@@ -1,5 +1,7 @@
 // Etapa 1: game loop, água, placas se movendo e o personagem pulando.
 import { suite, test, expect } from '../harness.js';
+import { ROW_Y } from '../../src/config.js';
+import { walkLimits } from '../../src/depth.js';
 import { makeGame, step, hold, release, centerRow, placeOnFloe, jump, aimAtRow0, press } from '../helpers.js';
 import { STEP, W, SHORE_Y, PLAYER, MARGIN, TRACK } from '../../src/config.js';
 
@@ -184,7 +186,8 @@ suite('Etapa 1 · loop, placas e movimento', () => {
   test('placa leva o jogador contra a borda e ele cai na água', () => {
     const g = makeGame();
     placeOnFloe(g, 0); // fileira 0 anda para a direita
-    g.player.x = W - PLAYER.edge - 30;
+    // 30 px antes da borda VISÍVEL da fileira (a câmera leva a borda além de W)
+    g.player.x = walkLimits(ROW_Y[0], PLAYER.edge)[1] - 30;
     const r = g.rows[0].pieceAt(g.player.x);
     if (!r) {
       // garante que haja placa sob o jogador perto da borda

@@ -91,6 +91,8 @@ export const SPECIALS = {
     aurora: false,
     breath: false, // calor: sem vapor da respiração
     weather: 'none', // nada caindo do céu
+    // Uma prancha de surfe inteira por grupo, sem abrir e fechar (pedido do usuário)
+    floes: 'single',
     pace: 0.8,
   },
   25: {

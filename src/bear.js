@@ -1,4 +1,5 @@
 import { W, SHORE_Y } from './config.js';
+import { walkLimits } from './depth.js';
 import { POWERS } from './powers.js';
 
 const EDGE = 70;
@@ -29,8 +30,10 @@ export class Bear {
     this.kvx = 0;
   }
 
+  // Fora da tela: além da borda visível da costa (com a câmera daquele lado)
   get offscreen() {
-    return this.x < -BEAR_OFFSCREEN || this.x > W + BEAR_OFFSCREEN;
+    const [lo, hi] = walkLimits(SHORE_Y, -BEAR_OFFSCREEN);
+    return this.x < Math.min(lo, -BEAR_OFFSCREEN) || this.x > Math.max(hi, W + BEAR_OFFSCREEN);
   }
 
   // Ao renascer, o urso volta para o lado oposto ao jogador.
