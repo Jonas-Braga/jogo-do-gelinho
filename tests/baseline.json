@@ -592,5 +592,9 @@
   "Só 3D no jogo de verdade › aparelho sem 3D: a tela inicial avisa e a partida não começa (nunca com o desenho 2D)",
   "Cena em 3D · etapa 1: água 3D ao vivo › todo cenário tem a sua água 3D (água em todos, lava sem reflexo nos Dinossauros)",
   "Cena em 3D · etapa 1: água 3D ao vivo › no modo só 3D a água é só a camada 3D (nada de degradê, reflexo em tiras, brilho do horizonte ou caminho de sol em 2D)",
-  "Cena em 3D · etapa 1: água 3D ao vivo › sem a camada 3D pronta, o modo só 3D não desenha água nenhuma (nunca a 2D); fora dele, a 2D continua"
+  "Cena em 3D · etapa 1: água 3D ao vivo › sem a camada 3D pronta, o modo só 3D não desenha água nenhuma (nunca a 2D); fora dele, a 2D continua",
+  "Cena em 3D · etapa 2: céu 3D ao vivo › todo cenário tem o seu céu 3D (dia, espaço, noite, pré-histórico) e os céus fixos usam as cores do 2D",
+  "Cena em 3D · etapa 2: céu 3D ao vivo › no modo só 3D o céu é só a camada 3D, com o sol/lua/Terra na posição do 2D (a água usa a mesma luz)",
+  "Cena em 3D · etapa 2: céu 3D ao vivo › a aurora das fases normais vai para o céu 3D (e não em faixas 2D)",
+  "Cena em 3D · etapa 2: céu 3D ao vivo › sem a camada pronta não há céu nenhum (nunca o 2D); bichos do céu viram modelos 3D e entram nas fotos da fase"
 ]

@@ -1,7 +1,7 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
   rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, drawBoat3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
-  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy, water3D,
+  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy, water3D, sky3D, drawSkyFlyers3D,
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
@@ -21,7 +21,7 @@ import {
   forestArt,
 } from './forest.js';
 import {
-  makeSpaceBackground, drawSpaceSky, asteroidSprite, drawUfo, drawCrawler, drawComet, drawStarBonus,
+  makeSpaceBackground, drawSpaceSky, earthPos, asteroidSprite, drawUfo, drawCrawler, drawComet, drawStarBonus,
   drawSpaceDecor, drawBase, drawBaseDoorFront, drawStardust, DUST, spaceArt,
 } from './space.js';
 import {
@@ -29,11 +29,11 @@ import {
   drawTropicalFish, drawHut, drawHutDoorFront, SEA, beachArt, drawSeaTraffic,
 } from './beach.js';
 import {
-  makeHalloweenBackground, drawHalloweenSky, drawHalloweenDecor, pumpkinSprite, drawGhost, drawSpider,
+  makeHalloweenBackground, drawHalloweenSky, moonPos, MOON, drawHalloweenDecor, pumpkinSprite, drawGhost, drawSpider,
   drawEyeball, drawCandy, drawHaunted, drawHauntedDoorFront, HAUNT, halloweenArt,
 } from './halloween.js';
 import {
-  makeDinoBackground, drawDinoSky, drawDinoDecor, drawLavaBubbles, drawEmbers, rockSprite, drawPtero,
+  makeDinoBackground, drawDinoSky, sunPos, SUN, drawDinoDecor, drawLavaBubbles, drawEmbers, rockSprite, drawPtero,
   drawRaptor, drawAmmonite, drawDinoEgg, drawCave, drawCaveDoorFront, LAVA, dinoArt,
 } from './dino.js';
 import { drawHud } from './hud.js';
@@ -145,6 +145,7 @@ export class Renderer {
     // (os testes deixam desligado e continuam com o desenho 2D)
     this.only3d = false;
     this.water3d = water3D; // trocável nos testes
+    this.sky3d = sky3D;
     this.photosBusy = photosBusy;
     this.hooked = new Map();
   }
@@ -267,7 +268,23 @@ export class Renderer {
     const far = DEPTH.sway.far;
     const shore = DEPTH.sway.shore;
     this.aurora = sp?.aurora === false ? 0 : auroraStrength(game.level, this.skyF);
-    swayLayer(ctx, far, () => {
+    // Sol, lua ou Terra (mesma posição do céu 2D; a água 3D usa a mesma luz)
+    const body = space ? earthPos(this.skyF)
+      : halloween ? { ...moonPos(this.skyF), r: MOON.r }
+        : dino ? { ...sunPos(this.skyF), r: SUN.r }
+          : { x: 300, y: 60 + (1 - this.skyF) * 110, r: 22 };
+    this.body = body;
+    // Modo só 3D: o céu é a camada 3D ao vivo (src/m3d/sky3d.js); sem ela pronta, nada
+    if (this.only3d) {
+      swayLayer(ctx, far, () => {
+        const s3 = this.sky3d();
+        const bodyCol = space ? [150, 200, 255] : halloween ? [255, 240, 200] : dino ? hexToRgb(SUN.color.slice(1)) : sky.sun;
+        this.sky3dDrawn = !!(s3 && s3.draw(ctx, t, {
+          scenery: scenery || 'ice', top: sky.top, hor: sky.hor, sun: bodyCol, body, aurora: this.aurora,
+        }));
+        drawSkyFlyers3D(ctx, scenery, t, body);
+      });
+    } else swayLayer(ctx, far, () => {
       if (space) drawSpaceSky(ctx, t, this.skyF);
       else if (halloween) drawHalloweenSky(ctx, t, this.skyF);
       else if (dino) drawDinoSky(ctx, t, this.skyF);
@@ -294,7 +311,7 @@ export class Renderer {
     drawHaze(ctx, horizon, lt.haze);
     ctx.save();
     ctx.translate(-camera.x * far, 0);
-    if (scenery === 'beach') drawSkyGulls(ctx, t);
+    if (scenery === 'beach' && !this.only3d) drawSkyGulls(ctx, t);
     if (sp?.sleigh) drawSleigh(ctx, game.sleigh, t);
     ctx.translate(-camera.x * (shore - far), 0);
     // Barco e jet ski no mar ao fundo (atrás dos enfeites da costa)
@@ -312,7 +329,7 @@ export class Renderer {
     const reflect = space ? { hor: [120, 80, 220] } : halloween ? { hor: HAUNT.sky } : dino ? { hor: LAVA.sky } : sky;
     const sunStrength = lt.strength * (0.45 + 0.55 * clamp01(this.skyF + (sp ? 0.4 : 0)));
     // Sol (ou lua, ou Terra) para a luz da água 3D: mesma posição do céu
-    this.sun = { color: lt.path, strength: sunStrength, x: 300, y: 60 + (1 - this.skyF) * 110 };
+    this.sun = { color: lt.path, strength: sunStrength, x: body.x, y: body.y };
     swayLayer(ctx, (shore + 1) / 2, () => {
       this.drawWater(ctx, t, reflect, WATERS[scenery] || ICE_WATER, scenery || 'ice');
       if (dino) drawLavaBubbles(ctx, t);

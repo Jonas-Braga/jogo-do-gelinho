@@ -4,6 +4,7 @@
 // Cada modelo é fotografado só quando aparece pela primeira vez, aos poucos (algumas
 // poses por quadro) para não travar o jogo. Enquanto a foto não fica pronta, ou sem
 // internet/WebGL, vale o desenho 2D de sempre.
+import { Sky3D } from './m3d/sky3d.js';
 import { Water3D } from './m3d/water3d.js';
 import { prepareSurface } from './water.js';
 import { DEPTH, W, IGLOO, BLOCK_W } from './config.js';
@@ -1146,6 +1147,7 @@ export function levelModels(level) {
   out.push(...(HOUSE_MODELS[sp?.house || 'igloo'] || []));
   out.push(PLAYER_BY_OUTFIT[sp?.outfits?.player || 'parka']);
   out.push(...(DECOR_MODELS[sp?.decor] || []));
+  if (SKY_FLYERS[scenery]) out.push(SKY_FLYERS[scenery]); // bichos voando no céu
   // O que entra depois: urso, bichos, peixe e itens
   if (p.bear) out.push(BEAR_BY_OUTFIT[sp?.outfits?.bear || 'polar']);
   out.push(...(p.enemies || [p.enemy]));
@@ -1179,11 +1181,85 @@ export function water3D() {
   }
   return live.water;
 }
+// Céu 3D ao vivo (src/m3d/sky3d.js)
+export function sky3D() {
+  if (live.sky || live.skyFailed || model.state !== 'ready') return live.sky;
+  try {
+    live.sky = new Sky3D(model.studio.THREE);
+  } catch (e) {
+    live.skyFailed = true;
+    console.info('[gelinho] céu 3D indisponível', e?.message || e);
+  }
+  return live.sky;
+}
+
+// Bichos voando no céu ao fundo (no lugar das silhuetas 2D): modelos 3D pequenos, com
+// a névoa da distância. Mesmos caminhos do 2D.
+export const SKY_FLYERS = { halloween: 'bat', dino: 'ptero', beach: 'gull' };
+const flyerBuf = { c: null };
+function drawFlyer(ctx, kind, x, y, dir, ph, t, scale, haze, hazeA) {
+  const subject = SUBJECTS[kind];
+  if (!subject) return false;
+  want(kind);
+  const img = sprite(kind, subject.pose({ kind, dir, ph, x }, t));
+  if (!img) return false;
+  const b = subject.box;
+  const w = Math.ceil((b.right - b.left) * scale) + 2;
+  const h = Math.ceil((b.top - b.bottom) * scale) + 2;
+  const c = (flyerBuf.c ||= document.createElement('canvas'));
+  if (c.width < w || c.height < h) {
+    c.width = Math.max(c.width, w);
+    c.height = Math.max(c.height, h);
+  }
+  const g = c.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = 'source-over';
+  g.drawImage(img, 1, 1, w - 2, h - 2);
+  // Névoa da distância por cima (só onde há bicho)
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = haze;
+  g.globalAlpha = hazeA;
+  g.fillRect(0, 0, w, h);
+  g.globalAlpha = 1;
+  ctx.drawImage(c, 0, 0, w, h, x - w / 2, y - h / 2, w, h);
+  return true;
+}
+
+export function drawSkyFlyers3D(ctx, scenery, t, body) {
+  const kind = SKY_FLYERS[scenery];
+  if (!kind || typeof document === 'undefined') return;
+  if (scenery === 'halloween') {
+    // Revoada de morcegos (7 s atravessando, 9 s sem)
+    const k = (t % 16) / 7;
+    if (k > 1) return;
+    for (let i = 0; i < 6; i++) {
+      const x = -60 + k * (1280 + 120) - i * 34;
+      const y = body.y - 20 + Math.sin(k * 9 + i * 1.7) * 18 + (i % 3) * 14;
+      drawFlyer(ctx, kind, x, y, 1, i, t, 0.22 + (i % 2) * 0.05, 'rgb(40, 22, 60)', 0.35);
+    }
+  } else if (scenery === 'dino') {
+    const k = (t % 19) / 9;
+    if (k > 1) return;
+    for (let i = 0; i < 4; i++) {
+      const x = 1280 + 60 - k * (1280 + 160) + i * 46;
+      const y = body.y - 30 + (i % 2) * 18 + Math.sin(k * 6 + i) * 8;
+      drawFlyer(ctx, kind, x, y, -1, i, t, 0.3 - i * 0.03, 'rgb(150, 70, 70)', 0.4);
+    }
+  } else if (scenery === 'beach') {
+    for (let i = 0; i < 4; i++) {
+      const x = ((t * (14 + i * 4) + i * 330) % (1280 + 80)) - 40;
+      const y = 50 + i * 18 + Math.sin(t * 0.8 + i) * 6;
+      drawFlyer(ctx, kind, x, y, 1, i, t, 0.16 + (i % 2) * 0.04, 'rgb(170, 210, 235)', 0.3);
+    }
+  }
+}
+
 // A água 3D já pode ser desenhada? (sem 3D não há o que esperar)
 export function water3DReady() {
   if (!M.enabled || typeof window === 'undefined' || !window.WebGLRenderingContext) return true;
   if (model.state === 'failed') return true;
-  return !!water3D() || live.waterFailed;
+  return (!!water3D() || live.waterFailed) && (!!sky3D() || live.skyFailed);
 }
 
 // O aparelho consegue mostrar o 3D? (falso sem WebGL ou se o Three.js não carregou)

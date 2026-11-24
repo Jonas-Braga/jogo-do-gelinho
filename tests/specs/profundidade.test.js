@@ -2469,3 +2469,135 @@ suite('Cena em 3D · etapa 1: água 3D ao vivo', () => {
     });
   }
 });
+
+suite('Cena em 3D · etapa 2: céu 3D ao vivo', () => {
+  test('todo cenário tem o seu céu 3D (dia, espaço, noite, pré-histórico) e os céus fixos usam as cores do 2D', async () => {
+    const { SKY3D } = await import('../../src/m3d/sky3d.js');
+    const sceneries = new Set(['ice', ...Object.values(SPECIALS).map((sp) => sp.scenery).filter(Boolean)]);
+    for (const k of sceneries) expect(!!SKY3D.kinds[k], `cenário ${k}`).toBe(true);
+    expect(SKY3D.kinds.space.kind).toBe(1);
+    expect(SKY3D.kinds.halloween.kind).toBe(2);
+    expect(SKY3D.kinds.dino.kind).toBe(3);
+    expect(SKY3D.gradients.space[0][0]).toBe('#03021A');
+    expect(SKY3D.gradients.halloween[0][0]).toBe('#0B0620');
+    expect(SKY3D.gradients.dino[0][0]).toBe('#2B1838');
+  });
+
+  test('no modo só 3D o céu é só a camada 3D, com o sol/lua/Terra na posição do 2D (a água usa a mesma luz)', async () => {
+    const { earthPos } = await import('../../src/space.js');
+    const { moonPos } = await import('../../src/halloween.js');
+    const { sunPos } = await import('../../src/dino.js');
+    const before = { ...model };
+    try {
+      model.state = 'ready';
+      model.sprites = {};
+      for (const [level, pos] of [[1, null], [15, earthPos], [25, moonPos], [30, sunPos]]) {
+        const g = makeGame({ level });
+        g.renderer.use3d = true;
+        g.renderer.only3d = true;
+        const sky = [];
+        const water = [];
+        g.renderer.sky3d = () => ({ draw: (ctx, t, o) => { sky.push(o); return true; } });
+        g.renderer.water3d = () => ({ draw: (ctx, t, o) => { water.push(o); return true; } });
+        const f = recordingCtx();
+        g.renderer.ctx = f.ctx;
+        g.renderer.draw(g);
+        expect(sky.length, `fase ${level}`).toBe(1);
+        expect(g.renderer.sky3dDrawn).toBe(true);
+        const want = pos ? pos(g.renderer.skyF) : { x: 300, y: 60 + (1 - g.renderer.skyF) * 110 };
+        expect(sky[0].body.x).toBe(want.x);
+        expect(Math.abs(sky[0].body.y - want.y)).toBeLessThan(1e-9);
+        expect(water[0].sunX).toBe(sky[0].body.x);
+        expect(water[0].sunY).toBe(sky[0].body.y);
+        // Nenhum degradê do céu 2D (0 → SHORE_TOP)
+        expect(f.calls.some((c) => c[0] === 'createLinearGradient' && c[2] === 0 && c[4] === SHORE_TOP)).toBe(false);
+      }
+    } finally {
+      Object.assign(model, before);
+      resetArt();
+    }
+  });
+
+  test('a aurora das fases normais vai para o céu 3D (e não em faixas 2D)', () => {
+    const before = { ...model };
+    try {
+      model.state = 'ready';
+      model.sprites = {};
+      const g = makeGame({ level: 9 });
+      g.renderer.use3d = true;
+      g.renderer.only3d = true;
+      const sky = [];
+      g.renderer.sky3d = () => ({ draw: (ctx, t, o) => { sky.push(o); return true; } });
+      g.renderer.water3d = () => null;
+      const f = recordingCtx();
+      g.renderer.ctx = f.ctx;
+      g.renderer.draw(g);
+      expect(sky[0].aurora).toBeGreaterThan(0);
+      // A faixa 2D da aurora desenha centenas de tirinhas de 7 px: nenhuma aqui
+      expect(f.calls.filter((c) => c[0] === 'fillRect' && c[3] === 7).length).toBe(0);
+    } finally {
+      Object.assign(model, before);
+      resetArt();
+    }
+  });
+
+  test('sem a camada pronta não há céu nenhum (nunca o 2D); bichos do céu viram modelos 3D e entram nas fotos da fase', async () => {
+    const { SKY_FLYERS, levelModels } = await import('../../src/model3d.js');
+    const before = { ...model };
+    try {
+      model.state = 'ready';
+      model.sprites = {};
+      const g = makeGame({ level: 25 });
+      g.renderer.use3d = true;
+      g.renderer.only3d = true;
+      g.renderer.sky3d = () => null;
+      g.renderer.water3d = () => null;
+      const f = recordingCtx();
+      g.renderer.ctx = f.ctx;
+      g.renderer.draw(g);
+      expect(g.renderer.sky3dDrawn).toBe(false);
+      expect(f.calls.some((c) => c[0] === 'createLinearGradient' && c[2] === 0 && c[4] === SHORE_TOP)).toBe(false);
+    } finally {
+      Object.assign(model, before);
+      resetArt();
+    }
+    expect(SKY_FLYERS).toEqual({ halloween: 'bat', dino: 'ptero', beach: 'gull' });
+    expect(levelModels(25)).toContain('bat');
+    expect(levelModels(30)).toContain('ptero');
+    expect(levelModels(20)).toContain('gull');
+  });
+
+  if (!isNode) {
+    test('no navegador: o céu 3D desenha o degradê, o sol/lua bem claro no lugar certo, estrelas no espaço', async () => {
+      const { loadModel, sky3D } = await import('../../src/model3d.js');
+      loadModel();
+      const t0 = Date.now();
+      while (!sky3D() && model.state !== 'failed' && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
+      const s = sky3D();
+      expect(!!s).toBe(true);
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      const g = c.getContext('2d');
+      const px = (x, y) => g.getImageData(x, y, 1, 1).data;
+      const day = { scenery: 'ice', top: [42, 156, 192], hor: [180, 224, 236], sun: [255, 246, 216], body: { x: 300, y: 80, r: 22 }, aurora: 0 };
+      expect(s.draw(g, 1, day)).toBe(true);
+      const sun = px(300, 80);
+      const far = px(1000, 20);
+      expect(sun[0] + sun[1] + sun[2]).toBeGreaterThan(700);
+      expect(far[2]).toBeGreaterThan(far[0]); // céu azul longe do sol
+      // Espaço: escuro com estrelas (alguns pixels bem claros numa faixa)
+      s.draw(g, 1, { ...day, scenery: 'space', body: { x: 300, y: 80, r: 26 } });
+      const d = g.getImageData(700, 0, 500, 60).data;
+      let dark = 0;
+      let bright = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const l = d[i] + d[i + 1] + d[i + 2];
+        if (l < 150) dark++;
+        if (l > 400) bright++;
+      }
+      expect(dark).toBeGreaterThan(d.length / 4 * 0.6);
+      expect(bright).toBeGreaterThan(5);
+    });
+  }
+});
