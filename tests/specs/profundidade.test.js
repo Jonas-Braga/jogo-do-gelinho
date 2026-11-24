@@ -2,7 +2,8 @@
 // das placas, volume com luz nos personagens, sombras de contato, névoa, luz e vinheta.
 // A profundidade só muda o DESENHO: a simulação continua nas mesmas coordenadas.
 import { suite, test, expect } from '../harness.js';
-import { isNode } from '../env.js';
+import { isNode, fakeCanvas } from '../env.js';
+import { Game } from '../../src/game.js';
 import { makeGame, step } from '../helpers.js';
 import { W, H, SHORE_Y, ROW_Y, DEPTH, WATER_TOP, SHORE_TOP, IGLOO } from '../../src/config.js';
 import {
@@ -2252,5 +2253,95 @@ suite('Água sem os gráficos 2D legados', () => {
     const t0 = Date.now();
     while (!surfaceReady('dino') && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
     expect(surfaceReady('dino')).toBe(true);
+  });
+});
+
+suite('Só 3D no jogo de verdade', () => {
+  // Fotos 3D "carregadas", mas nenhuma pronta: no modo só 3D nada cai para o 2D
+  const noPhotos = (fn) => {
+    const was = { ...model };
+    try {
+      model.state = 'ready';
+      model.sprites = {};
+      return fn();
+    } finally {
+      Object.assign(model, was);
+    }
+  };
+  const frame = (level, only3d) => noPhotos(() => {
+    const g = makeGame({ level });
+    g.bear.active = true;
+    g.particles.snow = []; // a neve (partículas) não conta: não é desenho de personagem
+    g.renderer.use3d = true;
+    g.renderer.only3d = only3d;
+    const { ctx, calls } = recordingCtx();
+    g.renderer.ctx = ctx;
+    g.renderer.draw(g);
+    return { g, calls };
+  });
+
+  test('o jogo de verdade (src/main.js) liga o modo só 3D e informa se o aparelho tem 3D', async () => {
+    const src = await (isNode
+      ? import('node:fs').then((fs) => fs.readFileSync(new URL('../../src/main.js', import.meta.url), 'utf8'))
+      : fetch('../src/main.js').then((r) => r.text()));
+    expect(src).toContain('game.renderer.only3d = true');
+    expect(src).toContain('game.preload.available = model3dAvailable');
+  });
+
+  test('sem as fotos prontas, o modo só 3D não desenha o 2D antigo (fundo, placas, personagem, urso, iglu, bichos)', () => {
+    for (const level of [1, 5, 10, 15, 20, 25, 30]) {
+      const two = frame(level, false);
+      const only = frame(level, true);
+      // O fundo 2D e as placas 2D nunca são desenhados
+      const r = only.g.renderer;
+      const imgs = only.calls.filter((c) => c[0] === 'drawImage').map((c) => c[1]);
+      for (const bg of [r.bg, r.forestBg, r.spaceBg, r.beachBg, r.halloweenBg, r.dinoBg]) {
+        if (bg) expect(imgs.includes(bg.canvas), `fase ${level}: fundo 2D`).toBe(false);
+      }
+      expect(two.calls.filter((c) => c[0] === 'drawImage').length, `fase ${level}`).toBeGreaterThan(imgs.length);
+      // Os desenhos 2D (curvas e arcos dos personagens, bichos e casa) somem
+      const shapes = (calls) => calls.filter((c) => ['bezierCurveTo', 'quadraticCurveTo', 'arc', 'ellipse'].includes(c[0])).length;
+      expect(shapes(only.calls), `fase ${level}`).toBeLessThan(shapes(two.calls) * 0.5);
+    }
+  });
+
+  test('fora do modo só 3D (testes, ferramentas) o 2D continua valendo enquanto não há foto', () => {
+    const { calls } = frame(1, false);
+    expect(calls.filter((c) => c[0] === 'drawImage').length).toBeGreaterThan(5);
+  });
+
+  test('tela inicial: enquanto as fotos da fase 1 não ficam prontas, mostra só um fundo liso e a partida espera; começa sozinha quando ficam prontas', () => {
+    const g = new Game(isNode ? fakeCanvas() : document.createElement('canvas'), { title: true });
+    let ready = false;
+    g.preload = { request() {}, ready: () => ready, available: () => true };
+    g.renderer.only3d = true;
+    expect(g.graphicsStatus()).toBe('loading');
+    expect(g.renderer.hideScene(g)).toBe(true);
+    g.input.emit('start');
+    expect(g.state).toBe('title');
+    expect(g.startPending).toBe(true);
+    step(g, 0.5);
+    expect(g.state).toBe('title');
+    ready = true;
+    step(g, 0.1);
+    expect(g.state).toBe('play');
+    expect(g.renderer.hideScene(g)).toBe(false);
+  });
+
+  test('aparelho sem 3D: a tela inicial avisa e a partida não começa (nunca com o desenho 2D)', () => {
+    const g = new Game(isNode ? fakeCanvas() : document.createElement('canvas'), { title: true });
+    g.preload = { request() {}, ready: () => true, available: () => false };
+    g.renderer.only3d = true;
+    expect(g.graphicsStatus()).toBe('unavailable');
+    g.input.emit('start');
+    step(g, 1);
+    expect(g.state).toBe('title');
+    const { ctx, calls } = recordingCtx();
+    g.renderer.ctx = ctx;
+    g.renderer.draw(g);
+    expect(calls.some((c) => c[0] === 'fillText' && /não consegue mostrar os gráficos 3D/.test(c[1]))).toBe(true);
+    // Sem o modo só 3D (testes) nada disso vale
+    g.renderer.only3d = false;
+    expect(g.graphicsStatus()).toBe('ok');
   });
 });

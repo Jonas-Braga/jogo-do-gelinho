@@ -4,7 +4,7 @@ import { MUTE_BUTTON } from './hud.js';
 import { createBackend } from './backend.js';
 import { AuthUI } from './auth-ui.js';
 import { InstallButton } from './install.js';
-import { prefetchLevel, levelReady } from './model3d.js';
+import { prefetchLevel, levelReady, model3dAvailable } from './model3d.js';
 
 const canvas = document.getElementById('game');
 
@@ -25,6 +25,9 @@ const game = new Game(canvas, { title: true, backend });
 game.renderer.use3d = true;
 // Fotos 3D tiradas antes de cada fase começar (sem o 2D aparecendo antes do 3D)
 game.preload = { request: prefetchLevel, ready: levelReady };
+// Só 3D: o desenho 2D antigo nunca aparece no jogo de verdade (fica só para os testes)
+game.preload.available = model3dAvailable;
+game.renderer.only3d = true;
 prefetchLevel(1);
 new AuthUI(game, backend);
 new InstallButton(game);

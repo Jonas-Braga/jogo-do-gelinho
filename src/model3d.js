@@ -1165,6 +1165,12 @@ export function prefetchLevel(level) {
 
 // Todas as fotos da fase prontas? Sem 3D (Node, sem WebGL, Three.js indisponível)
 // não há o que esperar.
+// O aparelho consegue mostrar o 3D? (falso sem WebGL ou se o Three.js não carregou)
+export function model3dAvailable() {
+  if (!M.enabled || typeof window === 'undefined' || !window.WebGLRenderingContext) return false;
+  return model.state !== 'failed';
+}
+
 export function levelReady(level) {
   if (!surfaceReady(sceneryOf(level))) return false;
   if (!M.enabled || typeof window === 'undefined' || !window.WebGLRenderingContext) return true;

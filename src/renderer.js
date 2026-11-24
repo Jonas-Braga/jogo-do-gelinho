@@ -140,6 +140,25 @@ export class Renderer {
     this.foreground = new Foreground();
     this.lastT = 0;
     this.slow = 0;
+    // Só 3D (jogo de verdade): nada cai para o desenho 2D antigo. O que ainda não tem a
+    // foto pronta simplesmente não aparece, e a tela inicial espera as fotos da fase 1
+    // (os testes deixam desligado e continuam com o desenho 2D)
+    this.only3d = false;
+    this.hooked = new Map();
+  }
+
+  // Gancho 3D dos enfeites: no modo só 3D sempre "desenhou" (sem cair no 2D)
+  hook(fn) {
+    if (!this.only3d) return fn;
+    let w = this.hooked.get(fn);
+    if (!w) this.hooked.set(fn, (w = (...a) => { fn(...a); return true; }));
+    return w;
+  }
+
+  // Tela inicial no modo só 3D enquanto as fotos da fase 1 não ficam prontas (ou num
+  // aparelho sem 3D): fundo liso em vez do cenário
+  hideScene(game) {
+    return !!(this.only3d && game.state === 'title' && game.graphicsStatus() !== 'ok');
   }
 
   // Volume desligado sozinho se o aparelho não aguentar (fps baixo por alguns segundos)
@@ -192,29 +211,29 @@ export class Renderer {
     // outras seguem inteiras em 2D até ganharem os seus modelos
     this.normal3d = !!(this.use3d && DEPTH.model3d?.enabled && (!game.special || THEMES_3D.has(game.special.id)));
     powerArt.on = this.normal3d;
-    powerArt.draw = drawPower3D;
+    powerArt.draw = this.hook(drawPower3D);
     xmasArt.on = this.normal3d;
-    xmasArt.sleigh = drawSleigh3D;
-    xmasArt.tree = drawTree3D;
+    xmasArt.sleigh = this.hook(drawSleigh3D);
+    xmasArt.tree = this.hook(drawTree3D);
     bonusArt.on = this.normal3d;
-    bonusArt.draw = drawBonus3D;
+    bonusArt.draw = this.hook(drawBonus3D);
     forestArt.on = this.normal3d;
-    forestArt.pine = drawPine3D;
-    forestArt.mushroom = drawMushroom3D;
+    forestArt.pine = this.hook(drawPine3D);
+    forestArt.mushroom = this.hook(drawMushroom3D);
     spaceArt.on = this.normal3d;
-    spaceArt.lander = drawLander3D;
-    spaceArt.flag = drawFlag3D;
+    spaceArt.lander = this.hook(drawLander3D);
+    spaceArt.flag = this.hook(drawFlag3D);
     beachArt.on = this.normal3d;
-    beachArt.palm = drawPalm3D;
-    beachArt.parasol = drawParasol3D;
-    beachArt.boat = drawBoat3D;
+    beachArt.palm = this.hook(drawPalm3D);
+    beachArt.parasol = this.hook(drawParasol3D);
+    beachArt.boat = this.hook(drawBoat3D);
     halloweenArt.on = this.normal3d;
-    halloweenArt.tree = drawDeadTree3D;
-    halloweenArt.jack = drawJack3D;
+    halloweenArt.tree = this.hook(drawDeadTree3D);
+    halloweenArt.jack = this.hook(drawJack3D);
     dinoArt.on = this.normal3d;
-    dinoArt.fern = drawFern3D;
-    dinoArt.nest = drawNest3D;
-    dinoArt.tusks = drawCaveTusks3D;
+    dinoArt.fern = this.hook(drawFern3D);
+    dinoArt.nest = this.hook(drawNest3D);
+    dinoArt.tusks = this.hook(drawCaveTusks3D);
     if (DEPTH.sway && tr && typeof tr.a === 'number') followCamera(game.player.x, dt);
 
     ctx.save();
@@ -225,6 +244,18 @@ export class Renderer {
     ctx.fillStyle = '#04192a';
     ctx.fillRect(-20, -20, W + 40, H + 40);
 
+    if (this.hideScene(game)) {
+      // Fundo liso de noite polar enquanto o 3D não fica pronto
+      const bgG = ctx.createLinearGradient(0, 0, 0, H);
+      bgG.addColorStop(0, '#0B2440');
+      bgG.addColorStop(1, '#04121F');
+      ctx.fillStyle = bgG;
+      ctx.fillRect(-20, -20, W + 40, H + 40);
+      ctx.restore();
+      camera.x = 0;
+      drawHud(ctx, game);
+      return;
+    }
     const sp = game.special;
     const scenery = sp?.scenery || null;
     const forest = scenery === 'forest';
@@ -249,8 +280,8 @@ export class Renderer {
     else if (halloween) bg = this.halloweenBg ||= makeHalloweenBackground();
     else if (dino) bg = this.dinoBg ||= makeDinoBackground();
     // Cenário 3D (foto do mesmo tamanho), quando já existe para este cenário e está pronto
-    if (this.normal3d) bg = background3D(scenery || 'ice') || bg;
-    swayLayer(ctx, shore, () => ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h));
+    if (this.normal3d) bg = background3D(scenery || 'ice') || (this.only3d ? null : bg);
+    if (bg) swayLayer(ctx, shore, () => ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h));
     const lt = LIGHT[scenery] || { warm: sky.sun, path: sky.sun, strength: 1, haze: 1 };
     // Luz do relevo dos personagens: a cor do sol misturada ao branco
     sceneLight.key = lt.key || sky.sun.map((v) => Math.round(255 - (255 - v) * 0.35));
@@ -435,7 +466,7 @@ export class Renderer {
       if (p.state === 'jump') contactShadow(ctx, p.x, pGround + 3, 22, pGround - p.y);
       drawPowerBack(ctx, p, t);
       // Piloto 3D: na fase normal (parka) usa as fotos do modelo 3D quando prontas
-      if (!(this.normal3d && drawPlayer3D(ctx, p, t, cold, ride, outfits.player))) {
+      if (!(this.normal3d && (drawPlayer3D(ctx, p, t, cold, ride, outfits.player) || this.only3d))) {
         withVolume(ctx, [p.x - 64, p.y - 150, p.x + 64, p.y + 26], (g) => drawPlayer(g, p, t, cold, ride, outfits.player), undefined, { key: p });
       }
       drawPowerFront(ctx, p, t);
@@ -449,10 +480,10 @@ export class Renderer {
     // Costa: a casa, o urso e o jogador na costa ficam na escala do fundo
     atDepth(ctx, SHORE_Y, () => {
       // Fase normal: iglu 3D (a moldura da porta também, inclusive por cima de quem entra)
-      game.igloo.frameHook = this.normal3d && !house ? drawIglooFrame3D : null;
+      game.igloo.frameHook = this.normal3d && !house ? this.hook(drawIglooFrame3D) : null;
       // Casa 3D da fase (iglu ou a casa do tema já convertido); senão, o desenho 2D
       const house3d = this.normal3d && (house ? HOUSE_3D[game.igloo.style] : drawIgloo3D);
-      if (!(house3d && house3d(ctx, game.igloo, t))) withVolume(ctx, [IGLOO.x - 200, IGLOO.baseY - 300, IGLOO.x + 200, IGLOO.baseY + 30], (g) => {
+      if (!(house3d && (house3d(ctx, game.igloo, t) || this.only3d))) withVolume(ctx, [IGLOO.x - 200, IGLOO.baseY - 300, IGLOO.x + 200, IGLOO.baseY + 30], (g) => {
         if (house) house.body(g, game.igloo, t);
         else game.igloo.draw(g, t);
       }, undefined, { key: game.igloo });
@@ -463,7 +494,7 @@ export class Renderer {
       atDepth(ctx, b.y, () => {
         // Fase normal: urso 3D quando a foto estiver pronta
         const bear3d = this.normal3d && drawBear3D(ctx, b, t, outfits.bear);
-        if (!bear3d) withVolume(ctx, [b.x - 150, b.y - 190, b.x + 150, b.y + 24], (g) => drawBear(g, b, t, outfits.bear), undefined, { key: b });
+        if (!bear3d && !(this.normal3d && this.only3d)) withVolume(ctx, [b.x - 150, b.y - 190, b.x + 150, b.y + 24], (g) => drawBear(g, b, t, outfits.bear), undefined, { key: b });
         if (b.stun > 0) drawDizzy(ctx, b.x, b.y - 92, t);
       });
     }
@@ -497,7 +528,8 @@ export class Renderer {
           // do tema (estrelinha no espaço) ou fica 2D nos temas ainda não convertidos
           const kind3d = c.kind === 'fish' ? FISH_3D[scenery] || (FISH_DRAW[scenery] ? null : 'fish') : c.kind;
           const try3d = this.normal3d && kind3d && CRITTERS_3D.has(kind3d);
-          const draw = try3d ? (g, cc, y, tt) => drawCritter3D(g, cc, y, tt, kind3d) || draw2d(g, cc, y, tt) : draw2d;
+          const only = try3d && this.only3d;
+          const draw = try3d ? (g, cc, y, tt) => drawCritter3D(g, cc, y, tt, kind3d) || only || draw2d(g, cc, y, tt) : draw2d;
           if (c.kicked) {
             // Chutado: voa girando por cima da fileira
             ctx.save();
@@ -509,7 +541,7 @@ export class Renderer {
           } else {
             const fly = FLYING.has(c.kind);
             contactShadow(ctx, c.x, row.y + 4, fly ? 18 : 24, fly ? 40 : 0, fly ? 0.18 : 0.26);
-            if (!(try3d && drawCritter3D(ctx, c, row.y, t, kind3d))) {
+            if (!(try3d && (drawCritter3D(ctx, c, row.y, t, kind3d) || only))) {
               withVolume(ctx, [c.x - 80, row.y - 120, c.x + 80, row.y + 50], (g) => draw2d(g, c, row.y, t), undefined, { key: c });
             }
           }
@@ -525,13 +557,14 @@ export class Renderer {
     // Placas/troncos 3D quando a fase está convertida e as fotos estão prontas
     const sprite2d = FLOE_SPRITE[scenery] || floeSprite;
     const sprite3d = this.normal3d && FLOE_3D[scenery || 'ice'];
-    const sprite = sprite3d ? (pc, on) => sprite3d(pc, on) || sprite2d(pc, on) : sprite2d;
+    const sprite = sprite3d ? (pc, on) => sprite3d(pc, on) || (this.only3d ? null : sprite2d(pc, on)) : sprite2d;
     const items = [];
     const [minX, maxX] = visibleRange(row.y);
     for (const r of row.rects()) {
       if (r.x > maxX || r.x + r.w < minX) continue;
       const y = row.y + floeOffset(r.piece, t);
-      items.push({ x: r.x, y, w: r.w, s: sprite(r.piece, row.active) });
+      const s = sprite(r.piece, row.active);
+      if (s) items.push({ x: r.x, y, w: r.w, s });
     }
     const halo = (FLOE_HALO[scenery] || [79, 195, 247]).join(', ');
     // Sombras, reflexos e brilho primeiro, para não cobrirem as placas vizinhas

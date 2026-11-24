@@ -172,8 +172,24 @@ export class Game {
     this.trophies = normTrophies(session.trophies, before?.uid === session.uid ? this.trophies : []);
   }
 
+  // Gráficos 3D do jogo de verdade (modo só 3D): 'ok', 'loading' (fotos da fase 1
+  // sendo tiradas) ou 'unavailable' (aparelho sem 3D). Fora desse modo, sempre 'ok'.
+  graphicsStatus() {
+    if (!this.renderer.only3d || !this.preload) return 'ok';
+    if (this.preload.available?.() === false) return 'unavailable';
+    return this.preload.ready(1) ? 'ok' : 'loading';
+  }
+
   newGame() {
     if (this.locked) return;
+    // Modo só 3D: a partida espera as fotos da fase 1 (começa sozinha quando ficam
+    // prontas) e num aparelho sem 3D não começa
+    const gfx = this.state === 'title' ? this.graphicsStatus() : 'ok';
+    if (gfx !== 'ok') {
+      this.startPending = gfx === 'loading';
+      return;
+    }
+    this.startPending = false;
     this.ranking = null;
     this.score = 0;
     this.lives = RULES.startLives;
@@ -342,6 +358,10 @@ export class Game {
     const playing = this.state !== 'title' && this.state !== 'gameOver' && this.state !== 'trophy';
     this.sfx.setEngine(playing && this.special?.boats ? engineSound(this.boats) : null);
 
+    if (this.state === 'title' && this.startPending && this.graphicsStatus() === 'ok') {
+      this.newGame();
+      return;
+    }
     if (this.state === 'title') {
       // Só o cenário vive: personagem respirando na costa e fumaça do iglu
       this.player.moving = false;

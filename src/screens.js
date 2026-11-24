@@ -134,6 +134,17 @@ export function drawTitle(ctx, game) {
     ctx.fillStyle = '#FFD36B';
     ctx.fillText(`RECORDE  ${pad6(game.highScore)}`, W / 2, 333);
   }
+  // Modo só 3D: avisa enquanto os gráficos são preparados (ou se o aparelho não tem 3D)
+  const gfx = game.graphicsStatus?.() || 'ok';
+  if (gfx !== 'ok') {
+    ctx.font = `700 20px ${FONT}`;
+    ctx.fillStyle = gfx === 'loading' ? 'rgba(255,255,255,0.85)' : '#FFB4A0';
+    ctx.fillText(gfx === 'loading'
+      ? (game.startPending ? 'Preparando os gráficos 3D… a partida começa sozinha' : 'Preparando os gráficos 3D…')
+      : 'Este aparelho não consegue mostrar os gráficos 3D do jogo (precisa de WebGL)', W / 2, 638);
+    ctx.restore();
+    return;
+  }
   ctx.globalAlpha = blink(t);
   ctx.font = `800 24px ${FONT}`;
   ctx.fillStyle = '#FFFFFF';

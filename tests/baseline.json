@@ -584,5 +584,10 @@
   "Fotos 3D da fase seguinte prontas antes de ela começar › na comemoração do troféu, a tecla espera as fotos e a fase segue sozinha quando ficam prontas",
   "Água sem os gráficos 2D legados › o caminho de luz do sol na água é um brilho suave, sem os traços do 2D antigo",
   "Água sem os gráficos 2D legados › a passagem de fase e as fotos 3D sendo tiradas não desligam o volume (nem a água nova)",
-  "Água sem os gráficos 2D legados › a textura da água é preparada junto com as fotos da fase (sem canvas de verdade não há o que esperar)"
+  "Água sem os gráficos 2D legados › a textura da água é preparada junto com as fotos da fase (sem canvas de verdade não há o que esperar)",
+  "Só 3D no jogo de verdade › o jogo de verdade (src/main.js) liga o modo só 3D e informa se o aparelho tem 3D",
+  "Só 3D no jogo de verdade › sem as fotos prontas, o modo só 3D não desenha o 2D antigo (fundo, placas, personagem, urso, iglu, bichos)",
+  "Só 3D no jogo de verdade › fora do modo só 3D (testes, ferramentas) o 2D continua valendo enquanto não há foto",
+  "Só 3D no jogo de verdade › tela inicial: enquanto as fotos da fase 1 não ficam prontas, mostra só um fundo liso e a partida espera; começa sozinha quando ficam prontas",
+  "Só 3D no jogo de verdade › aparelho sem 3D: a tela inicial avisa e a partida não começa (nunca com o desenho 2D)"
 ]
