@@ -621,7 +621,12 @@
   "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › pisca-pisca do iglu: fio e lâmpadas viram luz 3D (nenhum traço ou halo 2D)",
   "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › Halloween: neblina, abóboras acesas e a lanterna da árvore como luz 3D",
   "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › portas acesas: brilho de dentro e a luz das frestas da porta fechada (cabana, base lunar e iglu)",
-  "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › anéis dos bichos na água, brilho e fio da aranha, e o facho e a cauda dos bichos do espaço",
+  "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › ondas dos bichos na água (sem o anel parado), brilho e fio da aranha, e o facho e a cauda dos bichos do espaço",
   "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › o \"!\" do susto, as gotas de suor e a camada de gelo do personagem viram efeitos 3D",
-  "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › o renderizador junta as luzes do quadro e desenha numa passada 3D (só no modo só 3D)"
+  "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › o renderizador junta as luzes do quadro e desenha numa passada 3D (só no modo só 3D)",
+  "Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da tela › a câmera nunca passa da sobra das camadas: com o personagem na borda da costa, o fundo cobre a tela toda",
+  "Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da tela › cada placa na tela tem espuma na linha d'água e um rastro em V para trás (mais comprido mais rápido)",
+  "Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da tela › pousando numa placa a água reage: onda em volta da placa toda e gotinhas nas duas pontas",
+  "Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da tela › modo só 3D: as placas não têm mais a sombra escura 2D; o halo da fileira acesa é luz 3D e o rastro vem na passada do chão",
+  "Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da tela › bichos na água fazem ondas (no lugar do anel parado); peixe no ar não faz"
 ]

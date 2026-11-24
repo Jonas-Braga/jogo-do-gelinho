@@ -15,7 +15,8 @@
 // `volcanoItems`, `fireflyItems`): elas recebem `push` e funcionam também no Node.
 import { W, H, SHORE_TOP, WATER_TOP, DEPTH } from '../config.js';
 import { depthScale, swayAt, camera } from '../depth.js';
-import { PRINT_COLORS, printAlpha } from '../particles.js';
+import { PRINT_COLORS, printAlpha, WAKE_LINE } from '../particles.js';
+import { floeOffset } from '../floes.js';
 
 export const PARTICLES3D = {
   pad: 64,          // a camada passa um pouco das bordas (a câmera balança)
@@ -27,7 +28,7 @@ export const PARTICLES3D = {
 };
 
 // Tipos (o shader escolhe o desenho por eles)
-export const P3 = { snow: 0, leaf: 1, ember: 2, dust: 3, smoke: 4, glow: 5, flame: 6, ring: 7, shard: 8, bubble: 9, text: 10, print: 11, beam: 12, cord: 13, cone: 14, ice: 15 };
+export const P3 = { snow: 0, leaf: 1, ember: 2, dust: 3, smoke: 4, glow: 5, flame: 6, ring: 7, shard: 8, bubble: 9, text: 10, print: 11, beam: 12, cord: 13, cone: 14, ice: 15, wake: 16, waves: 17 };
 
 // Cores (as mesmas do 2D)
 export const LEAF_COLORS = ['#D9822B', '#C4462A', '#E3B23C', '#7FA33A', '#A65A2A'];
@@ -176,8 +177,10 @@ export function fireflyItems(push, t, dusk) {
 
 // Efeitos pequenos no chão e na água (atrás dos personagens): pegadas na costa, anéis na
 // água e, na lava, as bolhas que incham e estouram (mesmos tempos e lugares do 2D)
-export function groundItems(push, parts, t, scenery = 'ice') {
+export function groundItems(push, parts, t, scenery = 'ice', rows = null, critters = null) {
   if (!parts) return;
+  if (rows) floeWakeItems(push, rows, t, parts.liquid ? { ...parts.liquid, lava: scenery === 'dino' } : null);
+  if (rows && critters) critterWaveItems(push, critters, rows, t, scenery, parts.liquid);
   const pc = PRINT_COLORS[scenery] || PRINT_COLORS.ice;
   const printC = [pc[0] / 255, pc[1] / 255, pc[2] / 255];
   for (const pr of parts.prints || []) {
@@ -190,9 +193,61 @@ export function groundItems(push, parts, t, scenery = 'ice') {
     const k = r.t;
     const sc = r.s || 1;
     const p = project(r.x, r.y);
-    push(P3.ring, p.x, r.y, (10 + k * 60) * sc * p.s, (3 + k * 12) * sc * p.s, 0, rgba01(rc, 0.75 * (1 - k)), k, 0, 0);
+    push(P3.ring, p.x, r.y, ((10 + k * 60) * sc + (r.w || 0) / 2) * p.s, (3 + k * 12) * sc * p.s, 0, rgba01(rc, 0.75 * (1 - k)), k, 0, 0);
   }
   if (parts.liquid && scenery === 'dino') lavaBubbleItems(push, t);
+}
+
+// Placas (gelo, troncos, pranchas...) andando na água: espuma encostada nelas na linha
+// d'água e o rastro de ondas em V que fica para trás (mais comprido quanto mais rápido)
+export const WAKE = { length: 150, height: 20, foam: 0.5, trail: 0.42 };
+export function floeWakeItems(push, rows, t, liquid = null) {
+  const lava = !!liquid?.lava;
+  const fc = rgba01(liquid?.ripple || [215, 240, 250]);
+  for (const row of rows || []) {
+    const dir = Math.sign(row.vx) || 1;
+    const speedK = Math.min(1.4, Math.abs(row.vx) / 60);
+    for (const r of row.rects()) {
+      if (r.x > W + 140 || r.x + r.w < -140) continue;
+      const y = row.y + WAKE_LINE + floeOffset(r.piece, t) * 0.5;
+      const p = project(r.x + r.w / 2, row.y);
+      const half = (r.w / 2 + 5) * p.s;
+      // Espuma em volta da placa (anel achatado na linha d'água)
+      push(P3.ring, p.x, y, half / 0.86, 5.5 * p.s, 0, [fc[0], fc[1], fc[2], WAKE.foam * (lava ? 0.5 : 1)], r.piece.seed || 0, 0, 0);
+      // Rastro em V atrás da placa
+      const len = WAKE.length * speedK * p.s;
+      const back = p.x - dir * (half + len / 2 - 4);
+      push(P3.wake, back, y + 1, len / 2, WAKE.height * p.s, dir < 0 ? Math.PI : 0, [fc[0], fc[1], fc[2], WAKE.trail * (lava ? 0.6 : 1)], (r.piece.seed || 0) * 1.7, r.w * p.s / len, 0);
+    }
+  }
+}
+
+// Bichos que ficam na água (no lugar do anel parado em volta deles): anéis que nascem
+// no bicho e se abrem pela água, e um rastro curto atrás de quem anda. dy = linha
+// d'água abaixo da linha da fileira; r = tamanho; hop = frequência do salto (só na água,
+// fora do salto)
+export const CRITTER_WAVES = {
+  crab: { dy: 8, r: 20 }, clam: { dy: 11, r: 17 }, fish: { dy: 9, r: 14, hop: 4 }, tfish: { dy: 9, r: 14, hop: 3 },
+  piranha: { dy: 9, r: 15, hop: 3.2 }, jellyfish: { dy: 9, r: 18 }, eyeball: { dy: 8, r: 16 }, ammonite: { dy: 8, r: 16 },
+  candy: { dy: 9, r: 13, hop: 3 }, egg: { dy: 9, r: 13, hop: 3 },
+};
+const FISH_KIND = { beach: 'tfish', halloween: 'candy', dino: 'egg', space: null };
+export function critterWaveItems(push, critters, rows, t, scenery = 'ice', liquid = null) {
+  const fc = rgba01(liquid?.ripple || [220, 245, 255]);
+  for (const c of critters || []) {
+    if (c.dead || c.kicked || c.power || c.bonus) continue;
+    const kind = c.kind === 'fish' ? (scenery in FISH_KIND ? FISH_KIND[scenery] : 'fish') : c.kind;
+    const spec = CRITTER_WAVES[kind];
+    const row = rows?.[c.row];
+    if (!spec || !row) continue;
+    if (spec.hop && Math.sin(t * spec.hop + c.ph) > 0.25) continue; // no ar
+    const p = project(c.x, row.y);
+    const y = row.y + spec.dy;
+    const R = spec.r * 2.6 * p.s;
+    push(P3.waves, p.x, y, R, R * 0.22, 0, [fc[0], fc[1], fc[2], 0.7], (c.ph || 0) * 3.7, 0, 0);
+    const len = 46 * p.s;
+    push(P3.wake, p.x - c.dir * (len / 2 + spec.r * 0.5 * p.s), y + 1, len / 2, 9 * p.s, c.dir < 0 ? Math.PI : 0, [fc[0], fc[1], fc[2], 0.3], (c.ph || 0) * 2.3, 0.5, 0);
+  }
 }
 
 // Bolhas de lava inchando e estourando (as mesmas de drawLavaBubbles, src/dino.js),
@@ -273,6 +328,8 @@ export function lightItems(push, items) {
     const col = it.color || [255, 220, 150];
     if (it.kind === 'glow') {
       push(P3.glow, it.x, it.y, it.r, it.r, 0, c01(col, Math.min(1, it.a)), 0, 0, 0.6);
+    } else if (it.kind === 'halo') {
+      push(P3.glow, it.x, it.y, it.rx, it.ry, 0, c01(col, Math.min(1, it.a)), 0, 0, 0);
     } else if (it.kind === 'bulb') {
       // Lâmpada de vidro (acesa por dentro) e o halo quando acesa
       if (it.on) push(P3.glow, it.x, it.y, it.r * 4.5, it.r * 4.5, 0, c01(col, 0.75), 0, 0, 0.4);
@@ -514,6 +571,38 @@ void main() {
     vec3 col = vCol.rgb * (0.7 + 0.6 * clamp(-q.y, 0.0, 1.0)) * (uAmb + uSun * 0.5);
     float a = v * ends * vCol.a;
     o = vec4(col * a, a);
+  } else if (kind > 16.5 && kind < 17.5) {
+    // ---- Ondas em volta de um bicho na água: 3 anéis nascendo nele e se abrindo,
+    // mais fracos ao crescer, com a crista mais clara do lado de cima
+    float rr = length(q);
+    if (rr > 1.0) discard;
+    float v = 0.0;
+    for (int i = 0; i < 3; i++) {
+      float ph2 = fract(uTime * 0.55 + float(i) / 3.0 + ph * 0.1);
+      float rad = 0.28 + ph2 * 0.72;
+      float d = (rr - rad) / 0.045;
+      v += exp(-d * d) * (1.0 - ph2) * (1.0 - ph2);
+    }
+    // Contato com a água junto do corpo
+    float c0 = (rr - 0.3) / 0.06;
+    v += exp(-c0 * c0) * 0.5;
+    float lit = 0.7 + 0.5 * smoothstep(0.2, -0.8, q.y);
+    float a = v * vCol.a;
+    o = vec4(vCol.rgb * lit * a, a);
+  } else if (kind > 15.5 && kind < 16.5) {
+    // ---- Rastro de ondas em V atrás de uma placa: u = 0 junto da placa, 1 no fim;
+    // os dois braços se abrem com a distância, com ondinhas transversais andando para
+    // trás, e tudo some aos poucos
+    float u = (1.0 - q.x) * 0.5;
+    float spread = blur * 0.5 + u * 0.9;
+    float arm = abs(abs(q.y) - spread * 0.85);
+    float arms = exp(-arm * arm * 140.0) * (0.6 + 0.4 * sin(u * 40.0 - uTime * 6.0 + ph));
+    float inner = (1.0 - smoothstep(spread * 0.6, spread * 0.85, abs(q.y))) * (0.5 + 0.5 * sin(u * 26.0 - uTime * 5.0 + ph * 2.0));
+    float churn = exp(-u * 7.0) * (1.0 - smoothstep(0.2, 0.55, abs(q.y))) * (0.6 + 0.4 * noise(vec2(u * 18.0 - uTime * 4.0, q.y * 6.0 + ph)));
+    float fade = (1.0 - u) * (1.0 - u) * (1.0 - smoothstep(0.85, 1.0, abs(q.y)));
+    float v = (arms * 0.9 + inner * 0.22 + churn * 0.8) * fade;
+    float a = v * vCol.a;
+    o = vec4(vCol.rgb * a, a);
   } else if (kind > 14.5 && kind < 15.5) {
     // ---- Bloco de gelo em volta de quem congelou: facetas com luz diferente,
     // translúcido no meio, mais branco nas bordas e brilho do sol

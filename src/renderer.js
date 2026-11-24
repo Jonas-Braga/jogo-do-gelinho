@@ -39,7 +39,7 @@ import {
 import { drawHud } from './hud.js';
 import { drawMoneyBag, drawHeart, bonusArt } from './bonus.js';
 import { fireArt, PRINT_COLORS } from './particles.js';
-import { doorArt, lightArt } from './art.js';
+import { doorArt, lightArt, addLight } from './art.js';
 import { weatherItems, smokeItems, volcanoItems, fireflyItems, groundItems, fxItems, textItems, lightItems, SMOKE_COLORS } from './m3d/particles3d.js';
 import { drawCocoa } from './heat.js';
 import { drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront, drawDizzy, powerArt } from './powers.js';
@@ -386,7 +386,7 @@ export class Renderer {
       swayLayer(ctx, far, () => drawSunPath(ctx, t, 300, lt.path, sunStrength));
     }
     // Pegadas na costa, anéis na água e bolhas de lava (atrás dos personagens)
-    if (this.only3d) this.pass3d(ctx, t, (push) => groundItems(push, game.particles, t, scenery || 'ice'));
+    if (this.only3d) this.pass3d(ctx, t, (push) => groundItems(push, game.particles, t, scenery || 'ice', game.rows, game.critters.list));
     else {
       game.particles.drawPrints(ctx, PRINT_COLORS[scenery || 'ice']);
       game.particles.drawRipples(ctx);
@@ -673,10 +673,14 @@ export class Renderer {
     const halo = (FLOE_HALO[scenery] || [79, 195, 247]).join(', ');
     // Sombras, reflexos e brilho primeiro, para não cobrirem as placas vizinhas
     for (const it of items) {
-      ctx.fillStyle = 'rgba(2, 28, 46, 0.32)';
-      ctx.beginPath();
-      ctx.ellipse(it.x + it.w / 2 + 4, it.y + 28, it.w / 2 + 6, 7, 0, 0, Math.PI * 2);
-      ctx.fill();
+      // A sombra escura deslocada era do desenho 2D antigo; no modo só 3D a placa encosta
+      // na água pela espuma e pelo rastro (passada do chão)
+      if (!this.only3d) {
+        ctx.fillStyle = 'rgba(2, 28, 46, 0.32)';
+        ctx.beginPath();
+        ctx.ellipse(it.x + it.w / 2 + 4, it.y + 28, it.w / 2 + 6, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       // As abóboras 2D já trazem o reflexo pintado; as fotos 3D, não
       if (!OWN_REFLECTION.has(scenery) || it.s.is3d) {
         ctx.save();
@@ -686,7 +690,9 @@ export class Renderer {
         ctx.drawImage(it.s.canvas, 0, -(it.s.oy + 19), it.s.w, it.s.h);
         ctx.restore();
       }
-      if (row.active) {
+      if (row.active && addLight(ctx, 'halo', { x: it.x + it.w / 2, y: it.y + 6, rx: it.w * 0.8, ry: it.w * 0.36, color: FLOE_HALO[scenery] || [79, 195, 247], a: 0.4 + Math.sin(t * 4) * 0.08 })) {
+        // Modo só 3D: halo da fileira acesa como luz 3D
+      } else if (row.active) {
         // Halo elíptico (gradiente radial achatado, sem bordas cortadas)
         const R = it.w * 0.8;
         ctx.save();

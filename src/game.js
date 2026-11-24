@@ -2,7 +2,7 @@ import { STEP, RULES, W, IGLOO, SHORE_Y } from './config.js';
 import { Input } from './input.js';
 import { createRows } from './floes.js';
 import { Player } from './player.js';
-import { Particles, PRINTS, FISH_HOP } from './particles.js';
+import { Particles, PRINTS, FISH_HOP, WAKE_LINE } from './particles.js';
 import { Igloo } from './igloo.js';
 import { Renderer } from './renderer.js';
 import { Critters } from './enemies.js';
@@ -555,7 +555,12 @@ export class Game {
       return;
     }
     // A placa afunda um pouco e balança; lascas de gelo voam
-    if (p.support) p.support.dip = 1;
+    if (p.support) {
+      p.support.dip = 1;
+      // A placa afunda e empurra a água: onda em volta dela e gotinhas nas pontas
+      const rr = this.rows[row];
+      this.particles.landWave(rr.pieceX(p.support) + p.support.w / 2, rr.y + WAKE_LINE, p.support.w);
+    }
     // Lascas de gelo (ou de casca de árvore nos troncos, de rocha nos asteroides)
     this.particles.chips(p.x, p.y, 7, this.landFx.chip);
     const r = this.rows[row];

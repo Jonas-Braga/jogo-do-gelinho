@@ -5,7 +5,7 @@
 // poses por quadro) para não travar o jogo. Enquanto a foto não fica pronta, ou sem
 // internet/WebGL, vale o desenho 2D de sempre.
 import { Sky3D } from './m3d/sky3d.js';
-import { addLight } from './art.js';
+import { addLight, lightArt } from './art.js';
 import { Water3D } from './m3d/water3d.js';
 import { Particles3D } from './m3d/particles3d.js';
 import { DOOR_MODELS, DOOR_SUBJECTS, stonePose, LEAF_STEPS } from './m3d/doors.js';
@@ -265,8 +265,10 @@ export function drawBear3D(ctx, b, t, outfit = 'polar') {
 // Modo só 3D: os respingos dos peixes saltando são partículas 3D (src/game.js), então os
 // pinguinhos 2D ao lado da foto não são desenhados
 export const liveFx = { on: false };
+// Anel parado em volta do bicho na água (desenho 2D). No modo só 3D ele não existe:
+// no lugar dele, ondas de verdade saindo do bicho (critterWaveItems, passada do chão)
 function ringAt(ctx, x, y, rx, ry, color, a) {
-  if (addLight(ctx, 'ring', { x, y, rx, ry, color, a })) return;
+  if (liveFx.on || lightArt.on) return;
   ctx.strokeStyle = `rgba(${color.join(', ')}, ${a})`;
   ctx.lineWidth = 1.4;
   ctx.beginPath();

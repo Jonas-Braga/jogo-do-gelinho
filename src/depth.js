@@ -44,6 +44,18 @@ export const swayAt = (y) => (camera.x ? -camera.x * swayFactor(depthScale(y)) :
 // Maior deslocamento possível (jogador encostado na borda)
 export const maxSway = () => (W / 2) * DEPTH.sway.amount;
 
+// Deslocamento máximo de verdade: na costa o personagem anda além de 0..W (a costa é
+// desenhada encolhida), e a câmera o acompanha até lá. As camadas esticadas usam este
+// valor, senão sobrava uma faixa sem cenário na borda da tela
+export function maxCamera() {
+  let far = W / 2;
+  for (const y of [SHORE_Y, ...ROW_Y]) {
+    const [lo, hi] = walkLimits(y, 0);
+    far = Math.max(far, hi - W / 2, W / 2 - lo);
+  }
+  return far * DEPTH.sway.amount;
+}
+
 // Segue o jogador suavemente
 export function followCamera(targetX, dt) {
   const target = (targetX - W / 2) * DEPTH.sway.amount;
@@ -55,7 +67,7 @@ export function followCamera(targetX, dt) {
 // nunca aparecerem vazias
 export function swayLayer(ctx, f, fn) {
   if (!camera.x) return fn();
-  const pad = maxSway() * f + 2;
+  const pad = maxCamera() * f + 2;
   ctx.save();
   ctx.translate(W / 2 - camera.x * f, 0);
   ctx.scale(1 + (2 * pad) / W, 1);
@@ -508,7 +520,7 @@ export function foregroundKind(scenery) {
 
 function buildForeground(kind) {
   const spec = FG_KINDS[kind];
-  const pad = maxSway() * DEPTH.sway.fore + 8;
+  const pad = maxCamera() * DEPTH.sway.fore + 8;
   const w = Math.ceil(W + pad * 2);
   const h = FG_H;
   const c = document.createElement('canvas');

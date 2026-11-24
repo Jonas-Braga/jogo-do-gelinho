@@ -3293,7 +3293,7 @@ suite('Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do person
     }
   });
 
-  test('anéis dos bichos na água, brilho e fio da aranha, e o facho e a cauda dos bichos do espaço', async () => {
+  test('ondas dos bichos na água (sem o anel parado), brilho e fio da aranha, e o facho e a cauda dos bichos do espaço', async () => {
     const { drawCritter3D } = await import('../../src/model3d.js');
     const { drawUfoBeam, drawCometTail, drawStarGlow } = await import('../../src/space.js');
     const before = { ...model };
@@ -3306,7 +3306,9 @@ suite('Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do person
           drawCritter3D(f.ctx, { kind, x: 500, dir: 1, ph: 4.5, row: 1 }, 400, 0, kind);
         }
         const kinds = la.items.map((i) => i.kind);
-        expect(kinds.filter((k) => k === 'ring').length).toBeGreaterThan(3);
+        // O anel parado em volta dos bichos sumiu (nem 2D nem luz): no lugar dele, ondas
+        // de verdade na passada do chão (critterWaveItems, testado à parte)
+        expect(kinds.filter((k) => k === 'ring').length).toBe(0);
         expect(kinds.includes('glow') && kinds.includes('cord')).toBe(true);
         expect(f.calls.some((c) => c[0] === 'stroke' || c[0] === 'createRadialGradient')).toBe(false);
         la.items = [];
@@ -3400,6 +3402,152 @@ suite('Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do person
       expect(px(550, 300)[0]).toBeGreaterThan(120);
       expect(px(750, 300)[0]).toBeGreaterThan(60);
       expect(px(550, 320)[0]).toBeLessThan(30);
+    });
+  }
+});
+
+suite('Água viva: rastro das placas, onda do pouso, ondas dos bichos e borda da tela', () => {
+  const collect = (fn) => {
+    const items = [];
+    fn((kind, x, y, hw, hh, rot, c, ph, blur, ex) => items.push({ kind, x, y, hw, hh, rot, c, ph, blur, ex }));
+    return items;
+  };
+
+  test('a câmera nunca passa da sobra das camadas: com o personagem na borda da costa, o fundo cobre a tela toda', async () => {
+    const { maxCamera, walkLimits } = await import('../../src/depth.js');
+    const { hold, release } = await import('../helpers.js');
+    // Na costa ele anda além de W, então a câmera vai além do maxSway nominal
+    const [, hi] = walkLimits(SHORE_Y, 0);
+    expect((hi - W / 2) * DEPTH.sway.amount).toBeGreaterThan(maxSway());
+    expect(maxCamera()).toBeGreaterThanOrEqual((hi - W / 2) * DEPTH.sway.amount - 1e-9);
+    const was = camera.x;
+    try {
+      const g = makeGame({ level: 1 });
+      hold(g, 'right');
+      step(g, 10);
+      release(g, 'right');
+      for (let i = 0; i < 400; i++) followCamera(g.player.x, 0.05);
+      expect(Math.abs(camera.x)).toBeLessThanOrEqual(maxCamera() + 1e-6);
+      // Cada camada esticada cobre o deslocamento dela (costa, céu, água, primeiro plano)
+      for (const f of [DEPTH.sway.far, DEPTH.sway.shore, (DEPTH.sway.shore + 1) / 2]) {
+        expect(maxCamera() * f + 2).toBeGreaterThanOrEqual(Math.abs(camera.x) * f);
+      }
+    } finally {
+      camera.x = was;
+    }
+  });
+
+  test('cada placa na tela tem espuma na linha d\'água e um rastro em V para trás (mais comprido mais rápido)', async () => {
+    const { floeWakeItems, P3 } = await import('../../src/m3d/particles3d.js');
+    const g = makeGame({ level: 1 });
+    const items = collect((push) => floeWakeItems(push, g.rows, 1));
+    const visible = g.rows.reduce((n, r) => n + [...r.rects()].filter((q) => !(q.x > W + 140 || q.x + q.w < -140)).length, 0);
+    expect(items.filter((i) => i.kind === P3.ring).length).toBe(visible);
+    expect(items.filter((i) => i.kind === P3.wake).length).toBe(visible);
+    // Rastro para trás: fileira andando para a direita → rastro à esquerda da placa
+    const row = g.rows[0];
+    const one = collect((push) => floeWakeItems(push, [row], 1));
+    const r0 = [...row.rects()].find((q) => q.x > 0 && q.x < W);
+    const foam = one.find((i) => i.kind === P3.ring && Math.abs(i.x - projectX(r0.x + r0.w / 2, row.y)) < 1);
+    const wake = one[one.indexOf(foam) + 1];
+    expect(Math.sign(wake.x - foam.x)).toBe(-Math.sign(row.vx));
+    expect(wake.rot).toBe(row.vx < 0 ? Math.PI : 0);
+    const fast = makeGame({ level: 12 }).rows[0];
+    const fastWake = collect((push) => floeWakeItems(push, [fast], 1)).find((i) => i.kind === P3.wake);
+    expect(fastWake.hw).toBeGreaterThan(wake.hw);
+  });
+
+  test('pousando numa placa a água reage: onda em volta da placa toda e gotinhas nas duas pontas', async () => {
+    const { WAKE_LINE } = await import('../../src/particles.js');
+    const { placeOnFloe } = await import('../helpers.js');
+    const g = makeGame({ level: 1 });
+    placeOnFloe(g, 1);
+    g.particles.ripples = [];
+    g.particles.drops = [];
+    g.onLand(1);
+    const r = g.rows[1];
+    const piece = g.player.support;
+    expect(g.particles.ripples.length).toBe(2);
+    expect(g.particles.ripples[0].w).toBe(piece.w);
+    expect(g.particles.ripples[0].y).toBe(r.y + WAKE_LINE);
+    expect(Math.abs(g.particles.ripples[0].x - (r.pieceX(piece) + piece.w / 2))).toBeLessThan(1e-9);
+    const xs = g.particles.drops.map((d) => d.x);
+    expect(Math.min(...xs)).toBeLessThan(g.particles.ripples[0].x - piece.w / 2);
+    expect(Math.max(...xs)).toBeGreaterThan(g.particles.ripples[0].x + piece.w / 2);
+  });
+
+  test('modo só 3D: as placas não têm mais a sombra escura 2D; o halo da fileira acesa é luz 3D e o rastro vem na passada do chão', async () => {
+    const { P3 } = await import('../../src/m3d/particles3d.js');
+    const { lightArt } = await import('../../src/art.js');
+    const before = { ...model };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => ({ fake3d: true, width: 10, height: 10 }) });
+      const g = makeGame({ level: 1 });
+      g.rows[0].active = true;
+      g.renderer.use3d = true;
+      g.renderer.only3d = true;
+      g.renderer.sky3d = () => null;
+      g.renderer.water3d = () => null;
+      const passes = [];
+      g.renderer.particles3d = () => ({ draw: (ctx, t, l, fill) => { passes.push(collect(fill)); return true; }, flame: () => true });
+      const f = recordingCtx();
+      g.renderer.ctx = f.ctx;
+      g.renderer.draw(g);
+      // A sombra 2D era uma elipse escura rgba(2, 28, 46, 0.32) por placa
+      expect(f.calls.some((c) => c[0] === 'ellipse' && c[4] === 7)).toBe(false);
+      expect(lightArt.items.some((i) => i.kind === 'halo')).toBe(true);
+      expect(passes.some((p) => p.some((i) => i.kind === P3.wake))).toBe(true);
+    } finally {
+      Object.assign(model, before);
+      resetArt();
+    }
+  });
+
+  test('bichos na água fazem ondas (no lugar do anel parado); peixe no ar não faz', async () => {
+    const { critterWaveItems, CRITTER_WAVES, P3 } = await import('../../src/m3d/particles3d.js');
+    const g = makeGame({ level: 1 });
+    const list = [
+      { kind: 'clam', row: 1, dir: 1, x: 400, ph: 0 },
+      { kind: 'crab', row: 2, dir: -1, x: 600, ph: 0 },
+      { kind: 'goose', row: 2, dir: 1, x: 700, ph: 0 },
+    ];
+    const items = collect((push) => critterWaveItems(push, list, g.rows, 1));
+    expect(items.filter((i) => i.kind === P3.waves).length).toBe(2); // ganso voa: sem ondas
+    expect(items.filter((i) => i.kind === P3.wake).length).toBe(2);
+    expect(items[0].y).toBe(g.rows[1].y + CRITTER_WAVES.clam.dy);
+    // Peixe: só fora do salto (sin(t·4 + fase) ≤ 0,25)
+    const fish = { kind: 'fish', row: 1, dir: 1, x: 500, ph: 0 };
+    const inAir = Math.PI / 8; // sin(4t) = 1
+    expect(collect((push) => critterWaveItems(push, [fish], g.rows, inAir)).length).toBe(0);
+    expect(collect((push) => critterWaveItems(push, [fish], g.rows, Math.PI / 4 * 1.25)).length).toBe(2);
+    // No espaço a "estrelinha" não está na água
+    expect(collect((push) => critterWaveItems(push, [fish], g.rows, Math.PI / 4 * 1.25, 'space')).length).toBe(0);
+  });
+
+  if (!isNode) {
+    test('no navegador: rastro das placas e ondas dos bichos aparecem na camada 3D', async () => {
+      const { loadModel, particles3D } = await import('../../src/model3d.js');
+      const { P3 } = await import('../../src/m3d/particles3d.js');
+      loadModel();
+      const t0 = Date.now();
+      while (!particles3D() && model.state !== 'failed' && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
+      const p = particles3D();
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      const g = c.getContext('2d');
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, W, H);
+      p.draw(g, 1, null, (push) => {
+        push(P3.wake, 400, 400, 80, 20, 0, [1, 1, 1, 1], 0, 0.4, 0);
+        push(P3.waves, 800, 400, 60, 13, 0, [1, 1, 1, 1], 0, 0, 0);
+      });
+      const d = g.getImageData(300, 380, 200, 40).data;
+      const e = g.getImageData(740, 385, 120, 30).data;
+      const lit = (arr) => { let n = 0; for (let i = 0; i < arr.length; i += 4) if (arr[i] > 60) n++; return n; };
+      expect(lit(d)).toBeGreaterThan(40);
+      expect(lit(e)).toBeGreaterThan(40);
     });
   }
 });

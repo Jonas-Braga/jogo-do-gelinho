@@ -7,6 +7,8 @@ export const fireArt = { draw: null };
 
 // Pegadas na costa: uma a cada `step` px andados, alternando os pés; ficam inteiras um
 // instante e depois somem, a mais antiga primeiro
+// Linha d'água das placas (quanto abaixo da linha da fileira a água encosta nelas)
+export const WAKE_LINE = 16;
 export const PRINTS = { step: 22, life: 2.6, hold: 0.35, spread: 3.5 };
 // Cor das pegadas por cenário (a marca afundada no chão)
 export const PRINT_COLORS = {
@@ -87,6 +89,23 @@ export class Particles {
       });
     }
     this.ripples.push({ x, y, t: 0, s: back ? 0.45 : 0.3 });
+  }
+
+  // Pouso numa placa: a placa afunda e empurra a água (onda em volta da placa toda e
+  // gotinhas nas duas pontas)
+  landWave(x, y, w) {
+    this.ripples.push({ x, y, t: 0, s: 0.5, w }, { x, y, t: -0.12, s: 0.35, w });
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 4; i++) {
+        const a = -Math.PI / 2 + side * (0.3 + Math.random() * 0.7);
+        const sp = 50 + Math.random() * 70;
+        this.drops.push({
+          x: x + side * (w / 2 + 2), y,
+          vx: Math.cos(a) * sp * 0.6, vy: Math.sin(a) * sp,
+          r: 0.9 + Math.random() * 1.2, life: 0.45 + Math.random() * 0.25, t: 0, floor: y + 3,
+        });
+      }
+    }
   }
 
   // Pegada (side: 0 pé esquerdo, 1 pé direito; dir: para onde anda)
@@ -303,7 +322,7 @@ export class Particles {
       enterDepth(ctx, r.y);
       const sc = r.s || 1;
       ctx.beginPath();
-      ctx.ellipse(r.x, r.y, (10 + k * 60) * sc, (3 + k * 12) * sc, 0, 0, Math.PI * 2);
+      ctx.ellipse(r.x, r.y, (10 + k * 60) * sc + (r.w || 0) / 2, (3 + k * 12) * sc, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
