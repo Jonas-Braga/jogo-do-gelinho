@@ -4,7 +4,7 @@
 // estrelinhas douradas no lugar dos peixes e um alienígena no lugar do urso.
 // Só o visual muda: as regras, a colisão e a dificuldade são as mesmas.
 import { W, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
-import { doorArt } from './art.js';
+import { doorArt, addLight, lightArt } from './art.js';
 
 const SS = 2;
 const TAU = Math.PI * 2;
@@ -496,6 +496,7 @@ export function asteroidSprite(piece, active) {
 // Facho de luz até a fileira; devolve a altura do disco (também usado pelo disco 3D)
 export function drawUfoBeam(ctx, c, y, t) {
   const by = y - 30 + Math.sin(t * 3 + c.ph) * 4;
+  if (addLight(ctx, 'cone', { x0: c.x, y0: by + 4, x1: c.x, y1: y + 14, w0: 8, w1: 20, color: [160, 255, 200], a: 0.45 })) return by;
   const beam = ctx.createLinearGradient(0, by, 0, y + 14);
   beam.addColorStop(0, 'rgba(160, 255, 200, 0.28)');
   beam.addColorStop(1, 'rgba(160, 255, 200, 0)');
@@ -621,6 +622,14 @@ export function drawCrawler(ctx, c, y, t) {
 export function drawCometTail(ctx, c, y, t) {
   const hop = Math.max(0, Math.sin(t * 3 + c.ph)) * 10;
   const cy = y + 2 - hop;
+  if (lightArt.on) {
+    // Cauda em 2 camadas de luz afinando para trás, tremulando
+    for (const [len, wd, col] of [[46, 9, [120, 200, 255]], [32, 6, [200, 240, 255]]]) {
+      const L = len + Math.sin(t * 12 + c.ph) * 4;
+      addLight(ctx, 'beam', { x0: c.x + c.dir * 2, y0: cy, x1: c.x - c.dir * L, y1: cy, w: wd, color: col, a: 0.8, taper: 1 });
+    }
+    return cy;
+  }
   ctx.save();
   ctx.translate(c.x, cy);
   ctx.scale(c.dir, 1);
@@ -646,7 +655,9 @@ export function drawCometTail(ctx, c, y, t) {
 // Poeira levantada quando ele encosta na fileira
 export function drawCometDust(ctx, c, y, t) {
   const hop = Math.max(0, Math.sin(t * 3 + c.ph)) * 10;
-  if (hop < 3) {
+  if (hop < 3 && lightArt.on) {
+    for (let i = 0; i < 3; i++) addLight(ctx, 'glow', { x: c.x - c.dir * (10 + i * 7), y: y + 8 - i, r: 5, color: [225, 210, 255], a: 0.7 });
+  } else if (hop < 3) {
     ctx.fillStyle = 'rgba(225, 210, 255, 0.6)';
     for (let i = 0; i < 3; i++) {
       ctx.beginPath();
@@ -695,6 +706,7 @@ export const STAR_GOLD = '#FFD84A';
 // Brilho em volta (também usado pela estrela 3D); devolve a altura da estrela
 export function drawStarGlow(ctx, c, y, t) {
   const by = y - 8 + Math.sin(t * 4 + c.ph) * 3;
+  if (addLight(ctx, 'glow', { x: c.x, y: by, r: 22, color: [255, 220, 90], a: 0.75 })) return by;
   const glow = ctx.createRadialGradient(c.x, by, 2, c.x, by, 22);
   glow.addColorStop(0, 'rgba(255, 220, 90, 0.55)');
   glow.addColorStop(1, 'rgba(255, 220, 90, 0)');
@@ -1151,10 +1163,12 @@ function drawDoorFrame(ctx, lit, t, igloo) {
     // A luz da câmara de ar pisca por cima da lâmpada 3D
     if (lit) {
       const r = doorRect();
-      ctx.fillStyle = `rgba(110, 255, 150, ${0.25 + Math.sin(t * 4) * 0.2})`;
-      ctx.beginPath();
-      ctx.arc(r.x + r.w + 10, r.y + 8, 5, 0, TAU);
-      ctx.fill();
+      if (!addLight(ctx, 'glow', { x: r.x + r.w + 10, y: r.y + 8, r: 12, color: [110, 255, 150], a: 0.55 + Math.sin(t * 4) * 0.35 })) {
+        ctx.fillStyle = `rgba(110, 255, 150, ${0.25 + Math.sin(t * 4) * 0.2})`;
+        ctx.beginPath();
+        ctx.arc(r.x + r.w + 10, r.y + 8, 5, 0, TAU);
+        ctx.fill();
+      }
     }
     return;
   }
@@ -1291,13 +1305,15 @@ export function drawBaseDoor(ctx, igloo, t) {
     doorPath(ctx, r);
     ctx.fill();
   }
-  if (igloo.lit) {
+  if (igloo.lit && !(in3d && addLight(ctx, 'glow', { x: r.x + r.w / 2, y: r.y + r.h * 0.55, r: r.w, color: [255, 190, 110], a: 0.55 + Math.sin(t * 5) * 0.08 }))) {
     ctx.fillStyle = `rgba(255, 200, 120, ${in3d ? 0.16 + Math.sin(t * 5) * 0.16 : 0.55 + Math.sin(t * 5) * 0.08})`;
     doorPath(ctx, r, 2);
     ctx.fill();
   }
   drawDoorLeaves(ctx, igloo.curtain, igloo, t);
-  if (igloo.lit && igloo.curtain >= 1) {
+  if (igloo.lit && igloo.curtain >= 1 && lightArt.on) {
+    addLight(ctx, 'beam', { x0: r.x + r.w / 2, y0: r.y + 2, x1: r.x + r.w / 2, y1: r.y + r.h, w: 2.5, color: [255, 200, 120], a: 0.6 + Math.sin(t * 5) * 0.12 });
+  } else if (igloo.lit && igloo.curtain >= 1) {
     // Luz quente escapando pela fresta do meio
     ctx.save();
     ctx.shadowColor = 'rgba(255, 190, 100, 0.9)';

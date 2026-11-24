@@ -5,7 +5,7 @@
 // lugar do urso. Só o visual muda (e o ritmo, como em toda fase especial).
 import { W, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
 import { fireArt } from './particles.js';
-import { doorArt } from './art.js';
+import { doorArt, addLight } from './art.js';
 
 const SS = 2;
 const TAU = Math.PI * 2;
@@ -1103,7 +1103,7 @@ export function drawHutDoor(ctx, igloo, t) {
     ctx.fillStyle = dg;
     ctx.fillRect(r.x, r.y, r.w, r.h);
   }
-  if (igloo.lit) {
+  if (igloo.lit && !(in3d && addLight(ctx, 'glow', { x: r.x + r.w / 2, y: r.y + r.h * 0.55, r: r.w, color: [255, 190, 110], a: 0.55 + Math.sin(t * 5) * 0.08 }))) {
     ctx.fillStyle = `rgba(255, 200, 120, ${in3d ? 0.16 + Math.sin(t * 5) * 0.16 : 0.55 + Math.sin(t * 5) * 0.08})`;
     ctx.fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 2);
   }

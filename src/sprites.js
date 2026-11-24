@@ -1,6 +1,7 @@
 // Arte procedural. Tudo que é estático é pré-renderizado em canvases offscreen
 // com 2x de resolução para ficar nítido quando a tela é escalada.
 import { POWERS } from './powers.js';
+import { addLight, lightArt } from './art.js';
 import { W, SHORE_TOP, WATER_TOP, PALETTE as C, CROUCH_SCALE } from './config.js';
 import { drawAlien } from './space.js';
 import { drawGiantCrab } from './beach.js';
@@ -1268,6 +1269,22 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
 // "!" de susto com gotas de suor (fugindo) e a camada de gelo (congelando), por cima
 // do personagem; usada também pelo personagem 3D (src/model3d.js)
 export function drawPlayerMarks(ctx, p, t, fleeing, freezing) {
+  // Modo só 3D: "!" de susto, gotas de suor e a camada de gelo como efeitos 3D
+  if (lightArt.on) {
+    if (fleeing) {
+      const b = Math.abs(Math.sin(t * 9)) * 4;
+      addLight(ctx, 'cord', { x0: 4, y0: -97 - b, x1: 4, y1: -88 - b, w: 4, color: [255, 255, 255] });
+      addLight(ctx, 'cord', { x0: 4, y0: -96 - b, x1: 4, y1: -89 - b, w: 2.4, color: [229, 72, 77] });
+      addLight(ctx, 'drop', { x: 4, y: -79 - b, r: 4, color: [255, 255, 255] });
+      addLight(ctx, 'drop', { x: 4, y: -79 - b, r: 2.4, color: [229, 72, 77] });
+      for (let i = 0; i < 2; i++) {
+        const k = (t * 2.5 + i * 0.5) % 1;
+        addLight(ctx, 'drop', { x: -12 - k * 14, y: -66 - i * 6 + k * 8, r: 2.2 * (1 - k * 0.5), color: [150, 215, 245], a: 0.9 });
+      }
+    }
+    if (freezing > 0) addLight(ctx, 'ice', { x: 0, y: -38, rx: 22, ry: 40, a: p.alpha * freezing * 0.85 });
+    return;
+  }
   // "!" de susto e gotas de suor voando
   if (fleeing) {
     const bounce = Math.abs(Math.sin(t * 9)) * 4;

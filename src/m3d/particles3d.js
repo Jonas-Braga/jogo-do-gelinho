@@ -27,7 +27,7 @@ export const PARTICLES3D = {
 };
 
 // Tipos (o shader escolhe o desenho por eles)
-export const P3 = { snow: 0, leaf: 1, ember: 2, dust: 3, smoke: 4, glow: 5, flame: 6, ring: 7, shard: 8, bubble: 9, text: 10, print: 11 };
+export const P3 = { snow: 0, leaf: 1, ember: 2, dust: 3, smoke: 4, glow: 5, flame: 6, ring: 7, shard: 8, bubble: 9, text: 10, print: 11, beam: 12, cord: 13, cone: 14, ice: 15 };
 
 // Cores (as mesmas do 2D)
 export const LEAF_COLORS = ['#D9822B', '#C4462A', '#E3B23C', '#7FA33A', '#A65A2A'];
@@ -265,6 +265,43 @@ export function textItems(push, parts, glyph) {
   }
 }
 
+// Luzes registradas pelos desenhos (lightArt de src/art.js, já em coordenadas da tela):
+// brilhos, lâmpadas, filetes de luz, fios, anéis na água, facho em cone e neblina
+export function lightItems(push, items) {
+  const c01 = (c, a) => [c[0] / 255, c[1] / 255, c[2] / 255, a];
+  for (const it of items || []) {
+    const col = it.color || [255, 220, 150];
+    if (it.kind === 'glow') {
+      push(P3.glow, it.x, it.y, it.r, it.r, 0, c01(col, Math.min(1, it.a)), 0, 0, 0.6);
+    } else if (it.kind === 'bulb') {
+      // Lâmpada de vidro (acesa por dentro) e o halo quando acesa
+      if (it.on) push(P3.glow, it.x, it.y, it.r * 4.5, it.r * 4.5, 0, c01(col, 0.75), 0, 0, 0.4);
+      push(P3.snow, it.x, it.y, it.r, it.r, 0, c01(it.on ? col : col.map((v) => v * 0.45), 1), 0, 0, it.on ? 0.9 : 0);
+    } else if (it.kind === 'beam' || it.kind === 'cord') {
+      const dx = it.x1 - it.x0;
+      const dy = it.y1 - it.y0;
+      const len = Math.hypot(dx, dy) / 2;
+      const kind = it.kind === 'beam' ? P3.beam : P3.cord;
+      // Passa meia largura de cada ponta e some em rampa ali: pedaços emendados
+      // somam luz igual na emenda (sem "contas")
+      const hw = len + it.w * 0.5;
+      push(kind, (it.x0 + it.x1) / 2, (it.y0 + it.y1) / 2, hw, it.w, Math.atan2(dy, dx), c01(col, it.a ?? 1), 0, it.w / hw, it.taper || 0);
+    } else if (it.kind === 'drop') {
+      push(P3.snow, it.x, it.y, it.r, it.r, 0, c01(col, it.a ?? 1), 0, 0, 0);
+    } else if (it.kind === 'ice') {
+      push(P3.ice, it.x, it.y, it.rx, it.ry, it.rot || 0, [1, 1, 1, Math.min(1, it.a)], 0, 0, 0);
+    } else if (it.kind === 'ring') {
+      push(P3.ring, it.x, it.y, it.rx / 0.86, it.ry / 0.86, 0, c01(col, it.a), 0, 0, 0);
+    } else if (it.kind === 'fog') {
+      push(P3.smoke, it.x, it.y, it.rx, it.ry, 0, c01(col, it.a), it.x * 0.01, 0, 0);
+    } else if (it.kind === 'cone') {
+      const len = Math.hypot(it.x1 - it.x0, it.y1 - it.y0) / 2;
+      const rot = Math.atan2(it.y1 - it.y0, it.x1 - it.x0) - Math.PI / 2;
+      push(P3.cone, (it.x0 + it.x1) / 2, (it.y0 + it.y1) / 2, it.w1, len, rot, c01(col, it.a), 0, 0, it.w0 / Math.max(1, it.w1));
+    }
+  }
+}
+
 // ---------------------------------------------------------------- Shader
 const VERT = `
 attribute vec3 aPos;   // x, y, giro
@@ -462,6 +499,44 @@ void main() {
     col = mix(col * 1.25, col, inner);
     float a = vCol.a * (0.35 + 0.4 * inner) * (1.0 - smoothstep(0.85, 1.0, d));
     o = vec4(col * a, a);
+  } else if (kind > 11.5 && kind < 12.5) {
+    // ---- Filete de luz (fresta de porta, cauda de cometa): soma luz; ex = afinar na ponta
+    float u = (q.x + 1.0) * 0.5;
+    float wf = max(0.06, 1.0 - ex * u);
+    float across = abs(q.y) / wf;
+    float ends = ex > 0.0 ? (1.0 - u * 0.85) : clamp((1.0 - abs(q.x)) / max(blur, 0.01), 0.0, 1.0);
+    float v = exp(-across * across * 3.0) * ends * vCol.a;
+    o = vec4(vCol.rgb * v, 0.0);
+  } else if (kind > 12.5 && kind < 13.5) {
+    // ---- Fio (pisca-pisca, corrente, teia): cilindro fino, mais claro em cima
+    float v = 1.0 - smoothstep(0.55, 1.0, abs(q.y));
+    float ends = 1.0 - smoothstep(0.92, 1.0, abs(q.x));
+    vec3 col = vCol.rgb * (0.7 + 0.6 * clamp(-q.y, 0.0, 1.0)) * (uAmb + uSun * 0.5);
+    float a = v * ends * vCol.a;
+    o = vec4(col * a, a);
+  } else if (kind > 14.5 && kind < 15.5) {
+    // ---- Bloco de gelo em volta de quem congelou: facetas com luz diferente,
+    // translúcido no meio, mais branco nas bordas e brilho do sol
+    vec2 a2 = abs(q);
+    float box = max(a2.x * 1.05, a2.y * 0.95 + a2.x * 0.12);
+    if (box > 1.0) discard;
+    vec2 cell = floor((q + 1.0) * vec2(1.6, 2.6));
+    float hc = hash(cell);
+    vec3 n = normalize(vec3((hc - 0.5) * 0.9 + q.x * 0.5, (hash(cell + 3.1) - 0.5) * 0.9 - q.y * 0.3, 1.0));
+    float dif = max(dot(n, uLight), 0.0);
+    float fres = smoothstep(0.55, 1.0, box);
+    vec3 col = mix(vec3(0.5, 0.78, 0.92), vec3(0.93, 0.98, 1.0), dif) + uSun * pow(dif, 18.0) * 0.6;
+    float crack = 1.0 - smoothstep(0.0, 0.04, abs(fract((q.x + q.y * 0.6) * 1.6 + hc) - 0.5));
+    col = mix(col, vec3(1.0), crack * 0.5);
+    float a = vCol.a * (0.4 + 0.45 * fres) * (1.0 - smoothstep(0.93, 1.0, box));
+    o = vec4(col * a, a);
+  } else if (kind > 13.5 && kind < 14.5) {
+    // ---- Facho em cone (disco voador): estreito em cima, largo e sumindo embaixo
+    float u = (q.y + 1.0) * 0.5;
+    float wdt = mix(ex, 1.0, u);
+    float inside = 1.0 - smoothstep(wdt * 0.75, wdt, abs(q.x));
+    float v = inside * (1.0 - u) * (0.85 + 0.15 * sin(uTime * 7.0 + q.y * 9.0)) * vCol.a;
+    o = vec4(vCol.rgb * v, 0.0);
   } else {
     // ---- Chama: fogo subindo e se torcendo
     float h = (0.8 - q.y) / 1.7;   // 0 na base, 1 na ponta

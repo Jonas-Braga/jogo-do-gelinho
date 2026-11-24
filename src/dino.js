@@ -8,7 +8,7 @@
 // do rio no lugar da neve. Só o visual muda (e o ritmo, como toda especial).
 import { W, H, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
 import { fireArt } from './particles.js';
-import { doorArt } from './art.js';
+import { doorArt, addLight } from './art.js';
 
 const SS = 2;
 const TAU = Math.PI * 2;
@@ -1582,7 +1582,7 @@ export function drawCaveDoor(ctx, igloo, t) {
     ctx.fillStyle = dg;
     ctx.fill();
   }
-  if (igloo.lit) {
+  if (igloo.lit && !(in3d && addLight(ctx, 'glow', { x: r.x + r.w / 2, y: r.y + r.h * 0.55, r: r.w * 1.1, color: [255, 160, 60], a: 0.6 + Math.sin(t * 6) * 0.12 }))) {
     ctx.fillStyle = `rgba(255, 170, 70, ${in3d ? 0.18 + Math.sin(t * 6) * 0.18 : 0.5 + Math.sin(t * 6) * 0.1})`;
     ctx.fill();
   }

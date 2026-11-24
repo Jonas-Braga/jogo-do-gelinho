@@ -5,7 +5,7 @@
 // lugar do iglu, fantasminhas, aranhas e olhos boiando, balas de Halloween no lugar
 // dos peixes e um lobisomem no lugar do urso. Só o visual muda (e o ritmo).
 import { W, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
-import { doorArt } from './art.js';
+import { doorArt, addLight, lightArt } from './art.js';
 
 const SS = 2;
 const TAU = Math.PI * 2;
@@ -291,6 +291,7 @@ export function drawHalloweenDecor(ctx, t) {
   for (let i = 0; i < 7; i++) {
     const x = ((t * (12 + (i % 3) * 5) + i * 230) % (W + 300)) - 150;
     const y = SHORE_TOP + 30 + (i % 3) * 16;
+    if (addLight(ctx, 'fog', { x, y, rx: 110, ry: 30, color: [201, 190, 224], a: 0.3 })) continue;
     const fg = ctx.createRadialGradient(x, y, 4, x, y, 90);
     fg.addColorStop(0, 'rgba(201, 190, 224, 0.16)');
     fg.addColorStop(1, 'rgba(201, 190, 224, 0)');
@@ -360,6 +361,16 @@ function drawTreeLantern(ctx, t) {
   ctx.save();
   ctx.translate(52, -89);
   ctx.rotate(sw);
+  if (lightArt.on) {
+    // Corrente, tampas e a vela acesa como luz 3D
+    addLight(ctx, 'cord', { x0: 0, y0: 0, x1: 0, y1: 18, w: 0.8, color: [26, 18, 22] });
+    addLight(ctx, 'glow', { x: 0, y: 28, r: 26, color: [255, 210, 110], a: 0.6 + Math.sin(t * 9) * 0.08 });
+    addLight(ctx, 'bulb', { x: 0, y: 28.5, r: 5.5, color: [255, 214, 120], on: true });
+    addLight(ctx, 'cord', { x0: -6, y0: 19.5, x1: 6, y1: 19.5, w: 1.6, color: [42, 32, 40] });
+    addLight(ctx, 'cord', { x0: -5, y0: 37.5, x1: 5, y1: 37.5, w: 1.6, color: [42, 32, 40] });
+    ctx.restore();
+    return;
+  }
   ctx.strokeStyle = '#1A1216';
   ctx.lineWidth = 1.2;
   ctx.beginPath();
@@ -390,7 +401,7 @@ export function drawJack(ctx, x, y, r, t, lit) {
   ctx.beginPath();
   ctx.ellipse(2, 1, r * 1.1, r * 0.25, 0, 0, TAU);
   ctx.fill();
-  if (lit) {
+  if (lit && !addLight(ctx, 'glow', { x: 0, y: -r * 0.7, r: r * 2.6, color: [255, 170, 60], a: 0.45 + Math.sin(t * 11) * 0.06 })) {
     const gl = ctx.createRadialGradient(0, -r * 0.7, 2, 0, -r * 0.7, r * 2.6);
     gl.addColorStop(0, `rgba(255, 170, 60, ${0.28 + Math.sin(t * 11) * 0.05})`);
     gl.addColorStop(1, 'rgba(255, 170, 60, 0)');
@@ -1412,6 +1423,11 @@ export function drawWindowSilhouette(ctx, side, t) {
   if (side > 0 && Math.sin(t * 0.5) > 0.6) {
     const x = side * 58 - 13;
     const y = -60;
+    // Modo só 3D: cabeça e ombros escuros por trás do vidro
+    if (addLight(ctx, 'drop', { x: x + 13, y: y + 14, r: 6, color: [40, 20, 50], a: 0.6 })) {
+      addLight(ctx, 'cord', { x0: x + 13, y0: y + 22, x1: x + 13, y1: y + 30, w: 7, color: [40, 20, 50], a: 0.6 });
+      return;
+    }
     ctx.fillStyle = 'rgba(40, 20, 50, 0.55)';
     ctx.beginPath();
     ctx.arc(x + 13, y + 14, 6, 0, TAU);
@@ -1425,6 +1441,7 @@ export function drawWindowGlow(ctx, side) {
   const y = -60;
   const w = 26;
   const h = 30;
+  if (addLight(ctx, 'glow', { x: x + w / 2, y: y + h / 2, r: 34, color: [255, 210, 110], a: 0.4 })) return;
   const gl = ctx.createRadialGradient(x + w / 2, y + h / 2, 4, x + w / 2, y + h / 2, 34);
   gl.addColorStop(0, 'rgba(255, 210, 110, 0.22)');
   gl.addColorStop(1, 'rgba(255, 210, 110, 0)');
@@ -1478,6 +1495,7 @@ function drawLantern(ctx, t) {
 
 // Brilho da lanterna ao lado da porta (em volta de (40, −66); também na casa 3D)
 function lanternGlow(ctx, t) {
+  if (addLight(ctx, 'glow', { x: 0, y: 6, r: 26, color: [255, 210, 110], a: 0.6 + Math.sin(t * 9) * 0.08 })) return;
   const gl = ctx.createRadialGradient(0, 6, 2, 0, 6, 26);
   gl.addColorStop(0, `rgba(255, 210, 110, ${0.45 + Math.sin(t * 9) * 0.07})`);
   gl.addColorStop(1, 'rgba(255, 210, 110, 0)');
@@ -1646,7 +1664,7 @@ export function drawHauntedDoor(ctx, igloo, t) {
     ctx.fillStyle = dg;
     ctx.fill();
   }
-  if (igloo.lit) {
+  if (igloo.lit && !(in3d && addLight(ctx, 'glow', { x: r.x + r.w / 2, y: r.y + r.h * 0.5, r: r.w, color: [255, 180, 100], a: 0.55 + Math.sin(t * 5) * 0.08 }))) {
     ctx.fillStyle = `rgba(255, 190, 100, ${in3d ? 0.16 + Math.sin(t * 5) * 0.16 : 0.5 + Math.sin(t * 5) * 0.08})`;
     ctx.fill();
   }

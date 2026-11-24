@@ -3,7 +3,7 @@
 // piranhas, folhas caindo no lugar da neve. Só o visual muda: as regras, a
 // colisão e a dificuldade são as mesmas da fase normal.
 import { W, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
-import { doorArt } from './art.js';
+import { doorArt, addLight, lightArt } from './art.js';
 
 const SS = 2;
 
@@ -883,11 +883,15 @@ export function drawCabinDoor(ctx, igloo, t) {
   }
   if (igloo.lit) {
     const k = 0.55 + Math.sin(t * 5) * 0.08;
-    ctx.fillStyle = `rgba(255, 200, 120, ${in3d ? (k - 0.47) * 2 : k})`;
-    ctx.fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 2);
+    if (!(in3d && addLight(ctx, 'glow', { x: r.x + r.w / 2, y: r.y + r.h * 0.55, r: r.w, color: [255, 190, 110], a: k }))) {
+      ctx.fillStyle = `rgba(255, 200, 120, ${in3d ? (k - 0.47) * 2 : k})`;
+      ctx.fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 2);
+    }
   }
   drawDoorLeaf(ctx, igloo.curtain, igloo, t);
-  if (igloo.lit && igloo.curtain >= 1) {
+  if (igloo.lit && igloo.curtain >= 1 && lightArt.on) {
+    rectLeak(ctx, r, 0.6 + Math.sin(t * 5) * 0.12);
+  } else if (igloo.lit && igloo.curtain >= 1) {
     // Luz quente escapando pelas frestas da porta fechada
     ctx.save();
     ctx.shadowColor = 'rgba(255, 190, 100, 0.9)';
@@ -899,6 +903,14 @@ export function drawCabinDoor(ctx, igloo, t) {
   }
   drawDoorFrame(ctx, igloo, t);
   ctx.restore();
+}
+
+// Luz escapando pelas 4 frestas de uma porta retangular fechada (luz 3D)
+export function rectLeak(ctx, r, a) {
+  const c = [255, 200, 120];
+  addLight(ctx, 'beam', { x0: r.x + 1, y0: r.y + 1, x1: r.x + r.w - 1, y1: r.y + 1, w: 2.5, color: c, a });
+  addLight(ctx, 'beam', { x0: r.x + 1, y0: r.y + 1, x1: r.x + 1, y1: r.y + r.h, w: 2.5, color: c, a });
+  addLight(ctx, 'beam', { x0: r.x + r.w - 1, y0: r.y + 1, x1: r.x + r.w - 1, y1: r.y + r.h, w: 2.5, color: c, a });
 }
 
 // Desenhado POR CIMA do personagem enquanto ele entra: sombra do interior,

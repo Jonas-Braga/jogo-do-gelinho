@@ -39,8 +39,8 @@ import {
 import { drawHud } from './hud.js';
 import { drawMoneyBag, drawHeart, bonusArt } from './bonus.js';
 import { fireArt, PRINT_COLORS } from './particles.js';
-import { doorArt } from './art.js';
-import { weatherItems, smokeItems, volcanoItems, fireflyItems, groundItems, fxItems, textItems, SMOKE_COLORS } from './m3d/particles3d.js';
+import { doorArt, lightArt } from './art.js';
+import { weatherItems, smokeItems, volcanoItems, fireflyItems, groundItems, fxItems, textItems, lightItems, SMOKE_COLORS } from './m3d/particles3d.js';
 import { drawCocoa } from './heat.js';
 import { drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront, drawDizzy, powerArt } from './powers.js';
 
@@ -270,6 +270,12 @@ export class Renderer {
     }
     ctx.fillStyle = '#04192a';
     ctx.fillRect(-20, -20, W + 40, H + 40);
+    // Luzes do modo só 3D: os desenhos registram as luzes durante o quadro (com a
+    // posição de tela tirada da transformação de agora) e elas vão numa passada 3D
+    lightArt.on = this.only3d;
+    lightArt.items = [];
+    const bt = ctx.getTransform ? ctx.getTransform() : null;
+    lightArt.base = bt && typeof bt.a === 'number' ? { a: bt.a, d: bt.d, e: bt.e, f: bt.f } : null;
 
     if (this.hideScene(game)) {
       // Fundo liso de noite polar enquanto o 3D não fica pronto
@@ -406,6 +412,8 @@ export class Renderer {
     }
     if (!this.only3d) game.particles.drawTexts(ctx);
     const parts = game.particles;
+    // Luzes registradas no quadro (brilhos, lâmpadas, frestas, fios, anéis, facho, neblina)
+    if (this.only3d && lightArt.items.length) this.lights3dDrawn = this.pass3d(ctx, t, (push) => lightItems(push, lightArt.items));
     if (this.only3d) {
       // Partículas 3D ao vivo: clima, flocos desfocados, fumaça e vapor (sem a camada
       // pronta, nada; nunca o 2D)

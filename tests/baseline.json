@@ -616,5 +616,12 @@
   "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › modo só 3D: pegadas, anéis e bolhas de lava no chão; lascas, brilhos, bolhas e gotas por cima; textos em relevo",
   "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › sem o modo só 3D, as pegadas e os efeitos pequenos continuam no desenho 2D",
   "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › praia: uma prancha de surfe só por grupo (o tamanho das 3 placas), sem abrir e fechar",
-  "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › Halloween: o cenário 3D tem duas cordilheiras (a do fundo atrás da da frente)"
+  "Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera › Halloween: o cenário 3D tem duas cordilheiras (a do fundo atrás da da frente)",
+  "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › o coletor leva cada luz para a tela pela transformação do contexto (e não faz nada desligado)",
+  "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › pisca-pisca do iglu: fio e lâmpadas viram luz 3D (nenhum traço ou halo 2D)",
+  "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › Halloween: neblina, abóboras acesas e a lanterna da árvore como luz 3D",
+  "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › portas acesas: brilho de dentro e a luz das frestas da porta fechada (cabana, base lunar e iglu)",
+  "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › anéis dos bichos na água, brilho e fio da aranha, e o facho e a cauda dos bichos do espaço",
+  "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › o \"!\" do susto, as gotas de suor e a camada de gelo do personagem viram efeitos 3D",
+  "Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem › o renderizador junta as luzes do quadro e desenha numa passada 3D (só no modo só 3D)"
 ]

@@ -5,6 +5,7 @@
 // poses por quadro) para não travar o jogo. Enquanto a foto não fica pronta, ou sem
 // internet/WebGL, vale o desenho 2D de sempre.
 import { Sky3D } from './m3d/sky3d.js';
+import { addLight } from './art.js';
 import { Water3D } from './m3d/water3d.js';
 import { Particles3D } from './m3d/particles3d.js';
 import { DOOR_MODELS, DOOR_SUBJECTS, stonePose, LEAF_STEPS } from './m3d/doors.js';
@@ -264,6 +265,22 @@ export function drawBear3D(ctx, b, t, outfit = 'polar') {
 // Modo só 3D: os respingos dos peixes saltando são partículas 3D (src/game.js), então os
 // pinguinhos 2D ao lado da foto não são desenhados
 export const liveFx = { on: false };
+function ringAt(ctx, x, y, rx, ry, color, a) {
+  if (addLight(ctx, 'ring', { x, y, rx, ry, color, a })) return;
+  ctx.strokeStyle = `rgba(${color.join(', ')}, ${a})`;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
+  ctx.stroke();
+}
+function glowAt(ctx, x, y, r, color, a) {
+  if (addLight(ctx, 'glow', { x, y, r, color, a: a * 1.4 })) return;
+  const g = ctx.createRadialGradient(x, y, 2, x, y, r);
+  g.addColorStop(0, `rgba(${color.join(', ')}, ${a})`);
+  g.addColorStop(1, `rgba(${color.join(', ')}, 0)`);
+  ctx.fillStyle = g;
+  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+}
 // Ponto de apoio de cada bicho na fileira (o mesmo do desenho 2D)
 const ANCHOR = {
   goose: (c, y, t) => ({ y: y - 30 + Math.sin(t * 3 + c.ph) * 3 }),
@@ -301,13 +318,7 @@ const ANCHOR = {
   siri: (c, y) => ({ y: y - 2, shadow: [c.x, y + 2, 18, 3, 'rgba(4, 70, 90, 0.25)'] }),
   jellyfish: (c, y, t) => ({
     y: y + 2 - Math.max(0, Math.sin(t * 4 + c.ph)) * 5,
-    after: (ctx) => {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.ellipse(c.x, y + 9, 18, 3, 0, 0, TAU);
-      ctx.stroke();
-    },
+    after: (ctx) => ringAt(ctx, c.x, y + 9, 18, 3, [255, 255, 255], 0.5),
   }),
   tfish: (c, y, t) => {
     const hop = Math.max(0, Math.sin(t * 3 + c.ph)) * 12;
@@ -318,18 +329,14 @@ const ANCHOR = {
     const by = y - 34 + Math.sin(t * 3 + c.ph) * 5;
     return {
       y: by, shadow: [c.x, y + 14, 14, 3, 'rgba(20, 10, 40, 0.25)'],
-      before: (ctx) => {
-        const glow = ctx.createRadialGradient(c.x, by, 4, c.x, by, 30);
-        glow.addColorStop(0, 'rgba(220, 210, 255, 0.35)');
-        glow.addColorStop(1, 'rgba(220, 210, 255, 0)');
-        ctx.fillStyle = glow;
-        ctx.fillRect(c.x - 30, by - 30, 60, 60);
-      },
+      before: (ctx) => glowAt(ctx, c.x, by, 30, [220, 210, 255], 0.35),
     };
   },
   spider: (c, y) => ({
     y: y - 8, shadow: [c.x, y + 2, 18, 3, 'rgba(20, 10, 40, 0.3)'],
     before: (ctx) => {
+      // Fio da aranha (um fio claro bem fino)
+      if (addLight(ctx, 'cord', { x0: c.x - c.dir * 6, y0: y - 18, x1: c.x - c.dir * 22, y1: y - 68, w: 0.5, color: [200, 200, 230] })) return;
       ctx.strokeStyle = 'rgba(230, 230, 255, 0.35)';
       ctx.lineWidth = 0.8;
       ctx.beginPath();
@@ -340,13 +347,7 @@ const ANCHOR = {
   }),
   eyeball: (c, y, t) => ({
     y: y + 3 + Math.sin(t * 3 + c.ph) * 2, water: y + 8,
-    after: (ctx) => {
-      ctx.strokeStyle = 'rgba(205, 180, 255, 0.45)';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.ellipse(c.x, y + 8, 16, 3, 0, 0, TAU);
-      ctx.stroke();
-    },
+    after: (ctx) => ringAt(ctx, c.x, y + 8, 16, 3, [205, 180, 255], 0.45),
   }),
   // Dinossauros: o brilho do ovo e os anéis na lava são 2D
   ptero: (c, y, t) => ({
@@ -355,33 +356,16 @@ const ANCHOR = {
   raptor: (c, y) => ({ y, shadow: [c.x, y + 2, 20, 3, 'rgba(30, 10, 5, 0.3)'] }),
   ammonite: (c, y, t) => ({
     y: y + 2 + Math.sin(t * 3 + c.ph) * 2,
-    after: (ctx) => {
-      ctx.strokeStyle = 'rgba(255, 220, 120, 0.55)';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.ellipse(c.x, y + 8, 16, 3, 0, 0, TAU);
-      ctx.stroke();
-    },
+    after: (ctx) => ringAt(ctx, c.x, y + 8, 16, 3, [255, 220, 120], 0.55),
   }),
   egg: (c, y, t) => {
     const hop = Math.max(0, Math.sin(t * 3 + c.ph)) * 14;
     const ey = y - 4 - hop;
     return {
       y: ey, tilt: Math.sin(t * 6 + c.ph) * 0.3 * c.dir,
-      before: (ctx) => {
-        const gl = ctx.createRadialGradient(c.x, ey, 2, c.x, ey, 18);
-        gl.addColorStop(0, 'rgba(255, 250, 200, 0.35)');
-        gl.addColorStop(1, 'rgba(255, 250, 200, 0)');
-        ctx.fillStyle = gl;
-        ctx.fillRect(c.x - 18, ey - 18, 36, 36);
-      },
+      before: (ctx) => glowAt(ctx, c.x, ey, 18, [255, 250, 200], 0.35),
       after: (ctx) => {
-        if (hop >= 3) return;
-        ctx.strokeStyle = 'rgba(255, 220, 120, 0.55)';
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.ellipse(c.x, y + 9, 14, 3, 0, 0, TAU);
-        ctx.stroke();
+        if (hop < 3) ringAt(ctx, c.x, y + 9, 14, 3, [255, 220, 120], 0.55);
       },
     };
   },
@@ -390,12 +374,7 @@ const ANCHOR = {
     return {
       y: y + 2 - hop, tilt: t * 3 * c.dir + c.ph,
       after: (ctx) => {
-        if (hop >= 3) return;
-        ctx.strokeStyle = 'rgba(205, 180, 255, 0.5)';
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.ellipse(c.x, y + 9, 14, 3, 0, 0, TAU);
-        ctx.stroke();
+        if (hop < 3) ringAt(ctx, c.x, y + 9, 14, 3, [205, 180, 255], 0.5);
       },
     };
   },
@@ -439,13 +418,7 @@ export function drawCritter3D(ctx, c, y, t, kind = c.kind) {
       ctx.fill();
     }
   }
-  if (a.cover) {
-    ctx.strokeStyle = 'rgba(220, 245, 255, 0.55)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(c.x, a.water, a.cover / 2 - 4, 3, 0, 0, TAU);
-    ctx.stroke();
-  }
+  if (a.cover) ringAt(ctx, c.x, a.water, a.cover / 2 - 4, 3, [220, 245, 255], 0.55);
   a.after?.(ctx);
   return true;
 }
@@ -695,7 +668,9 @@ export function drawCabin3D(ctx, igloo, t) {
   }
   // Janela acesa depois que o lenhador entra (luz quente por cima do vidro)
   const win = CABIN_PIECES.findIndex((p) => p.kind === 'window');
-  if (igloo.lit && blocks > win) {
+  if (igloo.lit && blocks > win && addLight(ctx, 'glow', { x: -56, y: -34, r: 30, color: [255, 190, 100], a: 1.1 + Math.sin(t * 5) * 0.1 })) {
+    // Modo só 3D: a janela acende como luz 3D
+  } else if (igloo.lit && blocks > win) {
     ctx.fillStyle = `rgba(255, 196, 110, ${0.85 + Math.sin(t * 5) * 0.08})`;
     ctx.fillRect(-70, -47, 28, 25.5);
     ctx.fillStyle = '#4A2C16';
@@ -728,6 +703,7 @@ export function drawLander3D(ctx, t) {
   const img = sprite('lander', 'l');
   if (!img) return false;
   blit(ctx, img, landerModel.box);
+  if (addLight(ctx, 'bulb', { x: LANDER_LIGHT.x, y: LANDER_LIGHT.y * Math.cos(landerModel.elevation), r: 2.4, color: [255, 90, 74], on: Math.sin(t * 4) > 0 })) return true;
   ctx.fillStyle = Math.sin(t * 4) > 0 ? '#FF5A4A' : '#7A2A24';
   ctx.beginPath();
   ctx.arc(LANDER_LIGHT.x, LANDER_LIGHT.y * Math.cos(landerModel.elevation), 2.4, 0, TAU);
@@ -788,7 +764,9 @@ export function drawBase3D(ctx, igloo, t) {
     blit(ctx, sprite('base', `b${i}`), baseModel.box);
     ctx.restore();
   }
-  if (igloo.complete && Math.sin(t * 5) > 0) {
+  if (igloo.complete && addLight(ctx, 'bulb', { x: BASE_LIGHT.x, y: BASE_LIGHT.y, r: 2.2, color: [255, 74, 74], on: Math.sin(t * 5) > 0 })) {
+    // Modo só 3D: luz da antena 3D
+  } else if (igloo.complete && Math.sin(t * 5) > 0) {
     ctx.fillStyle = '#FF4A4A';
     ctx.beginPath();
     ctx.arc(BASE_LIGHT.x, BASE_LIGHT.y, 2.2, 0, TAU);

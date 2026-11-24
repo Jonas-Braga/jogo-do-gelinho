@@ -2,6 +2,8 @@
 // árvores de Natal na costa, pisca-pisca no iglu, gorro no urso e suéter no
 // personagem (os dois últimos ficam em sprites.js).
 import { W, IGLOO } from './config.js';
+import { addLight, lightArt } from './art.js';
+const hexRgb = (h) => h.match(/\w\w/g).map((v) => parseInt(v, 16));
 
 // Gancho do visual 3D (src/model3d.js): com `on` ligado e a foto pronta, o trenó e as
 // árvores viram fotos 3D (o rastro de brilhos, o pisca-pisca e o halo da estrela
@@ -259,6 +261,7 @@ const BULBS = ['#FF4B4B', '#3DDC84', '#FFD54A', '#4FB3FF', '#FF7AD9'];
 function bulb(ctx, x, y, i, t, r = 2.6) {
   const on = Math.sin(t * 3 + i * 1.3) > -0.2;
   const c = BULBS[i % BULBS.length];
+  if (addLight(ctx, 'bulb', { x, y, r, color: hexRgb(c), on })) return;
   if (on) {
     const h = ctx.createRadialGradient(x, y, 0, x, y, r * 4);
     h.addColorStop(0, c + 'AA');
@@ -369,10 +372,20 @@ export function drawIglooLights(ctx, t) {
     const [x1, y1] = anchors[i + 1];
     const cx = (x0 + x1) / 2;
     const cy = (y0 + y1) / 2 + 9;
-    ctx.beginPath();
-    ctx.moveTo(x0, y0);
-    ctx.quadraticCurveTo(cx, cy, x1, y1);
-    ctx.stroke();
+    if (lightArt.on) {
+      // Fio do pisca-pisca em 3D: a curva em 4 pedaços
+      const q = (u) => [(1 - u) ** 2 * x0 + 2 * (1 - u) * u * cx + u * u * x1, (1 - u) ** 2 * y0 + 2 * (1 - u) * u * cy + u * u * y1];
+      for (let j = 0; j < 4; j++) {
+        const [ax, ay] = q(j / 4);
+        const [bx, by] = q((j + 1) / 4);
+        addLight(ctx, 'cord', { x0: ax, y0: ay, x1: bx, y1: by, w: 1, color: [40, 70, 50] });
+      }
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo(cx, cy, x1, y1);
+      ctx.stroke();
+    }
     for (const u of [0.25, 0.5, 0.75]) {
       const bx = (1 - u) ** 2 * x0 + 2 * (1 - u) * u * cx + u * u * x1;
       const by = (1 - u) ** 2 * y0 + 2 * (1 - u) * u * cy + u * u * y1;
@@ -399,6 +412,7 @@ function treeLights(ctx, h, w, t, k) {
   }
   const top = -10 - (tiers - 1) * h * 0.24 - h * 0.42;
   const s = 7 * (h / 104) * (1 + Math.sin(t * 4 + k) * 0.1);
+  if (addLight(ctx, 'glow', { x: 0, y: top, r: s * 3, color: [255, 225, 120], a: 0.8 })) return;
   const halo = ctx.createRadialGradient(0, top, 0, 0, top, s * 3);
   halo.addColorStop(0, 'rgba(255, 225, 120, 0.6)');
   halo.addColorStop(1, 'rgba(255, 225, 120, 0)');

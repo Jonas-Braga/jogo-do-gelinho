@@ -3189,3 +3189,217 @@ suite('Efeitos pequenos em 3D, pegadas, respingos dos peixes, pranchas e câmera
     expect(HAUNT_HILLS[1].top[0]).toBeLessThan(HAUNT_HILLS[0].top[0]);
   });
 });
+
+suite('Últimos 2D em 3D: luzes, frestas, pisca-pisca, anéis e marcas do personagem', () => {
+  // Liga o coletor de luzes (como o renderizador no modo só 3D) só durante fn
+  const withLights = async (fn) => {
+    const { lightArt } = await import('../../src/art.js');
+    const was = { on: lightArt.on, items: lightArt.items, base: lightArt.base };
+    lightArt.on = true;
+    lightArt.items = [];
+    lightArt.base = null;
+    try {
+      return await fn(lightArt);
+    } finally {
+      Object.assign(lightArt, was);
+    }
+  };
+
+  test('o coletor leva cada luz para a tela pela transformação do contexto (e não faz nada desligado)', async () => {
+    const { addLight, lightArt } = await import('../../src/art.js');
+    expect(lightArt.on).toBe(false);
+    expect(addLight(recordingCtx().ctx, 'glow', { x: 1, y: 2, r: 3 })).toBe(false);
+    await withLights((la) => {
+      la.base = { a: 2, d: 2, e: 10, f: 20 };
+      // Contexto em escala 2 (a base) e ainda transladado (100, 50) e em escala 0,5
+      const ctx = { getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 10 + 200, f: 20 + 100 }) };
+      expect(addLight(ctx, 'glow', { x: 10, y: 4, r: 30, color: [1, 2, 3], a: 0.5 })).toBe(true);
+      const g = la.items[0];
+      expect(g.x).toBe(105);
+      expect(g.y).toBe(52);
+      expect(g.r).toBe(15);
+      addLight(ctx, 'beam', { x0: 0, y0: 0, x1: 20, y1: 0, w: 4, color: [9, 9, 9] });
+      expect(la.items[1].x1 - la.items[1].x0).toBe(10);
+      expect(la.items[1].w).toBe(2);
+    });
+  });
+
+  test('pisca-pisca do iglu: fio e lâmpadas viram luz 3D (nenhum traço ou halo 2D)', async () => {
+    const { drawIglooLights } = await import('../../src/christmas.js');
+    await withLights((la) => {
+      const f = recordingCtx();
+      drawIglooLights(f.ctx, 1.2);
+      const kinds = la.items.map((i) => i.kind);
+      expect(kinds.filter((k) => k === 'cord').length).toBe(7 * 4);
+      expect(kinds.filter((k) => k === 'bulb').length).toBe(7 * 3);
+      expect(la.items.some((i) => i.kind === 'bulb' && i.on) && la.items.some((i) => i.kind === 'bulb' && !i.on)).toBe(true);
+      expect(f.calls.some((c) => ['stroke', 'arc', 'createRadialGradient'].includes(c[0]))).toBe(false);
+    });
+  });
+
+  test('Halloween: neblina, abóboras acesas e a lanterna da árvore como luz 3D', async () => {
+    await withLights((la) => {
+      // Árvore e abóboras pelas fotos 3D (como no jogo); as luzes vão para o coletor.
+      // Ligado aqui dentro (síncrono): no navegador, um quadro do jogo de fundo pode
+      // rodar durante um await e desligar os ganchos
+      const was = { ...halloweenArt };
+      Object.assign(halloweenArt, { on: true, tree: () => true, jack: () => true });
+      const f = recordingCtx();
+      try {
+        drawHalloweenDecor(f.ctx, 2);
+      } finally {
+        Object.assign(halloweenArt, was);
+      }
+      const kinds = new Set(la.items.map((i) => i.kind));
+      for (const k of ['fog', 'glow', 'bulb', 'cord']) expect(kinds.has(k), k).toBe(true);
+      expect(la.items.filter((i) => i.kind === 'fog').length).toBe(7);
+      expect(f.calls.some((c) => c[0] === 'createRadialGradient' || c[0] === 'strokeRect')).toBe(false);
+    });
+  });
+
+  test('portas acesas: brilho de dentro e a luz das frestas da porta fechada (cabana, base lunar e iglu)', async () => {
+    const { drawCabinDoor } = await import('../../src/forest.js');
+    const { drawBaseDoor } = await import('../../src/space.js');
+    const { doorArt } = await import('../../src/art.js');
+    const was = doorArt.draw;
+    try {
+      await withLights((la) => {
+        doorArt.draw = () => true; // aqui dentro (síncrono), pelo mesmo motivo do teste acima
+        for (const [level, fn, beams] of [[10, drawCabinDoor, 3], [15, drawBaseDoor, 1]]) {
+          la.items = [];
+          const g = makeGame({ level });
+          for (let i = 0; i < 16; i++) g.igloo.add();
+          g.igloo.update(5);
+          g.igloo.lit = true;
+          g.igloo.curtain = 1;
+          const f = recordingCtx();
+          fn(f.ctx, g.igloo, 0);
+          expect(la.items.filter((i) => i.kind === 'glow').length, `fase ${level}`).toBeGreaterThan(0);
+          expect(la.items.filter((i) => i.kind === 'beam').length, `fase ${level}`).toBe(beams);
+          expect(f.calls.some((c) => c[0] === 'strokeRect' || (c[0] === 'stroke' && level === 15)), `fase ${level}`).toBe(false);
+        }
+        la.items = [];
+        const g = makeGame({ level: 1 });
+        for (let i = 0; i < 16; i++) g.igloo.add();
+        g.igloo.update(5);
+        g.igloo.lit = true;
+        g.igloo.curtain = 1;
+        g.igloo.drawPorch(recordingCtx().ctx, 0);
+        expect(la.items.filter((i) => i.kind === 'beam').length).toBe(12);
+        expect(la.items.some((i) => i.kind === 'glow')).toBe(true);
+      });
+    } finally {
+      doorArt.draw = was;
+    }
+  });
+
+  test('anéis dos bichos na água, brilho e fio da aranha, e o facho e a cauda dos bichos do espaço', async () => {
+    const { drawCritter3D } = await import('../../src/model3d.js');
+    const { drawUfoBeam, drawCometTail, drawStarGlow } = await import('../../src/space.js');
+    const before = { ...model };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => ({ fake3d: true }) });
+      await withLights((la) => {
+        const f = recordingCtx();
+        for (const kind of ['jellyfish', 'eyeball', 'ammonite', 'fish', 'ghost', 'spider', 'egg']) {
+          drawCritter3D(f.ctx, { kind, x: 500, dir: 1, ph: 4.5, row: 1 }, 400, 0, kind);
+        }
+        const kinds = la.items.map((i) => i.kind);
+        expect(kinds.filter((k) => k === 'ring').length).toBeGreaterThan(3);
+        expect(kinds.includes('glow') && kinds.includes('cord')).toBe(true);
+        expect(f.calls.some((c) => c[0] === 'stroke' || c[0] === 'createRadialGradient')).toBe(false);
+        la.items = [];
+        const s = recordingCtx();
+        const c = { x: 600, dir: 1, ph: 0 };
+        drawUfoBeam(s.ctx, c, 400, 0);
+        drawCometTail(s.ctx, c, 400, 0);
+        drawStarGlow(s.ctx, c, 400, 0);
+        expect(la.items.map((i) => i.kind)).toEqual(['cone', 'beam', 'beam', 'glow']);
+        expect(la.items[1].taper).toBe(1);
+        expect(s.calls.some((c2) => c2[0] === 'fill' || c2[0] === 'fillRect')).toBe(false);
+      });
+    } finally {
+      Object.assign(model, before);
+    }
+  });
+
+  test('o "!" do susto, as gotas de suor e a camada de gelo do personagem viram efeitos 3D', async () => {
+    const { drawPlayerMarks } = await import('../../src/sprites.js');
+    await withLights((la) => {
+      const f = recordingCtx();
+      drawPlayerMarks(f.ctx, { alpha: 1 }, 0.3, true, 0.8);
+      const kinds = la.items.map((i) => i.kind);
+      expect(kinds.filter((k) => k === 'cord').length).toBe(2);
+      expect(kinds.filter((k) => k === 'drop').length).toBe(4);
+      expect(kinds.filter((k) => k === 'ice').length).toBe(1);
+      expect(f.calls.some((c) => ['roundRect', 'arc', 'createLinearGradient'].includes(c[0]))).toBe(false);
+    });
+  });
+
+  test('o renderizador junta as luzes do quadro e desenha numa passada 3D (só no modo só 3D)', async () => {
+    const { P3, lightItems } = await import('../../src/m3d/particles3d.js');
+    const { lightArt } = await import('../../src/art.js');
+    const before = { ...model };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => ({ fake3d: true }) });
+      const g = makeGame({ level: 5 });
+      for (let i = 0; i < 16; i++) g.igloo.add();
+      g.igloo.update(5);
+      g.igloo.lit = true;
+      g.igloo.curtain = 1;
+      g.renderer.use3d = true;
+      g.renderer.only3d = true;
+      g.renderer.sky3d = () => null;
+      g.renderer.water3d = () => null;
+      const passes = [];
+      g.renderer.particles3d = () => ({
+        draw: (ctx, t, light, fill) => { const a = []; fill((k, ...r) => a.push(k)); passes.push(a); return true; },
+        flame: () => true,
+      });
+      g.renderer.ctx = recordingCtx().ctx;
+      g.renderer.draw(g);
+      expect(lightArt.items.length).toBeGreaterThan(20);
+      expect(g.renderer.lights3dDrawn).toBe(true);
+      const lights = passes.find((p) => p.includes(P3.cord));
+      expect(!!lights && lights.includes(P3.glow) && lights.includes(P3.beam)).toBe(true);
+    } finally {
+      Object.assign(model, before);
+      resetArt();
+    }
+    expect(lightArt.on).toBe(false);
+    // Pedaços de filete emendados: cada pedaço passa meia largura e some em rampa
+    const items = [];
+    lightItems((...a) => items.push(a), [{ kind: 'beam', x0: 0, y0: 0, x1: 20, y1: 0, w: 4, color: [255, 255, 255], a: 1 }]);
+    expect(items[0][3]).toBe(12);
+    expect(items[0][8]).toBeCloseTo(4 / 12);
+  });
+
+  if (!isNode) {
+    test('no navegador: brilho, filete e fio aparecem na camada 3D', async () => {
+      const { loadModel, particles3D } = await import('../../src/model3d.js');
+      const { lightItems } = await import('../../src/m3d/particles3d.js');
+      loadModel();
+      const t0 = Date.now();
+      while (!particles3D() && model.state !== 'failed' && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
+      const p = particles3D();
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      const g = c.getContext('2d');
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, W, H);
+      p.draw(g, 1, null, (push) => lightItems(push, [
+        { kind: 'glow', x: 300, y: 300, r: 40, color: [255, 200, 120], a: 1 },
+        { kind: 'beam', x0: 500, y0: 300, x1: 600, y1: 300, w: 4, color: [255, 200, 120], a: 1 },
+        { kind: 'cord', x0: 700, y0: 300, x1: 800, y1: 300, w: 3, color: [255, 255, 255], a: 1 },
+      ]));
+      const px = (x, y) => g.getImageData(x, y, 1, 1).data;
+      expect(px(300, 300)[0]).toBeGreaterThan(120);
+      expect(px(550, 300)[0]).toBeGreaterThan(120);
+      expect(px(750, 300)[0]).toBeGreaterThan(60);
+      expect(px(550, 320)[0]).toBeLessThan(30);
+    });
+  }
+});

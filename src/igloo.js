@@ -1,5 +1,5 @@
 import { IGLOO, RULES, SHORE_Y } from './config.js';
-import { doorArt } from './art.js';
+import { doorArt, addLight, lightArt } from './art.js';
 import { CABIN_PIECES, CABIN_VENT, RIVER } from './forest.js';
 import { BASE_PIECES, BASE_VENT, DUST } from './space.js';
 import { HUT_PIECES, HUT_VENT, SEA } from './beach.js';
@@ -271,7 +271,19 @@ export class Igloo {
     if (this.lit) this.drawGlow(ctx, t, in3d);
 
     this.drawCurtain(ctx, t);
-    if (this.lit && this.curtain >= 1) {
+    if (this.lit && this.curtain >= 1 && lightArt.on) {
+      // Modo só 3D: a luz que escapa pela borda da cortina vira filetes de luz 3D
+      const k = 0.65 + Math.sin(t * 5) * 0.12;
+      const pt = (i) => {
+        const a = Math.PI + (Math.PI * i) / 12;
+        return [DOOR.x + Math.cos(a) * (DOOR.rx - 1.5), DOOR.bottom + Math.sin(a) * (DOOR.h - 1.5)];
+      };
+      for (let i = 0; i < 12; i++) {
+        const [x0, y0] = pt(i);
+        const [x1, y1] = pt(i + 1);
+        addLight(ctx, 'beam', { x0, y0, x1, y1, w: 3, color: [255, 200, 120], a: k });
+      }
+    } else if (this.lit && this.curtain >= 1) {
       // Filete de luz quente escapando pelas bordas da cortina
       const k = 0.65 + Math.sin(t * 5) * 0.12;
       ctx.save();
@@ -386,6 +398,7 @@ export class Igloo {
   drawGlow(ctx, t, in3d = false) {
     const k = 0.5 + Math.sin(t * 5) * 0.08;
     const cy = DOOR.bottom - DOOR.h * 0.4;
+    if (addLight(ctx, 'glow', { x: DOOR.x, y: cy, r: 70, color: [255, 196, 110], a: k * 1.2 })) return;
     const lg = ctx.createRadialGradient(DOOR.x, cy, 4, DOOR.x, cy, 70);
     lg.addColorStop(0, `rgba(255, 196, 110, ${k})`);
     lg.addColorStop(1, 'rgba(255, 196, 110, 0)');
