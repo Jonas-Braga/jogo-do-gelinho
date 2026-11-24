@@ -4,6 +4,7 @@
 // águas-vivas, peixinhos tropicais no lugar dos peixes e um caranguejo gigante no
 // lugar do urso. Só o visual muda (e o ritmo, como em toda fase especial).
 import { W, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
+import { fireArt } from './particles.js';
 
 const SS = 2;
 const TAU = Math.PI * 2;
@@ -956,6 +957,7 @@ function drawTorch(ctx, side, t) {
 // Chama da tocha com o brilho tremulando (também usada pela cabana 3D)
 export function drawTorchFlame(ctx, side, t) {
   const x = side * TORCH_X;
+  if (fireArt.draw?.(ctx, x, -69, 24, 12, side > 0 ? 1 : 0, t)) return;
   const f = Math.sin(t * 13 + side) * 2;
   const glow = ctx.createRadialGradient(x, -78, 2, x, -78, 22);
   glow.addColorStop(0, 'rgba(255, 190, 80, 0.5)');

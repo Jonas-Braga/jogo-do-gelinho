@@ -2601,3 +2601,203 @@ suite('Cena em 3D · etapa 2: céu 3D ao vivo', () => {
     });
   }
 });
+
+suite('Cena em 3D · etapa 3: partículas 3D ao vivo', () => {
+  const collect = (fn) => {
+    const items = [];
+    fn((kind, x, y, hw, hh, rot, c, ph, blur, ex) => items.push({ kind, x, y, hw, hh, rot, c, ph, blur, ex }));
+    return items;
+  };
+  // Jogo no modo só 3D com uma camada de partículas falsa que registra as passadas
+  const frame3d = (level, setup = () => {}, layer = true) => {
+    const before = { ...model };
+    try {
+      model.state = 'ready';
+      model.sprites = {};
+      const g = makeGame({ level });
+      g.renderer.use3d = true;
+      g.renderer.only3d = true;
+      g.renderer.sky3d = () => null;
+      g.renderer.water3d = () => null;
+      const passes = [];
+      g.renderer.particles3d = () => (layer ? {
+        draw: (ctx, t, light, fill) => { passes.push({ light, items: collect(fill) }); return true; },
+        flame: (...a) => { passes.push({ flame: a }); return true; },
+      } : null);
+      setup(g);
+      const f = recordingCtx();
+      g.renderer.ctx = f.ctx;
+      g.renderer.draw(g);
+      return { g, passes, calls: f.calls };
+    } finally {
+      Object.assign(model, before);
+      resetArt();
+    }
+  };
+
+  test('cada cenário tem o seu clima em 3D: neve, folhas, poeira estelar, brasas (a praia, nada)', async () => {
+    const { weatherItems, P3 } = await import('../../src/m3d/particles3d.js');
+    const kinds = (level) => {
+      const g = makeGame({ level });
+      return new Set(collect((push) => weatherItems(push, g.particles, null, 1)).map((i) => i.kind));
+    };
+    expect([...kinds(1)]).toEqual([P3.snow]);
+    expect([...kinds(10)]).toEqual([P3.leaf]);
+    expect([...kinds(25)]).toEqual([P3.leaf]);
+    expect([...kinds(15)]).toEqual([P3.dust]);
+    expect([...kinds(30)]).toEqual([P3.ember]);
+    expect(kinds(20).size).toBe(0);
+    // Folhas viram de lado (o verso aparece) e as brasas sobem (y invertido como no 2D)
+    const g = makeGame({ level: 10 });
+    const leaves = collect((push) => weatherItems(push, g.particles, null, 1));
+    expect(leaves.some((l) => l.ex < 0) && leaves.some((l) => l.ex > 0)).toBe(true);
+    const d = makeGame({ level: 30 });
+    const em = collect((push) => weatherItems(push, d.particles, null, 0));
+    expect(em[0].y).toBe(H - d.particles.snow[0].y);
+  });
+
+  test('no modo só 3D o clima e os flocos desfocados vão para a camada 3D (nada de neve 2D)', async () => {
+    const { P3 } = await import('../../src/m3d/particles3d.js');
+    const { g, passes, calls } = frame3d(1);
+    const items = passes.flatMap((p) => p.items || []);
+    expect(items.filter((i) => i.kind === P3.snow && i.blur < 1).length).toBe(g.particles.snow.length);
+    // Os flocos perto da câmera (bokeh) entram desfocados, nunca como degradê 2D
+    expect(items.filter((i) => i.kind === P3.snow && i.blur === 1).length).toBe(g.renderer.bokeh.items.length);
+    expect(calls.filter((c) => c[0] === 'arc' && c[3] < 3.1).length).toBe(0);
+    expect(g.renderer.particles3dDrawn).toBe(true);
+    // A luz vem do lado do sol (à esquerda) e de cima
+    const light = passes.find((p) => p.light)?.light;
+    expect(light.dir[0]).toBeLessThan(0);
+    expect(light.dir[1]).toBeGreaterThan(0);
+  });
+
+  test('fumaça da chaminé, vapor da respiração e a poeira do encaixe viram fumaça 3D na perspectiva da linha', async () => {
+    const { P3, SMOKE_COLORS, rgba01 } = await import('../../src/m3d/particles3d.js');
+    const { passes, calls } = frame3d(15, (g) => {
+      g.particles.snow = [];
+      g.particles.fx = [];
+      g.particles.smoke(700, 300);
+      g.particles.fx[0].t = 0.5;
+      g.particles.breath(640, 600, 1);
+      g.particles.fx.forEach((f) => { if (f.kind === 'vapor') f.t = 0.2; });
+      g.particles.puff(640, SHORE_Y, 3, '#FF0000');
+    });
+    const smoke = passes.flatMap((p) => p.items || []).filter((i) => i.kind === P3.smoke);
+    expect(smoke.length).toBe(1 + 3 + 3);
+    // Base lunar: vapor branco na chaminé
+    const base = rgba01(SMOKE_COLORS.base);
+    expect(smoke.some((s) => s.c[0] === base[0] && s.c[2] === base[2])).toBe(true);
+    // Poeira na costa fica na escala do fundo
+    const red = smoke.filter((s) => s.c[0] === 1 && s.c[1] === 0);
+    expect(red.length).toBe(3);
+    // Nenhum círculo 2D de fumaça na chaminé
+    expect(calls.some((c) => c[0] === 'arc' && Math.abs(c[2] - 300) < 30 && c[3] >= 5)).toBe(false);
+  });
+
+  test('vulcões (fumaça acesa pela lava, gotas) e vagalumes em 3D; tochas da cabana e da caverna são chamas 3D', async () => {
+    const { P3 } = await import('../../src/m3d/particles3d.js');
+    const { fireArt } = await import('../../src/particles.js');
+    const dino = frame3d(30, (g) => { g.time = 2; for (let i = 0; i < 16; i++) g.igloo.add(); });
+    const vol = dino.passes.flatMap((p) => p.items || []);
+    expect(vol.filter((i) => i.kind === P3.smoke && i.ex > 0).length).toBeGreaterThan(5);
+    expect(vol.filter((i) => i.kind === P3.glow).length).toBe(2);
+    expect(vol.filter((i) => i.kind === P3.ember && i.c[3] > 0.3).length).toBeGreaterThan(5); // gotas aos 2 s
+    expect(dino.passes.filter((p) => p.flame).length).toBe(0); // fotos não prontas: casa não aparece
+    // Tocha direto: o gancho manda para a chama 3D e pula o desenho 2D
+    const { drawTorchFlame } = await import('../../src/beach.js');
+    const g = makeGame({ level: 20 });
+    g.renderer.use3d = true;
+    g.renderer.only3d = true;
+    g.renderer.sky3d = () => null;
+    g.renderer.water3d = () => null;
+    const flames = [];
+    g.renderer.particles3d = () => ({ draw: () => true, flame: (...a) => { flames.push(a); return true; } });
+    g.renderer.ctx = recordingCtx().ctx;
+    try {
+      g.renderer.draw(g);
+      expect(typeof fireArt.draw).toBe('function');
+      const f = recordingCtx();
+      drawTorchFlame(f.ctx, 1, 0);
+      expect(f.calls.some((c) => c[0] === 'quadraticCurveTo')).toBe(false);
+      expect(flames.length).toBe(1);
+      expect(flames[0][2]).toBe(134); // x da tocha da direita
+    } finally {
+      resetArt();
+    }
+    expect(fireArt.draw).toBe(null); // fora do modo só 3D, a chama 2D de sempre
+    const forest = frame3d(10, (g) => { g.renderer.skyF = 0; g.temp = 0; g.time = 0.3; });
+    expect(forest.passes.flatMap((p) => p.items || []).some((i) => i.kind === P3.glow)).toBe(true);
+  });
+
+  test('sem a camada pronta não há partículas (nunca o 2D)', () => {
+    const { g, calls } = frame3d(1, () => {}, false);
+    expect(g.renderer.particles3dDrawn).toBe(false);
+    expect(calls.filter((c) => c[0] === 'arc' && c[3] < 3.1).length).toBe(0);
+  });
+
+  if (!isNode) {
+    test('no navegador: a camada desenha flocos iluminados e a chama da tocha', async () => {
+      const { loadModel, particles3D } = await import('../../src/model3d.js');
+      loadModel();
+      const t0 = Date.now();
+      while (!particles3D() && model.state !== 'failed' && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
+      const p = particles3D();
+      expect(!!p).toBe(true);
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      const g = c.getContext('2d');
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, W, H);
+      expect(p.draw(g, 1, null, (push) => push(0, 400, 300, 20, 20, 0, [1, 1, 1, 1]))).toBe(true);
+      const px = g.getImageData(400, 300, 1, 1).data;
+      expect(px[0] + px[1] + px[2]).toBeGreaterThan(300);
+      expect(g.getImageData(440, 300, 1, 1).data[0]).toBeLessThan(10);
+      expect(p.flame(g, 1, 800, 400, 60, 24, 0)).toBe(true);
+      const d = g.getImageData(780, 340, 40, 60).data;
+      let hot = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i] > d[i + 2] + 60) hot++;
+      expect(hot).toBeGreaterThan(30);
+    });
+  }
+});
+
+suite('Água 3D sem xadrez: marolas espaçadas', () => {
+  test('as marolas ficam bem espaçadas (cristas a 140 do mundo) e cada cenário pode trocar a distância', async () => {
+    const { WATER3D } = await import('../../src/m3d/water3d.js');
+    expect(WATER3D.spacing).toBeGreaterThanOrEqual(120);
+    for (const [k, c] of Object.entries(WATER3D.kinds)) {
+      if (c.spacing != null) expect(c.spacing, `cenário ${k}`).toBeGreaterThanOrEqual(120);
+    }
+  });
+
+  if (!isNode) {
+    test('no navegador: a água não forma grade (as linhas vizinhas variam suave na horizontal)', async () => {
+      const { loadModel, water3D } = await import('../../src/model3d.js');
+      loadModel();
+      const t0 = Date.now();
+      while (!water3D() && model.state !== 'failed' && Date.now() - t0 < 120000) await new Promise((r) => setTimeout(r, 50));
+      const w = water3D();
+      expect(!!w).toBe(true);
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      const g = c.getContext('2d');
+      g.fillStyle = '#6AA0C0';
+      g.fillRect(0, 0, W, H);
+      const ok = w.draw(g, 3, { kind: 'ice', pal: { water: ['#1C7E99', '#0E5670', '#052A40'] }, horizon: [180, 224, 236], sunColor: [255, 240, 210], sunStrength: 0, sunX: -500, sunY: 80 });
+      expect(ok).toBe(true);
+      // Faixa da frente, longe do sol: o brilho varia mais de cima para baixo (faixas
+      // horizontais) que de um lado para o outro (num xadrez as duas seriam parecidas)
+      const d = g.getImageData(700, 560, 200, 100).data;
+      const lum = (x, y) => { const i = (y * 200 + x) * 4; return d[i] + d[i + 1] + d[i + 2]; };
+      let dx = 0;
+      let dy = 0;
+      for (let y = 0; y < 99; y++) for (let x = 0; x < 199; x++) {
+        dx += Math.abs(lum(x + 1, y) - lum(x, y));
+        dy += Math.abs(lum(x, y + 1) - lum(x, y));
+      }
+      expect(dy).toBeGreaterThan(dx * 1.3);
+    });
+  }
+});

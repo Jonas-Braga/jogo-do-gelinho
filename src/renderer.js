@@ -1,7 +1,7 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
   rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, drawBoat3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
-  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy, water3D, sky3D, drawSkyFlyers3D,
+  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy, water3D, sky3D, particles3D, drawSkyFlyers3D,
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
@@ -38,6 +38,8 @@ import {
 } from './dino.js';
 import { drawHud } from './hud.js';
 import { drawMoneyBag, drawHeart, bonusArt } from './bonus.js';
+import { fireArt } from './particles.js';
+import { weatherItems, smokeItems, volcanoItems, fireflyItems, SMOKE_COLORS } from './m3d/particles3d.js';
 import { drawCocoa } from './heat.js';
 import { drawDuckFloat, drawGoldenBoot, drawPowerBack, drawPowerFront, drawDizzy, powerArt } from './powers.js';
 
@@ -105,6 +107,8 @@ const AURORA = [
 ];
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
+// Efeitos que no modo só 3D são partículas 3D (não o desenho 2D)
+const SMOKE_3D = new Set(['smoke', 'vapor']);
 
 function hexToRgb(h) {
   return h.match(/\w\w/g).map((v) => parseInt(v, 16));
@@ -146,8 +150,16 @@ export class Renderer {
     this.only3d = false;
     this.water3d = water3D; // trocável nos testes
     this.sky3d = sky3D;
+    this.particles3d = particles3D;
     this.photosBusy = photosBusy;
     this.hooked = new Map();
+  }
+
+  // Uma passada das partículas 3D ao vivo no contexto atual (fill(push) diz o que
+  // desenhar); falso sem a camada pronta
+  pass3d(ctx, t, fill) {
+    const layer = this.particles3d();
+    return !!(layer && layer.draw(ctx, t, this.light3d, fill));
   }
 
   // Gancho 3D dos enfeites: no modo só 3D sempre "desenhou" (sem cair no 2D)
@@ -237,6 +249,9 @@ export class Renderer {
     dinoArt.fern = this.hook(drawFern3D);
     dinoArt.nest = this.hook(drawNest3D);
     dinoArt.tusks = this.hook(drawCaveTusks3D);
+    // Modo só 3D: fumaça dos vulcões e chamas das tochas são partículas 3D ao vivo
+    dinoArt.smoke = this.only3d ? (c, tt) => { this.pass3d(c, tt, (push) => volcanoItems(push, tt)); return true; } : null;
+    fireArt.draw = this.only3d ? (c, x, base, h, w, seed, tt) => { this.particles3d()?.flame(c, tt, x, base, h, w, seed); return true; } : null;
     if (DEPTH.sway && tr && typeof tr.a === 'number') followCamera(game.player.x, dt);
 
     ctx.save();
@@ -306,6 +321,17 @@ export class Renderer {
     sceneLight.key = lt.key || sky.sun.map((v) => Math.round(255 - (255 - v) * 0.35));
     sceneLight.shade = lt.shade || [60, 80, 130];
     sceneLight.strength = lt.relief ?? 1;
+    // Luz das partículas 3D: vinda do sol/lua/Terra, com o céu como luz ambiente
+    {
+      const hz = space ? [120, 80, 220] : halloween ? HAUNT.sky : dino ? LAVA.sky : sky.hor;
+      const night = space || halloween;
+      const day = 0.6 + 0.4 * clamp01(this.skyF + (sp ? 0.4 : 0));
+      this.light3d = {
+        dir: [(body.x - W / 2) / W * 1.6, 0.75, 0.6],
+        sun: sceneLight.key.map((v) => (v / 255) * day * (night ? 0.75 : 1)),
+        amb: hz.map((v) => ((v + (255 - v) * 0.35) / 255) * (night ? 0.45 : 0.62)),
+      };
+    }
     const horizon = space ? [120, 80, 220] : halloween ? HAUNT.sky : dino ? LAVA.sky : sky.hor;
     // Perspectiva atmosférica: o cenário distante se perde na cor do horizonte
     drawHaze(ctx, horizon, lt.haze);
@@ -322,7 +348,10 @@ export class Renderer {
     if (sp?.decor === 'praia') drawBeachDecor(ctx, t);
     if (sp?.decor === 'halloween') drawHalloweenDecor(ctx, t);
     if (sp?.decor === 'dino') drawDinoDecor(ctx, t);
-    if (forest) drawFireflies(ctx, t, 1 - this.skyF);
+    if (forest) {
+      if (this.only3d) this.pass3d(ctx, t, (push) => fireflyItems(push, t, 1 - this.skyF));
+      else drawFireflies(ctx, t, 1 - this.skyF);
+    }
     ctx.restore();
     // No espaço o "reflexo do céu" na poeira é o roxo do horizonte
     // No espaço e no Halloween o "reflexo do céu" na água é a cor do horizonte noturno
@@ -343,8 +372,9 @@ export class Renderer {
     }
     game.particles.drawRipples(ctx);
     this.drawEntities(ctx, game, t);
-    game.particles.drawPuffs(ctx);
-    game.particles.drawFx(ctx);
+    // Modo só 3D: fumaça, vapor e a poeira do encaixe vão para as partículas 3D
+    if (!this.only3d) game.particles.drawPuffs(ctx);
+    game.particles.drawFx(ctx, this.only3d ? SMOKE_3D : null);
     game.particles.drawDrops(ctx);
     // Luz do sol (ou da lua) banhando a cena: quente do lado dela, fria do outro
     drawLighting(ctx, 300, lt.warm, lt.strength);
@@ -356,13 +386,23 @@ export class Renderer {
       ctx.fillRect(-20, -20, W + 40, H + 40);
     }
     game.particles.drawTexts(ctx);
-    if (game.particles.leaves) drawLeaves(ctx, game.particles.snow, t);
+    const parts = game.particles;
+    if (this.only3d) {
+      // Partículas 3D ao vivo: clima, flocos desfocados, fumaça e vapor (sem a camada
+      // pronta, nada; nunca o 2D)
+      const bokehOn = DEPTH.bokeh && !parts.calm && !parts.leaves && !parts.stardust;
+      if (bokehOn) this.bokeh.update(dt, parts.embers);
+      const smoke = SMOKE_COLORS[game.igloo.style] || SMOKE_COLORS.igloo;
+      this.particles3dDrawn = this.pass3d(ctx, t, (push) => {
+        smokeItems(push, parts, t, smoke);
+        weatherItems(push, parts, bokehOn ? this.bokeh.items : null, t);
+      });
+    } else if (game.particles.leaves) drawLeaves(ctx, game.particles.snow, t);
     else if (game.particles.stardust) drawStardust(ctx, game.particles.snow, t);
     else if (game.particles.embers) drawEmbers(ctx, game.particles.snow, t);
     else if (!game.particles.calm) game.particles.drawSnow(ctx);
     // Flocos (ou brasas) desfocados bem na frente da câmera
-    const parts = game.particles;
-    if (DEPTH.bokeh && !parts.calm && !parts.leaves && !parts.stardust) {
+    if (!this.only3d && DEPTH.bokeh && !parts.calm && !parts.leaves && !parts.stardust) {
       this.bokeh.update(dt, parts.embers);
       this.bokeh.draw(ctx, parts.embers ? [255, 150, 60] : [255, 255, 255], parts.embers ? 0.3 : 0.2);
     }

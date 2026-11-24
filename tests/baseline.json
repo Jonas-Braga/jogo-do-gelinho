@@ -596,5 +596,11 @@
   "Cena em 3D · etapa 2: céu 3D ao vivo › todo cenário tem o seu céu 3D (dia, espaço, noite, pré-histórico) e os céus fixos usam as cores do 2D",
   "Cena em 3D · etapa 2: céu 3D ao vivo › no modo só 3D o céu é só a camada 3D, com o sol/lua/Terra na posição do 2D (a água usa a mesma luz)",
   "Cena em 3D · etapa 2: céu 3D ao vivo › a aurora das fases normais vai para o céu 3D (e não em faixas 2D)",
-  "Cena em 3D · etapa 2: céu 3D ao vivo › sem a camada pronta não há céu nenhum (nunca o 2D); bichos do céu viram modelos 3D e entram nas fotos da fase"
+  "Cena em 3D · etapa 2: céu 3D ao vivo › sem a camada pronta não há céu nenhum (nunca o 2D); bichos do céu viram modelos 3D e entram nas fotos da fase",
+  "Cena em 3D · etapa 3: partículas 3D ao vivo › cada cenário tem o seu clima em 3D: neve, folhas, poeira estelar, brasas (a praia, nada)",
+  "Cena em 3D · etapa 3: partículas 3D ao vivo › no modo só 3D o clima e os flocos desfocados vão para a camada 3D (nada de neve 2D)",
+  "Cena em 3D · etapa 3: partículas 3D ao vivo › fumaça da chaminé, vapor da respiração e a poeira do encaixe viram fumaça 3D na perspectiva da linha",
+  "Cena em 3D · etapa 3: partículas 3D ao vivo › vulcões (fumaça acesa pela lava, gotas) e vagalumes em 3D; tochas da cabana e da caverna são chamas 3D",
+  "Cena em 3D · etapa 3: partículas 3D ao vivo › sem a camada pronta não há partículas (nunca o 2D)",
+  "Água 3D sem xadrez: marolas espaçadas › as marolas ficam bem espaçadas (cristas a 140 do mundo) e cada cenário pode trocar a distância"
 ]

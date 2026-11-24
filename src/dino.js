@@ -7,6 +7,7 @@
 // lugar dos peixes, homem das cavernas e um T-rex no lugar do urso. Brasas sobem
 // do rio no lugar da neve. Só o visual muda (e o ritmo, como toda especial).
 import { W, H, IGLOO, SHORE_Y, SHORE_TOP, WATER_TOP, RULES } from './config.js';
+import { fireArt } from './particles.js';
 
 const SS = 2;
 const TAU = Math.PI * 2;
@@ -256,10 +257,11 @@ export const FERN_GREEN = '#4E8A2E';
 export const EGG_SHELL = '#F4EBD0';
 export const EGG_SPOT = '#7BBF4A';
 // Gancho do visual 3D (src/model3d.js): samambaias, ninho e as presas da caverna em 3D
-export const dinoArt = { on: false, fern: null, nest: null, tusks: null };
+// smoke: fumaça e brilho dos vulcões (partículas 3D ao vivo)
+export const dinoArt = { on: false, fern: null, nest: null, tusks: null, smoke: null };
 
 export function drawDinoDecor(ctx, t) {
-  drawVolcanoSmoke(ctx, t);
+  if (!(dinoArt.on && dinoArt.smoke?.(ctx, t))) drawVolcanoSmoke(ctx, t);
   for (const [i, f] of TREE_FERNS.entries()) drawTreeFern(ctx, f.x, f.base, f.s, t + i * 1.7);
   drawNest(ctx, t);
 }
@@ -1413,6 +1415,7 @@ export function drawCaveTorchFlame(ctx, t) {
 }
 
 function torchFlame(ctx, t) {
+  if (fireArt.draw?.(ctx, 2, -57, 28, 16, 2, t)) return;
   const gl = ctx.createRadialGradient(2, -66, 2, 2, -66, 40);
   gl.addColorStop(0, `rgba(255, 190, 80, ${0.45 + Math.sin(t * 9) * 0.07})`);
   gl.addColorStop(1, 'rgba(255, 190, 80, 0)');

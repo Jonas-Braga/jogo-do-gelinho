@@ -1,6 +1,10 @@
 import { W, H, PALETTE, DEPTH } from './config.js';
 import { depthScale, projectX, swayAt } from './depth.js';
 
+// Gancho das chamas 3D (src/m3d/particles3d.js): as tochas chamam fireArt.draw(ctx, x,
+// base, altura, largura, semente, t) e, se ele desenhou, pulam a chama 2D
+export const fireArt = { draw: null };
+
 // Cada partícula é desenhada na perspectiva da linha onde está (como placas e bichos)
 function enterDepth(ctx, y) {
   ctx.save();
@@ -150,10 +154,11 @@ export class Particles {
       !(f.kind === 'bubble' && f.y < f.surface));
   }
 
-  drawFx(ctx) {
+  // skip: tipos que não são desenhados aqui (no modo só 3D, fumaça e vapor são 3D)
+  drawFx(ctx, skip = null) {
     ctx.save();
     for (const f of this.fx) {
-      if (f.t < 0) continue;
+      if (f.t < 0 || skip?.has(f.kind)) continue;
       const k = f.t / f.life;
       enterDepth(ctx, f.y);
       switch (f.kind) {

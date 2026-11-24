@@ -6,6 +6,7 @@
 // internet/WebGL, vale o desenho 2D de sempre.
 import { Sky3D } from './m3d/sky3d.js';
 import { Water3D } from './m3d/water3d.js';
+import { Particles3D } from './m3d/particles3d.js';
 import { prepareSurface } from './water.js';
 import { DEPTH, W, IGLOO, BLOCK_W } from './config.js';
 import { levelParams } from './levels.js';
@@ -1193,6 +1194,18 @@ export function sky3D() {
   return live.sky;
 }
 
+// Partículas 3D ao vivo (src/m3d/particles3d.js): neve, folhas, brasas, fumaça, chamas
+export function particles3D() {
+  if (live.parts || live.partsFailed || model.state !== 'ready') return live.parts;
+  try {
+    live.parts = new Particles3D(model.studio.THREE);
+  } catch (e) {
+    live.partsFailed = true;
+    console.info('[gelinho] partículas 3D indisponíveis', e?.message || e);
+  }
+  return live.parts;
+}
+
 // Bichos voando no céu ao fundo (no lugar das silhuetas 2D): modelos 3D pequenos, com
 // a névoa da distância. Mesmos caminhos do 2D.
 export const SKY_FLYERS = { halloween: 'bat', dino: 'ptero', beach: 'gull' };
@@ -1255,11 +1268,12 @@ export function drawSkyFlyers3D(ctx, scenery, t, body) {
   }
 }
 
-// A água 3D já pode ser desenhada? (sem 3D não há o que esperar)
+// As camadas 3D ao vivo (água, céu e partículas) já podem ser desenhadas? (sem 3D não
+// há o que esperar)
 export function water3DReady() {
   if (!M.enabled || typeof window === 'undefined' || !window.WebGLRenderingContext) return true;
   if (model.state === 'failed') return true;
-  return (!!water3D() || live.waterFailed) && (!!sky3D() || live.skyFailed);
+  return (!!water3D() || live.waterFailed) && (!!sky3D() || live.skyFailed) && (!!particles3D() || live.partsFailed);
 }
 
 // O aparelho consegue mostrar o 3D? (falso sem WebGL ou se o Three.js não carregou)

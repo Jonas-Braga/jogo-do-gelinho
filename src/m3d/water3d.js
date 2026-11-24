@@ -15,6 +15,7 @@ export const WATER3D = {
   maxWidth: 1700,   // resolução máxima da camada (px de verdade); o navegador amplia o resto
   quality: 0.8,     // fração da resolução do canvas usada pela camada
   reflectRes: 0.5,  // resolução da cópia do cenário usada no reflexo
+  spacing: 140,     // distância entre as cristas das marolas (mundo; o cenário pode trocar)
   // Por cenário: tipo, ondas (força das normais), detalhe fino, deriva (px/s), força do
   // reflexo, brilho do sol e escurecimento da frente
   kinds: {
@@ -42,7 +43,7 @@ varying vec2 vUv;
 uniform float uTime, uTop, uH, uX0, uX1, uVx;
 uniform vec3 uC0, uC1, uC2, uHor, uSunCol;
 uniform vec2 uSun;
-uniform float uSunStr, uReflect, uWaves, uDetail, uDrift, uLava, uSpec, uFront, uHasRefl;
+uniform float uSunStr, uReflect, uWaves, uSwell, uDetail, uDrift, uLava, uSpec, uFront, uHasRefl;
 uniform sampler2D uRefl;
 uniform vec4 uMap;     // logical → pixel do canvas: a, e (x) e d, f (y)
 uniform vec2 uCanvas;  // largura do canvas e altura da faixa copiada (px de verdade)
@@ -58,16 +59,27 @@ float fbm(vec2 p) {
   for (int i = 0; i < 4; i++) { s += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; }
   return s;
 }
-// Altura das ondas (mundo): cristas compridas quase na horizontal + detalhe
+// Ruído das ondas com o domínio girado a cada oitava (o ruído de valor alinhado à grade
+// deixava a água quadriculada)
+float fbmR(vec2 p) {
+  float s = 0.0, a = 0.5;
+  mat2 R = mat2(0.8, -0.6, 0.6, 0.8);
+  for (int i = 0; i < 4; i++) { s += a * noise(p); p = R * p * 2.03 + 17.1; a *= 0.5; }
+  return s;
+}
+// Altura das ondas (mundo), como nas referências de mar calmo: marolas longas e bem
+// espaçadas com as cristas quase paralelas à linha d'água (ondas que se cruzam em
+// ângulo formavam um xadrez) + ondulação irregular em faixas compridas na horizontal,
+// que quebra o reflexo em tiras
 float waveH(vec2 q, float t, float lod) {
   float h = 0.0;
-  h += 1.00 * sin(dot(q, vec2(0.05, 1.0)) * 0.090 - t * 1.30);
-  h += 0.70 * sin(dot(q, vec2(-0.18, 1.0)) * 0.140 - t * 1.70 + 1.3);
-  h += 0.45 * sin(dot(q, vec2(0.25, 1.0)) * 0.210 - t * 2.10 + 2.1);
-  h += 0.30 * sin(dot(q, vec2(-0.32, 1.0)) * 0.330 - t * 2.70 + 4.0) * lod;
-  h += 0.20 * sin(dot(q, vec2(0.40, 1.0)) * 0.520 - t * 3.40 + 0.7) * lod;
+  h += 1.00 * sin(q.y * uSwell + q.x * 0.0015 - t * 0.85);
+  h += 0.50 * sin(q.y * uSwell * 1.61 - q.x * 0.0022 - t * 1.10 + 1.7);
   h *= uWaves;
-  h += (fbm(q * vec2(0.035, 0.11) + vec2(t * 0.15, -t * 0.32)) - 0.5) * 0.9 * uDetail * lod;
+  vec2 w = q * vec2(0.010, 0.070);
+  vec2 warp = vec2(fbmR(w * 0.6 + vec2(t * 0.04, 0.0)), fbmR(w * 0.6 + vec2(5.2, t * 0.06)));
+  h += (fbmR(w + warp * 1.6 + vec2(t * 0.05, -t * 0.20)) - 0.5) * 1.8 * uDetail;
+  h += (fbmR(w * 2.4 + warp + vec2(-t * 0.08, -t * 0.42)) - 0.5) * 0.7 * uDetail * lod;
   return h;
 }
 // Células da lava (distância às duas sementes mais próximas)
@@ -148,7 +160,7 @@ void main() {
     vec3 sky = uHor;
     if (uHasRefl > 0.5) {
       float yr = uTop - (y - uTop) * 1.25;
-      float xr = x + N.x * 90.0 * s;
+      float xr = x + N.x * 45.0 * s;
       yr += N.z * 60.0 * s - 2.0;
       vec2 dev = vec2(uMap.x * xr + uMap.y, uMap.z * yr + uMap.w);
       vec2 tc = vec2(dev.x / uCanvas.x, 1.0 - dev.y / uCanvas.y);
@@ -201,7 +213,7 @@ export class Water3D {
       uX0: { value: -WATER3D.pad }, uX1: { value: W + WATER3D.pad }, uVx: { value: DEPTH.vanishX },
       uC0: { value: v3() }, uC1: { value: v3() }, uC2: { value: v3() }, uHor: { value: v3() }, uSunCol: { value: v3() },
       uSun: { value: new THREE.Vector2(300, 80) }, uSunStr: { value: 1 },
-      uReflect: { value: 0.8 }, uWaves: { value: 1 }, uDetail: { value: 1 }, uDrift: { value: 5 }, uLava: { value: 0 },
+      uReflect: { value: 0.8 }, uWaves: { value: 1 }, uSwell: { value: 0.05 }, uDetail: { value: 1 }, uDrift: { value: 5 }, uLava: { value: 0 },
       uSpec: { value: 1 }, uFront: { value: 0.35 }, uHasRefl: { value: 0 },
       uRefl: { value: this.reflTex }, uMap: { value: new THREE.Vector4(1, 0, 1, 0) }, uCanvas: { value: new THREE.Vector2(1, 1) },
     };
@@ -263,6 +275,7 @@ export class Water3D {
     u.uSunStr.value = o.sunStrength ?? 1;
     u.uReflect.value = cfg.reflect;
     u.uWaves.value = cfg.waves;
+    u.uSwell.value = (Math.PI * 2) / (cfg.spacing || WATER3D.spacing);
     u.uDetail.value = cfg.detail;
     u.uDrift.value = cfg.drift;
     u.uLava.value = cfg.lava;
