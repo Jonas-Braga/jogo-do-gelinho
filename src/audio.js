@@ -75,6 +75,14 @@ export const SOUNDS = {
       s.noise({ dur: 1.1, vol: 0.16, filter: 'lowpass', f0: 600, f1: 150 });
       return;
     }
+    if (o.kind === 'croc') {
+      // Crocodilo: bocarra batendo (dois estalos secos) e um sibilo rouco e grave
+      s.noise({ dur: 0.05, vol: 0.32, filter: 'bandpass', f0: 900, q: 3 });
+      s.noise({ dur: 0.05, vol: 0.3, filter: 'bandpass', f0: 800, q: 3, t: 0.16 });
+      s.tone({ type: 'sawtooth', f0: 95, f1: 60, dur: 0.6, vol: 0.13, t: 0.2, filter: 450 });
+      s.noise({ dur: 0.6, vol: 0.1, filter: 'bandpass', f0: 2600, q: 1.2, t: 0.22 });
+      return;
+    }
     if (o.kind === 'werewolf') {
       // Uivo de lobisomem: "auuuu" subindo, segurando e caindo, com rosnado embaixo
       s.tone({ type: 'sawtooth', f0: 260, f1: 560, dur: 0.35, vol: 0.09, filter: 1400 });
@@ -163,6 +171,20 @@ export const SOUNDS = {
       // Amonite: "blóp" borbulhante
       s.tone({ type: 'sine', f0: 140, f1: 420, dur: 0.12, vol: 0.13 });
       s.tone({ type: 'sine', f0: 200, f1: 520, dur: 0.08, vol: 0.08, t: 0.1 });
+    } else if (o.kind === 'parrot') {
+      // Papagaio: "rrrá!" rouco e esganiçado, duas vezes
+      s.tone({ type: 'sawtooth', f0: 1300, f1: 1700, dur: 0.1, vol: 0.07, filter: 3400 });
+      s.tone({ type: 'square', f0: 1700, f1: 1100, dur: 0.12, vol: 0.05, t: 0.1, filter: 3000 });
+      s.tone({ type: 'sawtooth', f0: 1400, f1: 1800, dur: 0.08, vol: 0.06, t: 0.26, filter: 3400 });
+    } else if (o.kind === 'octopus') {
+      // Polvo: "plóp" de ventosa grudando e soltando
+      s.tone({ type: 'sine', f0: 260, f1: 90, dur: 0.1, vol: 0.13 });
+      s.tone({ type: 'sine', f0: 160, f1: 520, dur: 0.08, vol: 0.1, t: 0.1 });
+      s.noise({ dur: 0.06, vol: 0.06, filter: 'lowpass', f0: 900, t: 0.1 });
+    } else if (o.kind === 'shark') {
+      // Tubarão: água cortada (chiado que passa) e a bocada surda
+      s.noise({ dur: 0.3, vol: 0.14, filter: 'bandpass', f0: 1800, f1: 700, q: 1.5 });
+      s.tone({ type: 'sine', f0: 120, f1: 60, dur: 0.12, vol: 0.18, t: 0.2 });
     } else if (o.kind === 'jellyfish') {
       // Água-viva: choquinho elétrico ondulando
       s.tone({ type: 'square', f0: 220, f1: 660, dur: 0.18, vol: 0.05, filter: 1800 });
@@ -710,6 +732,99 @@ function buildDinoTrack({ beat }) {
   return { beat, length: DINO_BARS.length * 4, events };
 }
 
+// ---- Piratas: tema original de taverna do mar em ré menor.
+// Sanfona na melodia, baixo e acordes de concertina em "um-pá", bumbo de tábua no
+// convés, chocalho de moedas, o sino do navio de tempos em tempos e uma gaivota ao longe.
+
+// Sanfona: duas palhetas levemente desafinadas, com o fole tremendo o volume
+function accordion(s, n, t, dur) {
+  s.tone({ type: 'sawtooth', f0: NOTE(n) * 0.997, dur, vol: 0.022, t, filter: 2200 });
+  s.tone({ type: 'square', f0: NOTE(n) * 1.004, dur, vol: 0.012, t, filter: 1800 });
+  s.tone({ type: 'triangle', f0: NOTE(n - 12), dur: dur * 0.9, vol: 0.01, t });
+}
+
+// Acorde curto de concertina (o "pá")
+function concertina(s, notes, t) {
+  for (const n of notes) s.tone({ type: 'square', f0: NOTE(n), dur: 0.16, vol: 0.011, t, filter: 1500 });
+}
+
+// Baixo dedilhado (o "um")
+function shantyBass(s, n, t) {
+  s.tone({ type: 'triangle', f0: NOTE(n), dur: 0.3, vol: 0.06, t });
+}
+
+// Bumbo de tábua (pé batendo no convés) e chocalho de moedas
+function deckStomp(s, t, vol = 0.08) {
+  s.tone({ type: 'sine', f0: 140, f1: 70, dur: 0.16, vol, t });
+  s.noise({ dur: 0.04, vol: vol * 0.45, filter: 'bandpass', f0: 700, q: 2, t });
+}
+function coins(s, t, vol) {
+  s.noise({ dur: 0.04, vol, filter: 'bandpass', f0: 7000, q: 4, t });
+}
+
+// Sino do navio (duas badaladas) e gaivota ao longe
+function shipBell(s, t) {
+  for (const d of [0, 0.5]) {
+    s.tone({ type: 'sine', f0: 1180, dur: 1.2, vol: 0.02, t: t + d });
+    s.tone({ type: 'sine', f0: 2950, dur: 0.6, vol: 0.006, t: t + d });
+  }
+}
+function farGull(s, t) {
+  s.tone({ type: 'sawtooth', f0: 1500, f1: 1150, dur: 0.14, vol: 0.012, t, filter: 3000 });
+  s.tone({ type: 'sawtooth', f0: 1450, f1: 1050, dur: 0.16, vol: 0.01, t: t + 0.2, filter: 3000 });
+}
+
+const PIRATE_CHORDS = {
+  Dm: { bass: 38, notes: [62, 65, 69] },
+  C: { bass: 36, notes: [60, 64, 67] },
+  F: { bass: 41, notes: [60, 65, 69] },
+  A: { bass: 33, notes: [61, 64, 69] },
+};
+const PIRATE_BARS = ['Dm', 'Dm', 'C', 'Dm', 'Dm', 'A', 'Dm', 'Dm', 'F', 'C', 'Dm', 'A', 'F', 'C', 'A', 'Dm'];
+// Melodia original da sanfona, um compasso por linha (nota 0 = pausa)
+const PIRATE_TUNE = [
+  [69, 1], [74, 1], [74, 0.5], [72, 0.5], [74, 1],
+  [77, 1], [76, 0.5], [74, 0.5], [72, 1], [69, 1],
+  [67, 1], [72, 1], [72, 0.5], [71, 0.5], [72, 1],
+  [74, 3], [0, 1],
+  [69, 1], [74, 1], [77, 1], [74, 1],
+  [73, 1], [76, 1], [81, 1.5], [79, 0.5],
+  [77, 1], [76, 1], [74, 1], [73, 1],
+  [74, 3], [0, 1],
+  [72, 1], [77, 1], [77, 0.5], [76, 0.5], [77, 1],
+  [79, 1], [76, 1], [72, 1.5], [74, 0.5],
+  [77, 1], [74, 1], [69, 1], [74, 1],
+  [76, 3], [0, 1],
+  [81, 1], [79, 0.5], [77, 0.5], [76, 1], [77, 1],
+  [79, 1], [76, 0.5], [74, 0.5], [72, 1], [76, 1],
+  [73, 1], [76, 1], [79, 1], [76, 1],
+  [74, 3], [0, 1],
+];
+
+function buildPirateTrack({ beat }) {
+  const events = [];
+  const add = (b, play) => events.push({ beat: b, play });
+  PIRATE_BARS.forEach((name, bar) => {
+    const c = PIRATE_CHORDS[name];
+    const b0 = bar * 4;
+    // Um-pá: baixo no 1 e no 3 (o do 3 na quinta), acorde no 2 e no 4
+    add(b0, (s, t) => shantyBass(s, c.bass, t));
+    add(b0 + 2, (s, t) => shantyBass(s, c.bass + 7, t));
+    add(b0 + 1, (s, t) => concertina(s, c.notes, t));
+    add(b0 + 3, (s, t) => concertina(s, c.notes, t));
+    add(b0, (s, t) => deckStomp(s, t));
+    add(b0 + 2, (s, t) => deckStomp(s, t, 0.06));
+    for (let i = 0; i < 4; i++) add(b0 + i + 0.5, (s, t) => coins(s, t, 0.012));
+    if (bar % 8 === 0) add(b0, (s, t) => shipBell(s, t));
+    if (bar % 8 === 5) add(b0 + 2.5, (s, t) => farGull(s, t));
+  });
+  for (const m of phrase(PIRATE_TUNE)) {
+    if (m.note) add(m.beat, (s, t) => accordion(s, m.note, t, Math.min(1.1, m.len * beat * 0.9)));
+  }
+  events.sort((a, b) => a.beat - b.beat);
+  return { beat, length: PIRATE_BARS.length * 4, events };
+}
+
 // Trilhas disponíveis (as fases especiais escolhem a sua em specials.js)
 export const MUSIC = {
   // 64 batidas de melodia + 8 só de guizos, antes de recomeçar
@@ -724,6 +839,8 @@ export const MUSIC = {
   halloween: buildHalloweenTrack({ beat: 0.42 }),
   // 16 compassos (64 batidas), cerca de 26 s por volta
   dino: buildDinoTrack({ beat: 0.4 }),
+  // 16 compassos (64 batidas), cerca de 24 s por volta
+  pirata: buildPirateTrack({ beat: 0.37 }),
 };
 const LOOKAHEAD = 0.12;
 

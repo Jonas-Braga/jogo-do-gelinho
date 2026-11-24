@@ -1,7 +1,7 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
   rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, drawBoat3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
-  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, background3D, photosBusy, water3D, sky3D, particles3D, drawSkyFlyers3D, drawDoor3D, liveFx,
+  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, barrelSprite3D, drawFort3D, drawChest3D, drawCannon3D, drawAnchor3D, background3D, photosBusy, water3D, sky3D, particles3D, drawSkyFlyers3D, drawDoor3D, liveFx,
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
@@ -36,6 +36,9 @@ import {
   makeDinoBackground, drawDinoSky, sunPos, SUN, drawDinoDecor, drawLavaBubbles, drawEmbers, rockSprite, drawPtero,
   drawRaptor, drawAmmonite, drawDinoEgg, drawCave, drawCaveDoorFront, LAVA, dinoArt,
 } from './dino.js';
+import {
+  makePirateBackground, drawPirateDecor, barrelSprite, drawParrot, drawOctopus, drawShark, drawBottle, drawFort, drawFortDoorFront, COVE, pirateArt,
+} from './pirate.js';
 import { drawHud } from './hud.js';
 import { drawMoneyBag, drawHeart, bonusArt } from './bonus.js';
 import { fireArt, PRINT_COLORS } from './particles.js';
@@ -51,6 +54,7 @@ const CRITTER_DRAW = {
   gull: drawGull, siri: drawSiri, jellyfish: drawJellyfish,
   ghost: drawGhost, spider: drawSpider, eyeball: drawEyeball,
   ptero: drawPtero, raptor: drawRaptor, ammonite: drawAmmonite,
+  parrot: drawParrot, octopus: drawOctopus, shark: drawShark,
   bag: drawMoneyBag, heart: drawHeart,
   duck: drawDuckFloat, boot: drawGoldenBoot,
   cocoa: drawCocoa,
@@ -58,32 +62,33 @@ const CRITTER_DRAW = {
 
 // Construções das fases especiais (o iglu se desenha sozinho)
 // Casas 3D por estilo (as que ainda não têm ficam no 2D)
-const HOUSE_3D = { cabin: drawCabin3D, base: drawBase3D, hut: drawHut3D, haunted: drawHaunted3D, cave: drawCave3D };
+const HOUSE_3D = { cabin: drawCabin3D, base: drawBase3D, hut: drawHut3D, haunted: drawHaunted3D, cave: drawCave3D, fort: drawFort3D };
 const HOUSE_DRAW = {
   cabin: { body: drawCabin, front: drawCabinDoorFront },
   base: { body: drawBase, front: drawBaseDoorFront },
   hut: { body: drawHut, front: drawHutDoorFront },
   haunted: { body: drawHaunted, front: drawHauntedDoorFront },
   cave: { body: drawCave, front: drawCaveDoorFront },
+  fort: { body: drawFort, front: drawFortDoorFront },
 };
 
 // Cores do "rio" de cada cenário (padrão = água gelada)
-const WATERS = { forest: RIVER, space: DUST, beach: SEA, halloween: HAUNT, dino: LAVA };
+const WATERS = { forest: RIVER, space: DUST, beach: SEA, halloween: HAUNT, dino: LAVA, pirate: COVE };
 const ICE_WATER = { water: ['#1C7E99', '#0E5670', '#052A40'], ripple: [190, 235, 250], bank: 'rgba(3, 30, 48, 0.35)' };
 // Placas de cada cenário: gelo, troncos, asteroides ou pranchas
 // Placas 3D por cenário (os que ainda não têm ficam no 2D)
-const FLOE_3D = { ice: floeSprite3D, forest: logSprite3D, space: rockSprite3D, beach: boardSprite3D, halloween: pumpkinSprite3D, dino: basaltSprite3D };
+const FLOE_3D = { ice: floeSprite3D, forest: logSprite3D, space: rockSprite3D, beach: boardSprite3D, halloween: pumpkinSprite3D, dino: basaltSprite3D, pirate: barrelSprite3D };
 const FLOE_SPRITE = {
-  forest: logSprite, space: asteroidSprite, beach: boardSprite, halloween: pumpkinSprite, dino: rockSprite,
+  forest: logSprite, space: asteroidSprite, beach: boardSprite, halloween: pumpkinSprite, dino: rockSprite, pirate: barrelSprite,
 };
 // Cenários cujas placas já trazem o próprio reflexo na água (sem o espelho genérico)
 const OWN_REFLECTION = new Set(['halloween']);
-const FLOE_HALO = { forest: RIVER.halo, space: DUST.halo, beach: SEA.halo, halloween: HAUNT.halo, dino: LAVA.halo };
+const FLOE_HALO = { forest: RIVER.halo, space: DUST.halo, beach: SEA.halo, halloween: HAUNT.halo, dino: LAVA.halo, pirate: COVE.halo };
 // Peixes de cada cenário (mesmos pontos): estrelinha no espaço, peixinho tropical na praia
-const FISH_DRAW = { space: drawStarBonus, beach: drawTropicalFish, halloween: drawCandy, dino: drawDinoEgg };
+const FISH_DRAW = { space: drawStarBonus, beach: drawTropicalFish, halloween: drawCandy, dino: drawDinoEgg, pirate: drawBottle };
 
 // Bichos que voam ou flutuam: a sombra fica mais fraca e menor (estão longe do chão)
-const FLYING = new Set(['goose', 'bat', 'ufo', 'comet', 'gull', 'ghost', 'ptero', 'jellyfish', 'eyeball']);
+const FLYING = new Set(['goose', 'bat', 'ufo', 'comet', 'gull', 'ghost', 'ptero', 'jellyfish', 'eyeball', 'parrot']);
 // Luz de cada cenário (sol, lua cheia, Terra): cor do banho de luz e do caminho na água
 // key/shade/relief: cor da luz e da sombra no relevo dos personagens e força do relevo
 const LIGHT = {
@@ -91,6 +96,8 @@ const LIGHT = {
   // Noite: luar frio e fraco, sem névoa (a fase já tem a neblina rasteira própria)
   halloween: { warm: [190, 180, 255], path: [255, 240, 200], strength: 0.3, haze: 0, glow: 0, key: [205, 200, 255], shade: [40, 20, 80], relief: 0.85 },
   dino: { warm: [255, 170, 80], path: [255, 190, 110], strength: 1, haze: 1.1, key: [255, 200, 140], shade: [90, 40, 40], relief: 1 },
+  // Enseada ao entardecer: sol dourado e baixo
+  pirate: { warm: [255, 190, 110], path: [255, 210, 140], strength: 1, haze: 0.9, key: [255, 226, 180], shade: [50, 60, 110], relief: 1 },
 };
 
 // Intensidade da aurora boreal (0 = nenhuma). Aparece nas fases avançadas,
@@ -254,6 +261,10 @@ export class Renderer {
     dinoArt.fern = this.hook(drawFern3D);
     dinoArt.nest = this.hook(drawNest3D);
     dinoArt.tusks = this.hook(drawCaveTusks3D);
+    pirateArt.on = this.normal3d;
+    pirateArt.chest = this.hook(drawChest3D);
+    pirateArt.cannon = this.hook(drawCannon3D);
+    pirateArt.anchor = this.hook(drawAnchor3D);
     // Portas e cortinas 3D (interior, folha e batente) nas fases já convertidas
     doorArt.draw = this.normal3d ? this.hook(drawDoor3D) : null;
     // Respingos dos peixes viram partículas 3D (sem os pinguinhos 2D da foto do bicho)
@@ -328,6 +339,7 @@ export class Renderer {
     else if (scenery === 'beach') bg = this.beachBg ||= makeBeachBackground();
     else if (halloween) bg = this.halloweenBg ||= makeHalloweenBackground();
     else if (dino) bg = this.dinoBg ||= makeDinoBackground();
+    else if (scenery === 'pirate') bg = this.pirateBg ||= makePirateBackground();
     // Cenário 3D (foto do mesmo tamanho), quando já existe para este cenário e está pronto
     if (this.normal3d) bg = background3D(scenery || 'ice') || (this.only3d ? null : bg);
     if (bg) swayLayer(ctx, shore, () => ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h));
@@ -363,6 +375,7 @@ export class Renderer {
     if (sp?.decor === 'praia') drawBeachDecor(ctx, t);
     if (sp?.decor === 'halloween') drawHalloweenDecor(ctx, t);
     if (sp?.decor === 'dino') drawDinoDecor(ctx, t);
+    if (sp?.decor === 'piratas') drawPirateDecor(ctx, t);
     if (forest) {
       if (this.only3d) this.pass3d(ctx, t, (push) => fireflyItems(push, t, 1 - this.skyF));
       else drawFireflies(ctx, t, 1 - this.skyF);

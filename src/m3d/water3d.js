@@ -23,6 +23,7 @@ export const WATER3D = {
     forest: { lava: 0, waves: 0.8, detail: 0.9, drift: 10, reflect: 0.8, spec: 0.6, front: 0.4 },
     space: { lava: 0, waves: 0.9, detail: 1.1, drift: 4, reflect: 0.75, spec: 0.8, front: 0.4 },
     beach: { lava: 0, waves: 1.1, detail: 1, drift: 7, reflect: 0.7, spec: 1.1, front: 0.3 },
+    pirate: { lava: 0, waves: 1.05, detail: 1, drift: 6, reflect: 0.75, spec: 1.05, front: 0.35 },
     halloween: { lava: 0, waves: 0.85, detail: 0.9, drift: 4, reflect: 0.8, spec: 0.7, front: 0.45 },
     dino: { lava: 1, waves: 1, detail: 1, drift: 3, reflect: 0, spec: 0.4, front: 0.3 },
   },

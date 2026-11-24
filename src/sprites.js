@@ -7,6 +7,7 @@ import { drawAlien } from './space.js';
 import { drawGiantCrab } from './beach.js';
 import { drawWerewolf } from './halloween.js';
 import { drawTrex } from './dino.js';
+import { drawCroc } from './pirate.js';
 
 const SS = 2;
 
@@ -308,6 +309,17 @@ OUTFITS.caveman = {
   boots: ['#8A5A2E', '#6A4220'], bootTrim: ['#B07A44', '#8A5A2E'],
   hands: ['#C98B62', '#E3AA80'],
 };
+// Pirata (fase dos piratas): camisa listrada de branco e vermelho, faixa vermelha na
+// cintura, calça azul-marinho na altura da canela, botas pretas, chapéu de três
+// pontas com a caveira e o tapa-olho
+OUTFITS.pirate = {
+  body: ['#FFFFFF', '#F2EEE4', '#C8C0B0'], armBack: '#C8C0B0', armFront: ['#F7F4EC', '#C8C0B0'],
+  seam: 'rgba(90, 30, 30, 0.5)', sailor: true, pirateHat: true,
+  pants: ['#2A3A5E', '#1C2844'], boots: ['#1E1A18', '#141210'], bootTrim: ['#3A3028', '#2A221C'],
+  hands: ['#C98B62', '#E3AA80'],
+};
+export const PIRATE_STRIPE = '#C8302A';
+export const PIRATE_HAT = '#1E1A1E';
 export const CAVE_FUR = '#D9892B';
 export const CAVE_HAIR = '#3A2414';
 const CAVE_SPOT = '#5A3410';
@@ -327,7 +339,10 @@ const HAIR = '#6B4524';
 function cuff(ctx, O, x, y, w) {
   if (O.shortSleeve) return; // manga curta: braço de fora, sem punho
   if (O.sweater) knitCuff(ctx, x, y, w);
-  else if (O.stars) {
+  else if (O.sailor) {
+    ctx.fillStyle = PIRATE_STRIPE;
+    ctx.fillRect(x, y, w, 3.5);
+  } else if (O.stars) {
     ctx.fillStyle = WIZ_TRIM;
     ctx.fillRect(x, y, w, 3.5);
   } else if (O.suit) {
@@ -626,6 +641,79 @@ function starsPattern(ctx, back) {
     ctx.arc(6, -45, 2.2, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+// ---- Pirata
+// Listras horizontais vermelhas na camisa (já recortada pelo contorno)
+function sailorPattern(ctx) {
+  ctx.fillStyle = PIRATE_STRIPE;
+  for (let y = -48; y < -14; y += 6.5) ctx.fillRect(-20, y, 40, 3);
+}
+
+// Faixa vermelha amarrada na cintura, com as pontas soltas do lado
+function sashHem(ctx, back) {
+  ctx.fillStyle = '#A82420';
+  ctx.beginPath();
+  ctx.roundRect(-17, -20, 34, 6, 2);
+  ctx.fill();
+  if (!back) {
+    ctx.beginPath();
+    ctx.moveTo(-12, -17);
+    ctx.lineTo(-17, -6);
+    ctx.lineTo(-13, -6);
+    ctx.lineTo(-9, -15);
+    ctx.fill();
+  }
+}
+
+// Chapéu de três pontas com a caveira na frente. No susto, ele pula da cabeça.
+function pirateHat(ctx, back, scared, t) {
+  ctx.save();
+  if (scared) {
+    ctx.translate(0, -7 - Math.abs(Math.sin(t * 9)) * 3);
+    ctx.rotate(-0.15);
+  }
+  const cx = back ? 0 : 1;
+  ctx.fillStyle = PIRATE_HAT;
+  ctx.beginPath();
+  ctx.ellipse(cx, -68, 11, 6, 0, Math.PI, 0);
+  ctx.fill();
+  // Aba levantada dos dois lados e na frente (três pontas)
+  ctx.beginPath();
+  ctx.moveTo(cx - 19, -70);
+  ctx.quadraticCurveTo(cx - 10, -63, cx, -64);
+  ctx.quadraticCurveTo(cx + 10, -63, cx + 19, -70);
+  ctx.quadraticCurveTo(cx + 14, -62, cx, -60);
+  ctx.quadraticCurveTo(cx - 14, -62, cx - 19, -70);
+  ctx.fill();
+  ctx.strokeStyle = '#C9A44A';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - 18, -69.5);
+  ctx.quadraticCurveTo(cx, -62, cx + 18, -69.5);
+  ctx.stroke();
+  if (!back) {
+    ctx.fillStyle = '#F2F0E6';
+    ctx.beginPath();
+    ctx.arc(cx + 1, -69, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(cx - 1.4, -66.6, 4.8, 1);
+  }
+  ctx.restore();
+}
+
+// Tapa-olho preto no olho da frente, com a tira passando pela testa
+function eyePatch(ctx) {
+  ctx.fillStyle = '#141014';
+  ctx.beginPath();
+  ctx.ellipse(9.9, -57.6, 2.9, 3.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#141014';
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.moveTo(-11, -62);
+  ctx.lineTo(12.5, -59);
+  ctx.stroke();
 }
 
 // Barra do manto: faixa laranja
@@ -1060,6 +1148,12 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     floralPattern(ctx, false);
     ctx.restore();
     shortsHem(ctx, O, false);
+  } else if (O.sailor) {
+    ctx.save();
+    ctx.clip();
+    sailorPattern(ctx);
+    ctx.restore();
+    sashHem(ctx, false);
   } else if (O.stars) {
     ctx.save();
     ctx.clip();
@@ -1108,7 +1202,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     surfHairBack(ctx, O, false);
   } else if (O.caveHair) {
     caveHairBack(ctx, false);
-  } else if (O.beanie || O.witchHat) {
+  } else if (O.beanie || O.witchHat || O.pirateHat) {
     // Cabelo na nuca e orelha (o gorro ou o chapéu vêm por cima, depois do rosto)
     ctx.fillStyle = HAIR;
     ctx.beginPath();
@@ -1203,6 +1297,10 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
   }
 
   if (O.beanie) beanieHat(ctx, false);
+  if (O.pirateHat) {
+    eyePatch(ctx);
+    pirateHat(ctx, false, panicking, t);
+  }
   if (O.witchHat) wizardHat(ctx, false, panicking, t);
   if (O.caveHair) caveHairTop(ctx, false, panicking, t);
   if (O.hair) {
@@ -1413,6 +1511,12 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     floralPattern(ctx, true);
     ctx.restore();
     shortsHem(ctx, O, true);
+  } else if (O.sailor) {
+    ctx.save();
+    ctx.clip();
+    sailorPattern(ctx);
+    ctx.restore();
+    sashHem(ctx, true);
   } else if (O.stars) {
     ctx.save();
     ctx.clip();
@@ -1464,6 +1568,23 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     // Cabeleira desgrenhada por trás, com o ossinho
     caveHairBack(ctx, true);
     caveHairTop(ctx, true, false, t);
+    return;
+  }
+  if (O.pirateHat) {
+    // Nuca com cabelo, orelhas, a tira do tapa-olho e o chapéu de três pontas
+    ctx.fillStyle = HAIR;
+    ctx.beginPath();
+    ctx.arc(0, -57, 12.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#D99A70';
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(s * 12, -56, 2.6, 3.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#141014';
+    ctx.fillRect(-12, -61, 24, 1.2);
+    pirateHat(ctx, true, false, t);
     return;
   }
   if (O.witchHat) {
@@ -2078,6 +2199,10 @@ export function drawBear(ctx, b, t, outfit = null) {
   }
   if (outfit === 'trex') {
     drawTrex(ctx, b, t);
+    return;
+  }
+  if (outfit === 'croc') {
+    drawCroc(ctx, b, t);
     return;
   }
   const F = BEAR_FUR.polar;

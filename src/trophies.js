@@ -166,6 +166,38 @@ TROPHY_EMBLEMS.halloween = (ctx) => {
   ctx.fill();
 };
 
+// Caveira com os ossos cruzados numa bandeira pirata, sobre o mar ao entardecer
+TROPHY_EMBLEMS.piratas = (ctx) => {
+  ctx.fillStyle = '#F2A050';
+  ctx.fillRect(-16, -16, 32, 18);
+  ctx.fillStyle = '#1E6E8A';
+  ctx.fillRect(-16, 2, 32, 14);
+  ctx.fillStyle = '#1A1A1E';
+  ctx.beginPath();
+  ctx.moveTo(-11, -12);
+  ctx.lineTo(12, -12);
+  ctx.lineTo(12, 8);
+  ctx.lineTo(-11, 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#F2F0E6';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-6, 0);
+  ctx.lineTo(7, 6);
+  ctx.moveTo(7, 0);
+  ctx.lineTo(-6, 6);
+  ctx.stroke();
+  ctx.fillStyle = '#F2F0E6';
+  ctx.beginPath();
+  ctx.arc(0.5, -5, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1A1A1E';
+  ctx.fillRect(-2.4, -6, 2, 2);
+  ctx.fillRect(1.6, -6, 2, 2);
+};
+
 // Pegada de dinossauro de três dedos diante de um vulcão soltando lava
 TROPHY_EMBLEMS.dinossauros = (ctx) => {
   ctx.fillStyle = '#E8724A';

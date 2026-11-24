@@ -36,7 +36,7 @@ export const DUST_COLORS = ['#FFFFFF', '#CFC2FF', '#9FF3FF', '#FFE6A0'];
 export const EMBER_COLORS = ['#FFD25A', '#FF9A3A'];
 // Fumaça da chaminé de cada casa (vapor branco na base lunar)
 export const SMOKE_COLORS = {
-  igloo: '#9AAAB5', cabin: '#8E8A86', base: '#E8EEF5', hut: '#A49C92', haunted: '#7A6E86', cave: '#6A5E5A',
+  igloo: '#9AAAB5', cabin: '#8E8A86', base: '#E8EEF5', hut: '#A49C92', haunted: '#7A6E86', cave: '#6A5E5A', fort: '#8A8278',
 };
 // Vulcões (os mesmos do 2D, em src/dino.js; repetidos aqui para o módulo não depender
 // do desenho 2D)
@@ -230,8 +230,9 @@ export const CRITTER_WAVES = {
   crab: { dy: 8, r: 20 }, clam: { dy: 11, r: 17 }, fish: { dy: 9, r: 14, hop: 4 }, tfish: { dy: 9, r: 14, hop: 3 },
   piranha: { dy: 9, r: 15, hop: 3.2 }, jellyfish: { dy: 9, r: 18 }, eyeball: { dy: 8, r: 16 }, ammonite: { dy: 8, r: 16 },
   candy: { dy: 9, r: 13, hop: 3 }, egg: { dy: 9, r: 13, hop: 3 },
+  octopus: { dy: 8, r: 20 }, shark: { dy: 9, r: 22 }, bottle: { dy: 9, r: 13, hop: 3 },
 };
-const FISH_KIND = { beach: 'tfish', halloween: 'candy', dino: 'egg', space: null };
+const FISH_KIND = { beach: 'tfish', halloween: 'candy', dino: 'egg', pirate: 'bottle', space: null };
 export function critterWaveItems(push, critters, rows, t, scenery = 'ice', liquid = null) {
   const fc = rgba01(liquid?.ripple || [220, 245, 255]);
   for (const c of critters || []) {

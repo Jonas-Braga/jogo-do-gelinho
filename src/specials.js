@@ -15,10 +15,11 @@
 //            estrelinhas douradas no lugar dos peixes; 'beach' = praia, mar
 //            turquesa, pranchas de surfe e peixinhos tropicais; 'halloween' =
 //            noite de lua cheia, cemitério, rio escuro, abóboras e balas;
-//            'dino' = vulcões, rio de lava, pedras de basalto e ovos de dinossauro
+//            'dino' = vulcões, rio de lava, pedras de basalto e ovos de dinossauro;
+//            'pirate' = enseada ao entardecer, barris e garrafas com mensagem
 //   house    o que se constrói na costa: 'igloo' (padrão), 'cabin' (cabana de madeira)
 //            'base' (base lunar), 'hut' (cabana de palha), 'haunted' (casa assombrada)
-//            ou 'cave' (caverna de pedra)
+//            'cave' (caverna de pedra) ou 'fort' (forte pirata)
 //   enemies  inimigos sorteados a cada grupo (no lugar do ciclo ganso/caranguejo/molusco)
 //   aurora   false desliga a aurora boreal nesta fase
 //   breath   false desliga o vapor da respiração no frio
@@ -126,6 +127,23 @@ export const SPECIALS = {
     aurora: false,
     breath: false, // calor do vulcão: sem vapor da respiração
     weather: 'embers', // brasas subindo da lava
+    pace: 0.8,
+  },
+  35: {
+    id: 'piratas',
+    trophy: { name: 'Troféu dos Piratas', ribbon: '#1E3A6E' },
+    title: 'FASE 35 · ESPECIAL DOS PIRATAS',
+    intro: 'Pule nos barris da enseada e monte o forte pirata!',
+    music: 'pirata',
+    outfits: { player: 'pirate', bear: 'croc' },
+    sleigh: false,
+    decor: 'piratas',
+    scenery: 'pirate',
+    house: 'fort',
+    enemies: ['parrot', 'octopus', 'shark'],
+    aurora: false,
+    breath: false, // calor dos trópicos: sem vapor da respiração
+    weather: 'none', // nada caindo do céu
     pace: 0.8,
   },
 };

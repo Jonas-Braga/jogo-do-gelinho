@@ -49,6 +49,7 @@ export const OUTLINES = {
   base: () => [[-DW, 0], [DW, 0], ...arc(DW - 14, DH - 14, 14, 14, 0, Math.PI / 2, 6), ...arc(-DW + 14, DH - 14, 14, 14, Math.PI / 2, Math.PI, 6), [-DW, 0]],
   haunted: () => [[-DW, 0], [DW, 0], [DW, DH - 8], ...quad([DW, DH - 8], [DW, DH + 8], [0, DH + 14], 8).slice(1), ...quad([0, DH + 14], [-DW, DH + 8], [-DW, DH - 8], 8).slice(1)],
   cave: () => [[-DW, 0], [DW, 0], ...arc(0, DH - DW, DW, DW, 0, Math.PI, 16), [-DW, 0]],
+  fort: () => [[-DW, 0], [DW, 0], ...arc(0, DH - DW, DW, DW, 0, Math.PI, 16), [-DW, 0]],
 };
 
 // Recorta um polígono pelo semiplano a·x + b·y ≥ c (Sutherland–Hodgman)
@@ -493,6 +494,60 @@ export const hauntedDoor = {
   },
 };
 
+// ---------------------------------------------------------------- Forte pirata
+// Porta de tábuas grossas em arco com faixas e cravos de ferro e a argola; batente de
+// pedras aparelhadas em volta do arco (aduelas) e a soleira
+export const fortDoor = {
+  box: BOX, res: 2, elevation: ELEVATION,
+  poses: () => basePoses(),
+  build(kit) {
+    const { THREE, group, mesh, mat } = kit;
+    const root = group();
+    const inside = interior(kit, OUTLINES.fort(), { dark: '#2E2016', lit: '#C88A50', glow: '#FF9A40' });
+    const wood = new THREE.MeshStandardMaterial({ map: planksTex(THREE, '#6E4424', 'rgba(30,14,4,0.4)', DW * 0.5, 17), roughness: 0.85 });
+    const iron = mat('#2A2624', 0.45, { metalness: 0.6 });
+    const leafPoly = OUTLINES.fort().map(([x, y]) => [x * 0.98, y - 0.5]);
+    const leaf = hingedLeaf(kit, leafPoly, wood, (pv) => {
+      // Faixas de ferro com cravos e a argola de bronze
+      for (const y of [12, DH - 26]) {
+        pv.add(mesh(new THREE.BoxGeometry(DW * 2 - 3, 3.6, 1.4), iron, DW, y, 2.2));
+        for (let i = 0; i < 5; i++) pv.add(mesh(new THREE.SphereGeometry(0.9, 8, 6), iron, 4 + i * ((DW * 2 - 8) / 4), y, 3));
+      }
+      const ring = mesh(new THREE.TorusGeometry(3.4, 0.8, 8, 16), mat('#C9A44A', 0.35, { metalness: 0.7 }), DW * 2 - 9, DH * 0.42, 2.8);
+      pv.add(ring);
+      pv.add(mesh(new THREE.SphereGeometry(1.6, 10, 8), iron, DW * 2 - 9, DH * 0.42 + 3.6, 2.4));
+    });
+    // Batente: aduelas de pedra em volta do arco, ombreiras e a soleira
+    const frame = group();
+    const stone = mat('#A89C88', 0.95);
+    const stoneDark = mat('#8A7E6C', 0.95);
+    const cy = DH - DW;
+    const N = 9;
+    for (let i = 0; i < N; i++) {
+      const a0 = (i / N) * Math.PI;
+      const a1 = ((i + 1) / N) * Math.PI;
+      const am = (a0 + a1) / 2;
+      const r = DW + 4.5;
+      const b = mesh(new THREE.BoxGeometry(8, ((a1 - a0) * r) - 0.8, 9), i % 2 ? stone : stoneDark, Math.cos(am) * r, cy + Math.sin(am) * r, 0);
+      b.rotation.z = am;
+      frame.add(b);
+    }
+    for (const s of [-1, 1]) {
+      for (let k = 0; k < 3; k++) {
+        const h = cy / 3;
+        frame.add(mesh(new THREE.BoxGeometry(8, h - 0.8, 9), (k + (s > 0 ? 1 : 0)) % 2 ? stone : stoneDark, s * (DW + 4.5), h * (k + 0.5), 0));
+      }
+    }
+    frame.add(mesh(new THREE.BoxGeometry(DW * 2 + 20, 4, 12), mat('#7A6E60', 0.95), 0, -0.5, 3));
+    root.add(inside.group, leaf, frame);
+    return { root, inside, leaf, frame };
+  },
+  apply(rig, p) {
+    show(rig, p);
+    if (p.k != null) rig.leaf.rotation.y = (1 - p.k) * 1.7;
+  },
+};
+
 // ---------------------------------------------------------------- Caverna
 // Só o interior (a boca escura em relevo); a pedra é o modelo abaixo
 export const caveDoor = {
@@ -552,9 +607,9 @@ export function stonePose(angle) {
 
 // Modelo da porta de cada estilo de casa
 export const DOOR_MODELS = {
-  igloo: 'door-igloo', cabin: 'door-cabin', base: 'door-base', hut: 'door-hut', haunted: 'door-haunted', cave: 'door-cave',
+  igloo: 'door-igloo', cabin: 'door-cabin', base: 'door-base', hut: 'door-hut', haunted: 'door-haunted', cave: 'door-cave', fort: 'door-fort',
 };
 export const DOOR_SUBJECTS = {
   'door-igloo': iglooDoor, 'door-cabin': cabinDoor, 'door-base': baseDoor, 'door-hut': hutDoor,
-  'door-haunted': hauntedDoor, 'door-cave': caveDoor, 'door-stone': doorStone,
+  'door-haunted': hauntedDoor, 'door-cave': caveDoor, 'door-stone': doorStone, 'door-fort': fortDoor,
 };

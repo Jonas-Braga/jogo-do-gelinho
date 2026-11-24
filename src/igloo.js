@@ -5,6 +5,7 @@ import { BASE_PIECES, BASE_VENT, DUST } from './space.js';
 import { HUT_PIECES, HUT_VENT, SEA } from './beach.js';
 import { HAUNTED_PIECES, HAUNTED_VENT, HAUNT } from './halloween.js';
 import { CAVE_PIECES, CAVE_VENT, LAVA } from './dino.js';
+import { FORT_PIECES, FORT_VENT, COVE } from './pirate.js';
 
 // Construções das fases especiais: peças (para a poeira do encaixe), de onde sai
 // a fumaça e a cor da poeira. O iglu usa o próprio layout de blocos.
@@ -14,6 +15,7 @@ const HOUSES = {
   hut: { pieces: HUT_PIECES, vent: HUT_VENT, dust: SEA.sand },
   haunted: { pieces: HAUNTED_PIECES, vent: HAUNTED_VENT, dust: HAUNT.mist },
   cave: { pieces: CAVE_PIECES, vent: CAVE_VENT, dust: LAVA.ash },
+  fort: { pieces: FORT_PIECES, vent: FORT_VENT, dust: COVE.sand },
 };
 
 const LAYERS = [5, 4, 3, 2, 1]; // 15 blocos em 5 camadas; a peça 16 é a porta (pórtico)

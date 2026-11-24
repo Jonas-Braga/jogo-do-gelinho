@@ -7,7 +7,7 @@ import { HEAT, HEAT_KINDS } from './heat.js';
 // que substituem (morcego, disco voador e gaivota = ganso; cobra, bichinho lunar e
 // siri = caranguejo; piranha, cometa e água-viva = molusco; fantasma = ganso,
 // aranha = caranguejo, olho = molusco; pterossauro = ganso, raptor = caranguejo,
-// amonite = molusco).
+// amonite = molusco; papagaio = ganso, polvo = caranguejo, tubarão = molusco).
 export const SIZE = {
   goose: 44, crab: 40, clam: 34, fish: 30,
   bat: 44, snake: 40, piranha: 34,
@@ -15,6 +15,7 @@ export const SIZE = {
   gull: 44, siri: 40, jellyfish: 34,
   ghost: 44, spider: 40, eyeball: 34,
   ptero: 44, raptor: 40, ammonite: 34,
+  parrot: 44, octopus: 40, shark: 34,
   bag: BONUS.size, heart: BONUS.size,
   duck: POWERS.size, boot: POWERS.size,
   cocoa: HEAT.size,

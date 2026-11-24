@@ -511,6 +511,7 @@ const FG_KINDS = {
   beach: { base: [214, 184, 128], tip: [40, 110, 60], shape: 'fronds' },
   halloween: { base: [26, 16, 38], tip: [52, 34, 66], shape: 'blades' },
   dino: { base: [34, 44, 20], tip: [70, 96, 34], shape: 'fronds' },
+  pirate: { base: [206, 176, 120], tip: [46, 112, 64], shape: 'fronds' },
   space: { base: [70, 66, 84], tip: [120, 116, 136], shape: 'rocks' },
 };
 

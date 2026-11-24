@@ -7,6 +7,7 @@ import { W, SHORE_TOP, WATER_TOP, IGLOO } from '../config.js';
 import { TAU, sweepGeometry } from './kit.js';
 import { GRAVES } from '../halloween.js';
 import { VOLCANOES, NEST, TREE_FERNS } from '../dino.js';
+import { HORIZON as PIRATE_HORIZON, SKULL_ISLE, GALLEON, CHEST, CANNON, ANCHOR } from '../pirate.js';
 
 export const BG_H = WATER_TOP + 12;
 const IGLOO_X = IGLOO.x; // a casa de cada fase fica aqui (nada de pedras ou buracos embaixo dela) // mesma altura do fundo 2D
@@ -1336,6 +1337,211 @@ export const dinoScenery = {
       lip.push({ p: [x, 0.4 + k * 0.7, zEdge + 1], w: 2.2 + k, h: 1.4 + k * 0.5 });
     }
     root.add(kit.sweep(lip, mat('#5A4632', 0.9), { radial: 10, cap: 0.5, steps: lip.length * 6 }));
+    return { root };
+  },
+  apply() {},
+};
+
+// ---------------------------------------------------------------- Piratas
+// Fase 35 (Piratas): enseada ao entardecer. O mar até o horizonte (azul fundo ao longe,
+// verde-água perto), a ilha da caveira (rochedo com as órbitas, o nariz e a boca cavados
+// e um bosque de coqueiros do lado), o galeão ancorado com os três mastros, as velas
+// recolhidas e a bandeira preta, a onda quebrando antes da areia, a praia com marcas do
+// vento, pedrinhas, conchas, um bote encalhado e troncos trazidos pelo mar (longe do
+// baú, do canhão, da âncora e do forte) e a beira de pedras molhadas com algas.
+export const PIRATE_CLEAR = [[CHEST.x, 50], [CANNON.x, 56], [ANCHOR.x, 34], [IGLOO_X, 190]];
+export const pirateClear = (x) => PIRATE_CLEAR.every(([cx, r]) => Math.abs(x - cx) > r);
+export const ROWBOAT = { x: 650 };
+
+export const pirateScenery = {
+  box: { left: 0, right: W, top: 0, bottom: -BG_H },
+  res: 2,
+  elevation: SCENE_EL,
+  distance: 1300,
+  poses: () => [{ key: 'main' }],
+  stage: (studio) => studio.stageScenery({
+    target: [640, 0, 480], size: 950, fog: { color: '#E8CDB4', near: 1100, far: 2500 },
+    sky: 0.85, skyColor: '#C8DCF0', ground: '#D8B888', keyIntensity: 3.3, keyColor: '#FFDDB0',
+    // Sol baixo do entardecer, da esquerda e um pouco de trás
+    sun: [-0.8, 0.45, -0.3], exposure: 0.98,
+  }),
+  build(kit) {
+    const { THREE, group, mat } = kit;
+    const root = group();
+    const vcol = (extra = {}) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, ...extra });
+    let seed = 1;
+    const rnd = () => hash(seed++, 23, 353);
+    // Mar
+    const zHor = zAt(PIRATE_HORIZON);
+    const zSand = zAt(BEACH_SAND_BACK);
+    const cFar = new THREE.Color('#25668E');
+    const cNear = new THREE.Color('#3AAFB8');
+    root.add(kit.mesh(heightField(THREE, {
+      x0: -40, x1: W + 40, z0: zHor, z1: zSand + 20, dx: 6, dz: 3,
+      h: (x, z) => Math.sin(x * 0.05 + z * 0.4) * 0.35 + Math.sin(x * 0.11 - z * 0.25) * 0.25 + (fbm(x * 0.03, z * 0.08, 361, 3) - 0.5) * 0.8,
+      colorAt: (c, x, y, z) => c.copy(cFar).lerp(cNear, Math.min(1, Math.max(0, (z - zHor) / (zSand - zHor)) ** 1.4)),
+    }), vcol({ roughness: 0.18, metalness: 0.1 })));
+    // Ilha da caveira: rochedo com relevo e a cara cavada virada para a praia
+    {
+      const { x, w, h } = SKULL_ISLE;
+      const z = zHor + 10;
+      const H = (h * 1.3) / C;
+      const geo = new THREE.SphereGeometry(1, 48, 24, 0, TAU, 0, Math.PI / 2);
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const vx = pos.getX(i), vy = pos.getY(i), vz = pos.getZ(i);
+        const n = 1 + (fbm(vx * 3 + 5, vz * 3 + vy * 2, 367, 3) - 0.5) * 0.25;
+        pos.setXYZ(i, vx * (w / 2) * n, vy * H * n, vz * 18 * n);
+      }
+      geo.computeVertexNormals();
+      const rock = mat('#857E70', 0.95, { flatShading: true });
+      root.add(kit.mesh(geo, rock, x, 0, z));
+      const dark = mat('#1E1A18', 1);
+      for (const s of [-1, 1]) {
+        const eye = kit.mesh(new THREE.SphereGeometry(1, 16, 12), dark, x + s * 14, H * 0.58, z + 13);
+        eye.scale.set(9, 7, 5);
+        root.add(eye);
+      }
+      const nose = kit.mesh(new THREE.ConeGeometry(4, 8, 3), dark, x, H * 0.36, z + 16);
+      nose.rotation.z = Math.PI;
+      root.add(nose);
+      root.add(kit.mesh(new THREE.BoxGeometry(24, 4, 4), dark, x, H * 0.16, z + 16));
+      for (let k = -2; k <= 2; k++) root.add(kit.mesh(new THREE.BoxGeometry(3, 5, 3), mat('#B8B0A0', 0.9), x + k * 5, H * 0.17, z + 17.5));
+      // Bosque de coqueiros do lado da ilha, na faixa de areia
+      const sand = kit.mesh(new THREE.CylinderGeometry(1, 1.06, 1, 28), mat('#F2DFB0', 0.9), x + w * 0.42, 0.3, z);
+      sand.scale.set(40, 1.2, 14);
+      root.add(sand);
+      const palmsT = [];
+      const palmsL = [];
+      for (let k = 0; k < 4; k++) {
+        const px = x + w * 0.3 + k * 16 + rnd() * 6;
+        const ph = 12 + rnd() * 6;
+        palmsT.push({ x: px, y: 0, z, s: 1, sy: ph, rz: (rnd() - 0.5) * 0.5 });
+        palmsL.push({ x: px, y: ph * 0.95, z, s: 4.5 + rnd() * 1.5, sy: 0.35, ry: rnd() * TAU });
+      }
+      const trunkG = new THREE.CylinderGeometry(0.4, 0.6, 1, 6);
+      trunkG.translate(0, 0.5, 0);
+      root.add(instanced(THREE, trunkG, mat('#7A5A3A', 0.9), palmsT));
+      const crown = new THREE.ConeGeometry(1, 1, 7, 1, true);
+      crown.rotateX(Math.PI);
+      root.add(instanced(THREE, crown, new THREE.MeshStandardMaterial({ color: '#2F6E44', roughness: 0.8, side: THREE.DoubleSide }), palmsL));
+    }
+    // Galeão ancorado: casco de madeira escura com a faixa dourada e as portinholas,
+    // castelo de popa, três mastros com as vergas e as velas recolhidas, bandeira preta
+    {
+      const ship = group(GALLEON.x, 0, zHor + 6);
+      ship.rotation.y = 0.25;
+      root.add(ship);
+      const S = 1 / C;
+      const hullM = mat('#4A2E1C', 0.8);
+      const trim = mat('#C9A040', 0.6);
+      const prof = new THREE.Shape();
+      prof.moveTo(-48, 14 * S);
+      prof.lineTo(40, 14 * S);
+      prof.lineTo(54, 22 * S);
+      prof.lineTo(36, -2);
+      prof.lineTo(-36, -2);
+      prof.lineTo(-52, 22 * S);
+      prof.closePath();
+      const hull = new THREE.ExtrudeGeometry(prof, { depth: 16, bevelEnabled: true, bevelThickness: 2, bevelSize: 1.5, bevelSegments: 2 });
+      hull.translate(0, 0, -8);
+      ship.add(kit.mesh(hull, hullM));
+      ship.add(kit.mesh(new THREE.BoxGeometry(86, 1.6, 17), trim, -2, 9 * S, 0));
+      for (let k = 0; k < 6; k++) ship.add(kit.mesh(new THREE.BoxGeometry(3, 2.4, 1), mat('#1A120C', 0.9), -30 + k * 11, 5 * S, 9.4));
+      ship.add(kit.mesh(new THREE.BoxGeometry(22, 10 * S, 17), hullM, -38, 19 * S, 0));
+      const mastM = mat('#3A2414', 0.8);
+      const sail = mat('#EDE2C8', 0.9);
+      for (const [mx, mh] of [[-24, 46], [4, 58], [30, 40]]) {
+        const H = mh * S;
+        ship.add(kit.mesh(new THREE.CylinderGeometry(0.9, 1.3, H, 8), mastM, mx, 14 * S + H / 2, 0));
+        for (const k of [0.45, 0.75]) {
+          const len = 22 * (1.1 - k * 0.4);
+          const yard = kit.mesh(new THREE.CylinderGeometry(0.6, 0.6, len, 6), mastM, mx, 14 * S + H * k, 0);
+          yard.rotation.z = Math.PI / 2;
+          ship.add(yard);
+          const furl = kit.mesh(new THREE.CapsuleGeometry(1.6, len * 0.8, 4, 8), sail, mx, 14 * S + H * k - 1.6, 0.4);
+          furl.rotation.z = Math.PI / 2;
+          ship.add(furl);
+        }
+        // Vela de baixo meio aberta (pano estufado)
+        const geo = new THREE.PlaneGeometry(18, H * 0.3, 6, 3);
+        const p = geo.attributes.position;
+        for (let i = 0; i < p.count; i++) p.setZ(i, Math.cos((p.getX(i) / 18) * Math.PI) * 2.4);
+        geo.computeVertexNormals();
+        ship.add(kit.mesh(geo, new THREE.MeshStandardMaterial({ color: '#EDE2C8', roughness: 0.9, side: THREE.DoubleSide }), mx, 14 * S + H * 0.27, 1.2));
+      }
+      ship.add(kit.mesh(new THREE.PlaneGeometry(12, 7), new THREE.MeshStandardMaterial({ color: '#141014', roughness: 0.9, side: THREE.DoubleSide }), 10, 72 * S - 4, 0));
+    }
+    // Onda quebrando: rolo de espuma na frente da areia
+    const foam = [];
+    for (let x = -60; x <= W + 60; x += 24) {
+      const k = noise2(x * 0.03, 4, 371);
+      foam.push({ p: [x, 0.8 + k * 0.8, zSand - 2 + Math.sin(x * 0.045) * 2], w: 1.6 + k, h: 1.2 + k * 0.6 });
+    }
+    root.add(kit.sweep(foam, mat('#FFFFFF', 0.6, { emissive: '#F4E8D8', emissiveIntensity: 0.3 }), { radial: 10, cap: 0.5, steps: foam.length * 6 }));
+    // Areia
+    const zEdge = zAt(EDGE_TOP);
+    const cS1 = new THREE.Color('#F6DDA8');
+    const cS2 = new THREE.Color('#DDB47A');
+    const sandH = (x, z) => {
+      const k = (z - zSand) / (zEdge - zSand);
+      const dune = (fbm(x * 0.008, z * 0.02, 373, 4) - 0.45) * (8 - k * 5) * Math.min(1, (1 - k) * 6);
+      const ripples = Math.sin(x * 0.09 + z * 0.35 + fbm(x * 0.01, z * 0.02, 379, 2) * 8) * 0.4 * Math.min(1, (1 - k) * 4);
+      return dune + ripples + Math.min(0, (k - 0.04) * 30) * 0.15;
+    };
+    root.add(kit.mesh(heightField(THREE, {
+      x0: -40, x1: W + 40, z0: zSand, z1: zEdge, dx: 4, dz: 3,
+      h: sandH,
+      colorAt: (c, x, y, z) => c.copy(cS1).lerp(cS2, Math.min(1, fbm(x * 0.02, z * 0.05, 383, 3) * 0.9 + Math.max(0, (z - zSand) / (zEdge - zSand) - 0.6))),
+    }), vcol({ bumpMap: grainTexture(THREE, 29), bumpScale: 0.5 })));
+    // Pedrinhas, conchas e troncos trazidos pelo mar (longe dos enfeites e do forte)
+    const pebbles = [];
+    const shells = [];
+    const drift = [];
+    for (let i = 0; i < 60; i++) {
+      const x = rnd() * W;
+      if (!pirateClear(x) || Math.abs(x - ROWBOAT.x) < 46) continue;
+      const z = zSand + 16 + rnd() * (zEdge - zSand - 30);
+      const r = rnd();
+      if (r < 0.5) pebbles.push({ x, y: sandH(x, z) + 0.3, z, s: 1.4 + rnd() * 2.2, sy: 0.6, rx: rnd() * 3, ry: rnd() * 3, color: ['#8A7E70', '#A89A86', '#6E6458'][i % 3] });
+      else if (r < 0.85) shells.push({ x, y: sandH(x, z) + 0.4, z, s: 1.8 + rnd() * 1.2, sy: 0.45, ry: rnd() * TAU, color: ['#F7B7A3', '#FFFFFF', '#F4D08A'][i % 3] });
+      else drift.push({ x, y: sandH(x, z) + 1, z, s: 1, sy: 10 + rnd() * 14, rz: Math.PI / 2, ry: rnd() * TAU });
+    }
+    root.add(instanced(THREE, new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.9, flatShading: true }), pebbles));
+    root.add(instanced(THREE, new THREE.SphereGeometry(1, 10, 6), new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.4 }), shells));
+    if (drift.length) root.add(instanced(THREE, new THREE.CylinderGeometry(1.4, 1.6, 1, 8), mat('#A08A6C', 0.95), drift));
+    // Bote encalhado de lado na areia, com o banco e o remo
+    {
+      const z = zSand + 34;
+      const boat = group(ROWBOAT.x, sandH(ROWBOAT.x, z) + 2.5, z);
+      boat.rotation.set(0, 0.5, 0.18);
+      root.add(boat);
+      const hull = kit.mesh(new THREE.SphereGeometry(1, 24, 10, 0, TAU, Math.PI / 2, Math.PI / 2), mat('#7A5032', 0.85, { side: THREE.DoubleSide }));
+      hull.scale.set(22, 7, 9);
+      hull.position.y = 5;
+      boat.add(hull);
+      const rim = kit.mesh(new THREE.TorusGeometry(1, 0.08, 6, 32), mat('#4A2E1C', 0.8), 0, 5, 0);
+      rim.rotation.x = Math.PI / 2;
+      rim.scale.set(22, 9, 1);
+      boat.add(rim);
+      boat.add(kit.mesh(new THREE.BoxGeometry(2.5, 1, 17), mat('#5A3A22', 0.85), 4, 3.6, 0));
+      boat.add(kit.bone(0.6, [-6, 4.5, 6], [16, 6, 14], mat('#8A6444', 0.8)));
+    }
+    // Beira de pedras molhadas descendo para a água, com algas na linha d'água
+    const cTop = new THREE.Color('#C8B898');
+    const cMid = new THREE.Color('#8A7C66');
+    const cLow = new THREE.Color('#4E6A58');
+    const cAlga = new THREE.Color('#3E6A3A');
+    const bank = bankWall(THREE, {
+      zEdge, step: 5, rows: 9,
+      bulge: (x, v) => (noise2(x * 0.06, v * 3, 389) - 0.5) * 7 + (fbm(x * 0.02, v * 2, 397, 2) - 0.5) * 6 + v * 26,
+      color: (c, x, v) => {
+        if (v < 0.45) c.copy(cTop).lerp(cMid, v / 0.45);
+        else c.copy(cMid).lerp(cLow, (v - 0.45) / 0.55);
+        c.lerp(cAlga, Math.min(1, Math.max(0, v - 0.6) * fbm(x * 0.05, v * 4, 401, 2) * 1.6));
+      },
+    });
+    root.add(kit.mesh(bank.geo, vcol({ roughness: 0.55, flatShading: true })));
     return { root };
   },
   apply() {},
