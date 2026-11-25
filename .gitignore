@@ -3,6 +3,11 @@ frostbite1.jpeg
 # Referências de água (imagens de bancos de imagem, de terceiros): NÃO publicar
 referencia de agua/
 referencia de urso/
+# Modelos de origem dos ursos (pesados; o jogo usa os convertidos em assets/models/)
+urso_marrom_liso.glb
+urso_polar_liso.glb
+# .blend dos ursos lisos (pesados, com a textura original; o script os refaz)
+blender/bear-liso-*.blend
 
 # Sistema / editores
 .DS_Store

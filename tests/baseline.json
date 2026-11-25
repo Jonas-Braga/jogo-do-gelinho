@@ -659,5 +659,10 @@
   "Bordas da tela: placas e bichos surgem e somem fora da vista › worldEdges cobre tudo o que a tela mostra com a câmera em qualquer posição",
   "Bordas da tela: placas e bichos surgem e somem fora da vista › as placas nunca surgem nem somem à vista (andam contínuas até a borda que a câmera pode mostrar)",
   "Bordas da tela: placas e bichos surgem e somem fora da vista › levado pela placa até a borda visível, o jogador fica na borda e só cai quando a placa sai de baixo dele",
-  "Bordas da tela: placas e bichos surgem e somem fora da vista › bichos, prêmios e itens entram além do que a tela pode mostrar e só somem fora dela"
+  "Bordas da tela: placas e bichos surgem e somem fora da vista › bichos, prêmios e itens entram além do que a tela pode mostrar e só somem fora dela",
+  "Urso liso: boca que abre, sobrancelhas que franzem e andar sem sobras nas patas › o urso do jogo é o liso; o antigo continua só para comparar (?modelourso=antigo)",
+  "Urso liso: boca que abre, sobrancelhas que franzem e andar sem sobras nas patas › perseguindo, a mandíbula abre e as sobrancelhas franzem (rosto do urso liso)",
+  "Urso liso: boca que abre, sobrancelhas que franzem e andar sem sobras nas patas › fim do apoio: o calcanhar sobe e a pata gira em volta dos dedos (sem os dedos entrarem no chão)",
+  "Urso liso: boca que abre, sobrancelhas que franzem e andar sem sobras nas patas › o tornozelo fica na altura do modelo (baixo, perto do calcanhar), não na do urso antigo",
+  "Urso liso: boca que abre, sobrancelhas que franzem e andar sem sobras nas patas › o leitor de .glb lê a textura e as UVs do modelo (o urso liso é colorido pela textura)"
 ]

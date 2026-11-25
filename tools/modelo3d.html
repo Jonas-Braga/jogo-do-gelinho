@@ -2,7 +2,9 @@
 <!-- Ferramenta de desenvolvimento: mostra as fotos de um modelo 3D (src/m3d/).
      ?m=player|bear|goose|...|floe82|log36|rock82|barrel82  modelo
      ?k=idleR,run0R,...                   só estas fotos (senão, todas)
-     ?z=1.5                               zoom (a tela cresce para caber todas) -->
+     ?z=1.5                               zoom (a tela cresce para caber todas)
+     ?anim=12                             toca as fotos em sequência (quadros por segundo), grande,
+                                          andando pela tela no passo da passada (?parado=1 fica no lugar) -->
 <canvas id=c width=1600 height=900></canvas>
 <script type="module">
 import { model, want, SUBJECTS } from '../src/model3d.js';
@@ -24,6 +26,7 @@ const pre = name === 'player' ? '' : name + ':';
 const wait = () => {
   if (model.state === 'failed') { document.title = 'FALHOU ' + model.error; return; }
   if (model.state !== 'ready' || !model.sprites[pre + keys[keys.length - 1]]) return setTimeout(wait, 50);
+  if (q.get('anim')) return animate(Number(q.get('anim')));
   const b = S.box, res = 1.6 * z;
   const w = (b.right - b.left) * res, h = (b.top - b.bottom) * res;
   const cols = Math.max(1, Math.floor(1600 / (w + 8)));
@@ -37,5 +40,35 @@ const wait = () => {
   });
   document.title = `fotos prontas: ${name}`;
 };
+// Toca as fotos em sequência, grandes, deslizando pelo chão (como andando no jogo)
+function animate(fps) {
+  const b = S.box, res = 1.6 * z;
+  const w = (b.right - b.left) * res, h = (b.top - b.bottom) * res;
+  ctx.canvas.width = 1600;
+  ctx.canvas.height = h + 60;
+  const ground = h + 20;
+  // Velocidade casada com a passada (o urso anda ~35 unidades do jogo por ciclo de quadros)
+  const speed = q.get('parado') ? 0 : Number(q.get('vel') || (35 * fps) / keys.length) * res;
+  const left = keys.some((k) => k.includes('L')) && !keys.some((k) => k.includes('R'));
+  const t0 = performance.now();
+  document.title = `andando: ${name}`;
+  const loop = (now) => {
+    const t = (now - t0) / 1000;
+    const k = keys[Math.floor(t * fps) % keys.length];
+    const span = 1600 + w;
+    let x = speed ? ((t * speed) % span) - w : (1600 - w) / 2;
+    if (left && speed) x = 1600 - x - w;
+    ctx.clearRect(0, 0, 1600, ctx.canvas.height);
+    ctx.fillStyle = '#e8f1f6';
+    ctx.fillRect(0, ground, 1600, 60);
+    ctx.fillStyle = '#9fb6c4';
+    for (let i = 0; i < 40; i++) ctx.fillRect(i * 40, ground + 4, 2, 6);
+    ctx.drawImage(model.sprites[pre + k], x, ground - b.top * res, w, h);
+    ctx.fillStyle = '#000';
+    ctx.fillText(k, 8, 16);
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
 wait();
 </script></body></html>

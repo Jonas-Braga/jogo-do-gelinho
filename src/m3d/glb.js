@@ -1,7 +1,7 @@
 // Leitor mínimo de .glb (glTF binário) para os modelos feitos no Blender (blender/*.py).
 // Lê só o que os nossos scripts exportam: nós com translação/rotação/escala, malhas
-// (posição, normal, cor de vértice, índices), pele (ossos e pesos) e o nome e a cor
-// de cada material. Sem texturas, animações, Draco ou extensões.
+// (posição, normal, UV, cor de vértice, índices), pele (ossos e pesos), o nome e a cor
+// de cada material e as texturas embutidas (cor e normais). Sem animações, Draco ou extensões.
 //
 // Não usa o GLTFLoader do Three.js de propósito: ele importa "three" por nome, o que
 // exigiria um import map, e o jogo carrega o Three.js por URL (DEPTH.model3d.url).
@@ -44,6 +44,21 @@ export function readAccessor(gltf, i) {
   return { array: out, itemSize: n, normalized: !!a.normalized };
 }
 
+// Decodifica as imagens embutidas (texturas). Sem createImageBitmap (Node), fica sem elas
+export async function decodeImages(gltf) {
+  const imgs = gltf.json.images || [];
+  gltf.bitmaps = [];
+  if (!imgs.length || typeof createImageBitmap !== 'function') return gltf;
+  gltf.bitmaps = await Promise.all(imgs.map((im) => {
+    if (im.bufferView == null) return null;
+    const bv = gltf.json.bufferViews[im.bufferView];
+    const start = bv.byteOffset || 0;
+    const blob = new Blob([gltf.bin.slice(start, start + bv.byteLength)], { type: im.mimeType || 'image/png' });
+    return createImageBitmap(blob).catch(() => null);
+  }));
+  return gltf;
+}
+
 const cache = new Map();
 // Baixa e lê um .glb (uma vez por URL)
 export function fetchGLB(url) {
@@ -51,13 +66,14 @@ export function fetchGLB(url) {
     cache.set(url, fetch(url).then((r) => {
       if (!r.ok) throw new Error(`${url}: ${r.status}`);
       return r.arrayBuffer();
-    }).then(parseGLB));
+    }).then(parseGLB).then(decodeImages));
   }
   return cache.get(url);
 }
 
-// Monta a cena: devolve { root, nodes (por nome), meshes }. `materialFor(nome, gltfMat)`
-// cria o material de cada peça (o modelo decide cor, brilho e cor de vértice).
+// Monta a cena: devolve { root, nodes (por nome), meshes }. `materialFor(nome, gltfMat, tex)`
+// cria o material de cada peça (o modelo decide cor, brilho e cor de vértice); `tex(info)`
+// devolve a textura de um { index } do material (ou null), já pronta para o Three.js.
 export function instantiate(THREE, gltf, materialFor) {
   const { json } = gltf;
   const joints = new Set((json.skins || []).flatMap((s) => s.joints));
@@ -73,10 +89,28 @@ export function instantiate(THREE, gltf, materialFor) {
   json.nodes.forEach((n, i) => {
     for (const c of n.children || []) objs[i].add(objs[c]);
   });
+  const texs = new Map();
+  const tex = (info, srgb = false) => {
+    if (!info || info.index == null) return null;
+    const src = json.textures?.[info.index]?.source;
+    const bmp = gltf.bitmaps?.[src];
+    if (!bmp) return null;
+    const key = `${src},${srgb}`;
+    if (!texs.has(key)) {
+      const t = new THREE.Texture(bmp);
+      t.flipY = false; // UV do glTF: origem no alto
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 4;
+      t.needsUpdate = true;
+      texs.set(key, t);
+    }
+    return texs.get(key);
+  };
   const mats = new Map();
   const matOf = (k) => {
     if (k == null) k = -1;
-    if (!mats.has(k)) mats.set(k, materialFor(json.materials?.[k]?.name || '', json.materials?.[k] || {}));
+    if (!mats.has(k)) mats.set(k, materialFor(json.materials?.[k]?.name || '', json.materials?.[k] || {}, tex));
     return mats.get(k);
   };
   const meshes = [];
@@ -92,6 +126,7 @@ export function instantiate(THREE, gltf, materialFor) {
       };
       attr('POSITION', 'position');
       attr('NORMAL', 'normal');
+      attr('TEXCOORD_0', 'uv');
       attr('COLOR_0', 'color');
       attr('JOINTS_0', 'skinIndex');
       attr('WEIGHTS_0', 'skinWeight');

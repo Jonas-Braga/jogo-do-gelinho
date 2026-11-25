@@ -334,7 +334,7 @@ export function footAt(leg, u) {
   const s = (u - STANCE) / (1 - STANCE);
   const e = s * s * (3 - 2 * s); // acelera e freia
   const lift = Math.sin(Math.PI * s);
-  return { y: ground + lift * (leg.front ? 15 : 9), z: z0 + stride * (-0.5 + e), lift };
+  return { y: ground + lift * (leg.front ? 15 : 9) * (leg.liftK ?? 1), z: z0 + stride * (-0.5 + e), lift };
 }
 
 // Cinemática inversa de dois ossos no plano (z, y). A dianteira dobra para trás
@@ -342,7 +342,8 @@ export function footAt(leg, u) {
 export function legIK(leg, u, hy, hz) {
   const f = footAt(leg, u);
   // O tornozelo fica um pouco acima da pata
-  const ay = f.y + 4;
+  // O tornozelo fica a ankleUp acima da pata (o do modelo; 4 no urso antigo)
+  const ay = f.y + (leg.ankleUp ?? 4) + (leg.raise || 0);
   const az = f.z - (leg.front ? 1.5 : 2.5);
   let dz = az - hz;
   let dy = ay - hy;
@@ -426,13 +427,44 @@ function applyProcedural(rig, p) {
 // na escala do jogo (1 unidade do Blender = 100 do jogo) e as poses giram os ossos:
 // pernas pela mesma cinemática inversa do passo sem patinar, corpo que sobe e balança,
 // cabeça virada três quartos para a câmera, mandíbula que abre e sobrancelhas que franzem.
-const GLB_FILE = { polar: 'bear-polar', santa: 'bear-polar', brown: 'bear-brown' };
-export const glbUrl = (variant = 'polar') => new URL(`../../assets/models/${GLB_FILE[variant] || 'bear-polar'}.glb`, import.meta.url).href;
+//
+// Modelos: 'liso' = os ursos lisos prontos do usuário (urso_marrom_liso.glb e
+// urso_polar_liso.glb, convertidos por blender/build_bear_urso.py: malha reduzida, boca que
+// abre, sobrancelhas que franzem, textura refeita, mesmo esqueleto), o do jogo; 'antigo' = o
+// modelado do zero em blender/build_bear.py (`?modelourso=antigo` na URL, para comparar).
+export const BEAR_MODELS = {
+  liso: { polar: 'bear-liso-polar', santa: 'bear-liso-polar', brown: 'bear-liso-brown' },
+  antigo: { polar: 'bear-polar', santa: 'bear-polar', brown: 'bear-brown' },
+};
+const fromUrl = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('modelourso') : null;
+export const bearModel = { style: BEAR_MODELS[fromUrl] ? fromUrl : 'liso' };
+// Ajuste da passada por modelo: os ursos lisos têm patas mais grossas que as do antigo e
+// deformam feio se a pata sobe e dobra tanto (lift = altura do passo, tilt = quanto a pata
+// inclina no ar; o comprimento do passo não muda)
+// heel = quanto o calcanhar sobe no fim do apoio (a pata empurra com os dedos; traseira,
+// dianteira), toe = distância do tornozelo aos dedos, em volta dos quais a pata gira
+export const BEAR_GAIT = {
+  liso: { lift: 0.7, tilt: 0.55, heel: [0.5, 0.3], toe: [14, 9] },
+  antigo: { lift: 1, tilt: 1 },
+};
+const smoothstep = (t) => { const k = Math.max(0, Math.min(1, t)); return k * k * (3 - 2 * k); };
+// Calcanhar subindo: começa no fim do apoio e volta a zero na primeira metade da passada
+export function heelOff(u) {
+  return u < STANCE ? smoothstep((u - STANCE * 0.55) / (STANCE * 0.45)) : 1 - smoothstep((u - STANCE) / ((1 - STANCE) * 0.6));
+}
+// Rosto por modelo: quanto a mandíbula abre (× o valor da boca da pose, até 0,55) e quanto
+// as sobrancelhas do urso liso giram ao franzir (ossos brow_L/brow_R, presos no canto de fora)
+export const BEAR_FACE = { liso: { jaw: 0.82, brow: 0.32 }, antigo: { jaw: 1.5, brow: 0 } };
+const glbFile = (variant) => {
+  const files = BEAR_MODELS[bearModel.style] || BEAR_MODELS.liso;
+  return files[variant] || files.polar;
+};
+export const glbUrl = (variant = 'polar') => new URL(`../../assets/models/${glbFile(variant)}.glb`, import.meta.url).href;
 const glbData = {};
 
 // Baixa o modelo da variante (o estúdio espera isso antes de fotografar)
 export function prepare(variant = 'polar') {
-  const file = GLB_FILE[variant] || 'bear-polar';
+  const file = glbFile(variant);
   return fetchGLB(glbUrl(variant)).then((g) => {
     glbData[file] = g;
     return g;
@@ -440,7 +472,7 @@ export function prepare(variant = 'polar') {
 }
 
 export function build(kit, variant = 'polar') {
-  const g = glbData[GLB_FILE[variant] || 'bear-polar'];
+  const g = glbData[glbFile(variant)];
   return g ? buildGLB(kit, variant, g) : buildProcedural(kit, variant);
 }
 
@@ -448,9 +480,15 @@ export function apply(rig, p) {
   return rig.glb ? applyGLB(rig, p) : applyProcedural(rig, p);
 }
 
-function glbMaterial(kit, name, m) {
+function glbMaterial(kit, name, m, tex) {
   const { THREE } = kit;
   const f = m.pbrMetallicRoughness || {};
+  // Modelo com textura (o urso do usuário): cor e relevo da pelagem vêm das imagens
+  const map = tex?.(f.baseColorTexture, true);
+  if (map) {
+    const normalMap = tex(m.normalTexture);
+    return new THREE.MeshStandardMaterial({ map, normalMap, roughness: f.roughnessFactor ?? 0.9, metalness: 0 });
+  }
   const c = f.baseColorFactor || [1, 1, 1, 1];
   // A cor do glTF é linear (o espaço de trabalho do Three.js)
   const color = new THREE.Color().setRGB(c[0], c[1], c[2]);
@@ -468,7 +506,7 @@ export const JAW_OPEN = 1.5;
 
 function buildGLB(kit, variant, gltf) {
   const { THREE, group } = kit;
-  const { root: scene, nodes } = instantiate(THREE, gltf, (name, m) => glbMaterial(kit, name, m));
+  const { root: scene, nodes } = instantiate(THREE, gltf, (name, m, tex) => glbMaterial(kit, name, m, tex));
   const root = group();
   root.rotation.order = 'YXZ';
   const model = group();
@@ -500,8 +538,11 @@ function buildGLB(kit, variant, gltf) {
     const h = wp(up);
     const k = wp(low);
     const a = wp(foot);
+    const gait = BEAR_GAIT[bearModel.style] || BEAR_GAIT.antigo;
     rig.legs.push({
-      key, x: h.x, front, phase, near: h.x < 0, up, low, foot, hipRest: h,
+      key, x: h.x, front, phase, near: h.x < 0, up, low, foot, hipRest: h, liftK: gait.lift, tiltK: gait.tilt,
+      ankleUp: a.y - 4.2 + 0.2,
+      heel: gait.heel ? gait.heel[front ? 1 : 0] : 0, toe: gait.toe ? gait.toe[front ? 1 : 0] : 0,
       hip: { y: h.y, z: h.z }, L1: h.distanceTo(k), L2: k.distanceTo(a),
     });
   }
@@ -518,6 +559,9 @@ function buildGLB(kit, variant, gltf) {
     rig.brows.push({ node: o, s, c, axis, m0: o.matrix.clone() });
   }
   rig.mouthParts = ['Fang1', 'Fang-1', 'ToothLow1', 'ToothLow-1'].map((n) => nodes[n]).filter(Boolean);
+  // Sobrancelhas com osso (urso liso): giram em volta do canto de fora, no plano da cara
+  rig.browBones = [['brow_L', -1], ['brow_R', 1]].filter(([n]) => nodes[n]).map(([n, s]) => ({ node: bone(n), s }));
+  rig.face = BEAR_FACE[bearModel.style] || BEAR_FACE.antigo;
 
   // Gorro de Papai Noel (Natal): copa vermelha, barra de pelo, ponta articulada
   // que cai para trás e balança com o passo, e o pompom; preso ao osso da cabeça
@@ -525,7 +569,9 @@ function buildGLB(kit, variant, gltf) {
     const { mat, mesh, sphere } = kit;
     const red = mat('#C8242B', 0.8);
     const white = mat('#FFFFFF', 0.95);
-    const hat = group(0, 101, 45);
+    // Em cima da cabeça: a âncora "hat" do modelo, se houver (urso do usuário)
+    const at = nodes.hat ? wp(nodes.hat) : new THREE.Vector3(0, 101, 45);
+    const hat = group(at.x, at.y, at.z);
     hat.rotation.x = -0.32;
     hat.scale.setScalar(1.45);
     hat.add(mesh(new THREE.ConeGeometry(10.5, 14, 20, 1, true), red, 0, 6, 0));
@@ -574,20 +620,29 @@ function applyGLB(rig, p) {
   const nod = Math.sin(u * TAU * 2 + 0.6) * 0.05;
   const qHead = qRoll.clone().multiply(Q(Y, turn)).multiply(Q(X, nod));
   set(rig.head, qHead.clone().multiply(R(rig.head)));
-  set(rig.jaw, qHead.clone().multiply(Q(X, p.mouth * JAW_OPEN)).multiply(R(rig.jaw)));
+  set(rig.jaw, qHead.clone().multiply(Q(X, p.mouth * (rig.face?.jaw ?? JAW_OPEN))).multiply(R(rig.jaw)));
+  // Perseguindo (boca abrindo): a ponta de dentro das sobrancelhas desce, cara brava
+  const frown = p.mouth > 0 ? Math.min(1, p.mouth / 0.32) : 0;
+  for (const b of rig.browBones || []) set(b.node, qHead.clone().multiply(Q(Z, b.s * frown * rig.face.brow)).multiply(R(b.node)));
   set(rig.tail, qRoll.clone().multiply(Q(X, Math.sin(u * TAU * 2) * 0.15)).multiply(R(rig.tail)));
   // Pernas: quadril preso ao corpo (com o balanço), joelho e tornozelo pela cinemática inversa
   const bodyNow = rig.bodyRest.clone().add(new THREE.Vector3(0, bob, 0));
   for (const leg of rig.legs) {
     const hip = leg.hipRest.clone().sub(rig.bodyRest).applyQuaternion(qRoll).add(bodyNow);
-    const ik = legIK(leg, (u + leg.phase) % 1, hip.y, hip.z);
+    const uu = (u + leg.phase) % 1;
+    // Fim do apoio: o calcanhar sobe e a pata gira em volta dos dedos (o tornozelo sobe junto,
+    // senão os dedos entrariam no chão)
+    const heel = leg.heel * heelOff(uu);
+    leg.raise = leg.toe * Math.sin(heel);
+    const ik = legIK(leg, uu, hip.y, hip.z);
+    leg.raise = 0;
     const h = new THREE.Vector3(...ik.hip);
     const k = new THREE.Vector3(...ik.knee);
     const a = new THREE.Vector3(...ik.ankle);
     set(leg.up, new THREE.Quaternion().setFromUnitVectors(DOWN, k.clone().sub(h).normalize()).multiply(R(leg.up)));
     set(leg.low, new THREE.Quaternion().setFromUnitVectors(DOWN, a.clone().sub(k).normalize()).multiply(R(leg.low)));
     // Na passada a pata se inclina (dedos para baixo) e no chão fica plana
-    set(leg.foot, Q(X, ik.f.lift * (leg.front ? 0.9 : 0.6)).multiply(R(leg.foot)));
+    set(leg.foot, Q(X, Math.max(heel, ik.f.lift * (leg.front ? 0.9 : 0.6) * (leg.tiltK ?? 1))).multiply(R(leg.foot)));
   }
   // Boca aberta (perseguindo): o miolo escuro e as presas aparecem
   for (const o of rig.mouthParts) o.visible = p.mouth > 0;
