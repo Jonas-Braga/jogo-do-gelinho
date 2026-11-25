@@ -59,7 +59,7 @@ export function levelParams(level) {
     // para os pulos não valerem tanto nas fases avançadas e as vidas extras não sobrarem
     floePoints: floePoints(level),
     degreePoints: floePoints(level), // grau de bônus: mesmo ciclo de 10 a 100
-    fishPoints: 200,
+    fishPoints: 100, // pedido do usuário: no máximo 100 (o jogo estava fácil demais)
 
     // Fase especial (a cada 5 fases, quando já há um tema criado), ou null
     special: specialFor(level),

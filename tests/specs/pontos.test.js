@@ -90,7 +90,7 @@ suite('Pontos: chute da chuteira vale metade do peixe', () => {
       g.player.givePower('boot');
       touch(g, 'crab');
       expect(g.score, `fase ${lv}`).toBe(levelParams(lv).fishPoints / 2);
-      expect(g.score, `fase ${lv}`).toBe(100);
+      expect(g.score, `fase ${lv}`).toBe(50);
     }
   });
 });

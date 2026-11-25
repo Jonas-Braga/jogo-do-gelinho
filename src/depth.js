@@ -505,13 +505,15 @@ export class Bokeh {
 // se move (parallax) e fica baixa para não esconder as placas.
 const FG_BLUR = 3.5;  // desfoque (px)
 const FG_H = 96;      // altura da faixa (px da tela)
-const FG_KINDS = {
+export const FG_KINDS = {
   ice: { base: [196, 226, 240], tip: [236, 248, 255], shape: 'mound' },
   forest: { base: [22, 52, 26], tip: [58, 98, 40], shape: 'blades' },
   beach: { base: [214, 184, 128], tip: [40, 110, 60], shape: 'fronds' },
   halloween: { base: [26, 16, 38], tip: [52, 34, 66], shape: 'blades' },
   dino: { base: [34, 44, 20], tip: [70, 96, 34], shape: 'fronds' },
-  pirate: { base: [206, 176, 120], tip: [46, 112, 64], shape: 'fronds' },
+  // Piratas (pedido do usuário): capim em toda a borda de baixo, não só nos cantos
+  // (full = altura mínima no meio), mais denso e menos desfocado
+  pirate: { base: [46, 96, 50], tip: [104, 164, 78], shape: 'fronds', full: 0.32, blur: 1.6, dense: true },
   space: { base: [70, 66, 84], tip: [120, 116, 136], shape: 'rocks' },
 };
 
@@ -535,9 +537,9 @@ function buildForeground(kind) {
   // Altura da faixa: só nas pontas ela sobe (o meio fica quase livre)
   const tall = (x) => {
     const e = Math.min(x, W2 - x) / W2;
-    return e < 0.16 ? 1 - e / 0.16 : 0;
+    return Math.max(spec.full || 0, e < 0.16 ? 1 - e / 0.16 : 0);
   };
-  for (let x = -20; x < W2 + 20; x += 14 + rnd() * 22) {
+  for (let x = -20; x < W2 + 20; x += spec.dense ? 8 + rnd() * 10 : 14 + rnd() * 22) {
     const k = tall(x);
     const top = FG_H - 10 - k * 52 - rnd() * 10;
     const shade = 0.75 + rnd() * 0.35;
@@ -578,17 +580,17 @@ function buildForeground(kind) {
       }
     }
   }
-  return { canvas: blurred(c, w, h), pad };
+  return { canvas: blurred(c, w, h, spec.blur ?? FG_BLUR), pad };
 }
 
 // Desfoque: filtro do canvas quando existe; senão reduz e amplia em dois passos
-function blurred(src, w, h) {
+function blurred(src, w, h, blur = FG_BLUR) {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
   const g = c.getContext('2d');
   if (typeof g.filter === 'string') {
-    g.filter = `blur(${FG_BLUR}px)`;
+    g.filter = `blur(${blur}px)`;
     g.drawImage(src, 0, 0);
     if (g.filter !== 'none') return c;
     g.clearRect(0, 0, w, h);

@@ -452,3 +452,63 @@ suite('Piratas em 3D', () => {
     });
   });
 });
+
+suite('Ajustes: mar 3D ao fundo, reflexo do sol ao se pôr, valores e matinho dos Piratas', () => {
+  test('peixe vale 100, o chute 50 e o saco de dinheiro 1.000 (o jogo estava fácil demais)', async () => {
+    const { BONUS } = await import('../../src/bonus.js');
+    const { POWERS } = await import('../../src/powers.js');
+    for (const lv of [1, 11, 35, 57]) expect(levelParams(lv).fishPoints, `fase ${lv}`).toBe(100);
+    expect(Math.round(levelParams(12).fishPoints * POWERS.kickShare)).toBe(50);
+    expect(BONUS.bagPoints).toBe(1000);
+  });
+
+  test('o reflexo do sol na água some quando o sol se põe atrás do horizonte', async () => {
+    const { bodyAbove } = await import('../../src/renderer.js');
+    expect(bodyAbove({ y: 60, r: 22 }, 150)).toBe(1);
+    expect(bodyAbove({ y: 150, r: 22 }, 150)).toBeCloseTo(0.5);
+    expect(bodyAbove({ y: 175, r: 22 }, 150)).toBe(0);
+    expect(bodyAbove({ y: 175, r: 22 }, null), 'sem medida do horizonte, não muda').toBe(1);
+  });
+
+  test('Praia e Piratas: o mar ao fundo é uma camada 3D ao vivo, por trás da foto do cenário', async () => {
+    const { SEA_BAND } = await import('../../src/model3d.js');
+    for (const k of ['beach', 'pirate']) {
+      const b = SEA_BAND[k];
+      expect(b.top, k).toBe(150);
+      expect(b.bottom).toBeGreaterThan(185);
+      expect(b.s0).toBeLessThan(b.s1);
+    }
+    const was = { ...model };
+    const img = { fake3d: true };
+    try {
+      model.state = 'ready';
+      model.sprites = new Proxy({}, { get: () => img });
+      for (const [lv, want] of [[35, true], [1, false]]) {
+        const g = makeGame({ level: lv });
+        g.renderer.use3d = true;
+        g.renderer.only3d = true;
+        const order = [];
+        g.renderer.sea3d = () => ({ draw: () => (order.push('mar'), true) });
+        // Camadas falsas: as de verdade (antes do Three.js carregar) ficariam marcadas como falhas
+        g.renderer.water3d = () => null;
+        g.renderer.sky3d = () => null;
+        g.renderer.particles3d = () => null;
+        const rec = recordingCtx();
+        const draw = rec.ctx.drawImage;
+        g.renderer.ctx = new Proxy(rec.ctx, { get: (o, k) => (k === 'drawImage' ? (...a) => { if (a[0] === img) order.push('foto'); return draw(...a); } : o[k]) });
+        g.renderer.draw(g);
+        if (want) expect(order.indexOf('mar'), `fase ${lv}`).toBeLessThan(order.indexOf('foto'));
+        else expect(order.includes('mar'), `fase ${lv}`).toBe(false);
+      }
+    } finally {
+      Object.assign(model, was);
+    }
+  });
+
+  test('o matinho do primeiro plano dos Piratas cobre toda a borda de baixo (não só os cantos)', async () => {
+    const { FG_KINDS } = await import('../../src/depth.js');
+    expect(FG_KINDS.pirate.full).toBeGreaterThan(0.2);
+    expect(FG_KINDS.pirate.blur).toBeLessThan(3.5);
+    expect(FG_KINDS.beach.full ?? 0).toBe(0);
+  });
+});

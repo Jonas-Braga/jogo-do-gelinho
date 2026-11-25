@@ -134,13 +134,13 @@ suite('Etapa 3 · inimigos, peixes, urso e progressão', () => {
     expect(g.player.x).toBeCloseTo(x0, 0.01);
   });
 
-  test('pegar um peixe dá 200 pontos e remove o peixe', () => {
+  test('pegar um peixe dá 100 pontos e remove o peixe', () => {
     const g = makeGame();
     g.rows[0].speed = 0;
     placeOnFloe(g, 0);
     g.critters.list.push(critter('fish', 0, g.player.x + 5, -1, 60));
     step(g, STEP * 2);
-    expect(g.score).toBe(200);
+    expect(g.score).toBe(100);
     expect(g.critters.list.length).toBe(0);
   });
 

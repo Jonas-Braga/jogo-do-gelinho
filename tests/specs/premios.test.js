@@ -1,5 +1,5 @@
 // Prêmios das fases especiais: em toda fase especial passam, um de cada vez e em
-// ordem sorteada, 3 sacos de dinheiro (1.500 pontos cada) e 2 corações (+1 vida
+// ordem sorteada, 3 sacos de dinheiro (1.000 pontos cada) e 2 corações (+1 vida
 // cada). Pegam-se como os peixes. O título das fases não muda.
 import { suite, test, expect } from '../harness.js';
 import { makeGame, step } from '../helpers.js';
@@ -64,10 +64,10 @@ function touch(g, kind) {
 }
 
 suite('Fases especiais · prêmios (sacos de dinheiro e corações)', () => {
-  test('regra: 3 sacos de 1.500 pontos e 2 corações por fase especial', () => {
+  test('regra: 3 sacos de 1.000 pontos e 2 corações por fase especial', () => {
     expect(BONUS.bags).toBe(3);
     expect(BONUS.hearts).toBe(2);
-    expect(BONUS.bagPoints).toBe(1500);
+    expect(BONUS.bagPoints).toBe(1000);
   });
 
   test('toda fase especial prepara os 5 prêmios; fases normais, nenhum', () => {
@@ -145,13 +145,13 @@ suite('Fases especiais · prêmios (sacos de dinheiro e corações)', () => {
     }
   });
 
-  test('pegar o saco de dinheiro: +1.500 pontos, "+1500" e som de moedas', () => {
+  test('pegar o saco de dinheiro: +1.000 pontos, "+1000" e som de moedas', () => {
     const g = bonusGame(5);
     const before = g.score;
     touch(g, 'bag');
-    expect(g.score - before).toBe(1500);
+    expect(g.score - before).toBe(1000);
     expect(g.critters.list[0].dead).toBe(true);
-    expect(g.particles.texts.some((x) => x.str === '+1500')).toBe(true);
+    expect(g.particles.texts.some((x) => x.str === '+1000')).toBe(true);
     expect(g.sfx.history).toContain('coins');
   });
 

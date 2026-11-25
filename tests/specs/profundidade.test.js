@@ -1719,7 +1719,7 @@ suite('Cenários de fundo em 3D: Praia', () => {
   });
 
   if (!isNode) {
-    test('no navegador: a foto da Praia sai com céu transparente, mar azul no horizonte, ilha verde e areia clara e quente', async () => {
+    test('no navegador: a foto da Praia sai com céu e mar transparentes (o mar é a camada 3D ao vivo, por trás), ilha verde e areia clara e quente', async () => {
       const { background3D } = await import('../../src/model3d.js');
       const t0 = Date.now();
       let bg = null;
@@ -1730,9 +1730,8 @@ suite('Cenários de fundo em 3D: Praia', () => {
       const px = (x, y) => g.getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data;
       expect(px(640, 10)[3]).toBe(0);
       expect(px(400, 140)[3]).toBe(0); // acima do horizonte: céu
-      const sea = px(400, 165);
-      expect(sea[3]).toBe(255);
-      expect(sea[2]).toBeGreaterThan(sea[0] + 40);
+      // Mar: transparente na foto (a camada do mar 3D ao vivo fica por trás, a pedido do usuário)
+      expect(px(400, 165)[3]).toBe(0);
       const isle = px(700, 145);
       expect(isle[1]).toBeGreaterThan(isle[0]);
       const sand = px(600, SHORE_Y - 12);

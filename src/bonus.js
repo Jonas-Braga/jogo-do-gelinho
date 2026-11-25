@@ -5,7 +5,7 @@
 export const BONUS = {
   bags: 3,          // sacos de dinheiro por fase especial
   hearts: 2,        // corações por fase especial
-  bagPoints: 1500,  // pontos de cada saco
+  bagPoints: 1000,  // pontos de cada saco (era 1.500; reduzido a pedido do usuário)
   first: 3,         // segundos até o primeiro prêmio
   gapMin: 4,        // intervalo entre um prêmio e o próximo (s)
   gapMax: 6,

@@ -1,7 +1,7 @@
 import {
   drawPlayer3D, drawBear3D, drawCritter3D, floeSprite3D, drawIgloo3D, drawIglooFrame3D, drawPower3D, drawSleigh3D, drawTree3D, drawBonus3D, logSprite3D, drawPine3D, drawMushroom3D, drawCabin3D,
   rockSprite3D, drawBase3D, drawLander3D, drawFlag3D, boardSprite3D, drawHut3D, drawPalm3D, drawParasol3D, drawBoat3D, pumpkinSprite3D, drawHaunted3D, drawDeadTree3D, drawJack3D,
-  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, barrelSprite3D, drawFort3D, drawChest3D, drawCannon3D, drawAnchor3D, background3D, photosBusy, water3D, sky3D, particles3D, drawSkyFlyers3D, drawDoor3D, liveFx,
+  basaltSprite3D, drawCave3D, drawFern3D, drawNest3D, drawCaveTusks3D, barrelSprite3D, drawFort3D, drawChest3D, drawCannon3D, drawAnchor3D, background3D, photosBusy, water3D, SEA_BAND, sky3D, particles3D, drawSkyFlyers3D, drawDoor3D, liveFx,
   CRITTERS_3D, THEMES_3D, FISH_3D,
 } from './model3d.js';
 import { W, H, SHORE_Y, SHORE_TOP, WATER_TOP, RULES, IGLOO, DEPTH } from './config.js';
@@ -115,6 +115,42 @@ const AURORA = [
 ];
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const WATER3D_PAD = 64;
+
+// Linha do horizonte do cenário (topo do que está desenhado no fundo) na coluna x:
+// a primeira linha opaca da foto do fundo, medida uma vez por fundo. null sem canvas
+// de verdade (testes). Serve para apagar o reflexo do sol quando ele se põe atrás do
+// mar ou das montanhas.
+const horizons = new WeakMap();
+export function horizonAt(bg, x) {
+  if (!bg?.canvas) return null;
+  const key = bg.canvas;
+  const hit = horizons.get(key);
+  if (hit && hit.x === x) return hit.y;
+  let y = null;
+  try {
+    const c = bg.canvas;
+    const sx = Math.max(0, Math.min(c.width - 1, Math.round((x / bg.w) * c.width)));
+    const data = c.getContext('2d').getImageData(sx, 0, 1, c.height).data;
+    for (let i = 0; i < c.height; i++) {
+      if (data[i * 4 + 3] > 200) {
+        y = (i / c.height) * bg.h;
+        break;
+      }
+    }
+  } catch {
+    y = null;
+  }
+  horizons.set(key, { x, y });
+  return y;
+}
+
+// Quanto do sol (lua, Terra) ainda aparece acima do horizonte: 1 inteiro, 0 já se pôs
+export function bodyAbove(body, horizon) {
+  if (horizon == null) return 1;
+  const r = body.r || 22;
+  return clamp01((horizon - (body.y - r)) / (2 * r));
+}
 
 function hexToRgb(h) {
   return h.match(/\w\w/g).map((v) => parseInt(v, 16));
@@ -155,6 +191,7 @@ export class Renderer {
     // (os testes deixam desligado e continuam com o desenho 2D)
     this.only3d = false;
     this.water3d = water3D; // trocável nos testes
+    this.sea3d = () => this.water3d(); // o mar ao fundo usa a mesma camada da água
     this.sky3d = sky3D;
     this.particles3d = particles3D;
     this.photosBusy = photosBusy;
@@ -341,9 +378,21 @@ export class Renderer {
     else if (dino) bg = this.dinoBg ||= makeDinoBackground();
     else if (scenery === 'pirate') bg = this.pirateBg ||= makePirateBackground();
     // Cenário 3D (foto do mesmo tamanho), quando já existe para este cenário e está pronto
+    const bg2d = bg;
     if (this.normal3d) bg = background3D(scenery || 'ice') || (this.only3d ? null : bg);
-    if (bg) swayLayer(ctx, shore, () => ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h));
     const lt = LIGHT[scenery] || { warm: sky.sun, path: sky.sun, strength: 1, haze: 1 };
+    // Mar ao fundo (Praia e Piratas) ao vivo em 3D: a foto do cenário deixa o mar
+    // transparente e a faixa do mar é desenhada antes dela
+    const band = bg && bg !== bg2d ? SEA_BAND[scenery] : null;
+    // Depois que o sol se põe atrás do mar ou das montanhas, o reflexo dele na água some
+    const sunUp = bodyAbove(body, band ? band.top : horizonAt(bg, body.x));
+    const sunStrength = lt.strength * (0.45 + 0.55 * clamp01(this.skyF + (sp ? 0.4 : 0))) * sunUp;
+    if (bg) {
+      swayLayer(ctx, shore, () => {
+        if (band) this.drawSea(ctx, t, band, sky, lt, sunStrength, body);
+        ctx.drawImage(bg.canvas, 0, 0, bg.w, bg.h);
+      });
+    }
     // Luz do relevo dos personagens: a cor do sol misturada ao branco
     sceneLight.key = lt.key || sky.sun.map((v) => Math.round(255 - (255 - v) * 0.35));
     sceneLight.shade = lt.shade || [60, 80, 130];
@@ -384,7 +433,6 @@ export class Renderer {
     // No espaço o "reflexo do céu" na poeira é o roxo do horizonte
     // No espaço e no Halloween o "reflexo do céu" na água é a cor do horizonte noturno
     const reflect = space ? { hor: [120, 80, 220] } : halloween ? { hor: HAUNT.sky } : dino ? { hor: LAVA.sky } : sky;
-    const sunStrength = lt.strength * (0.45 + 0.55 * clamp01(this.skyF + (sp ? 0.4 : 0)));
     // Sol (ou lua, ou Terra) para a luz da água 3D: mesma posição do céu
     this.sun = { color: lt.path, strength: sunStrength, x: body.x, y: body.y };
     swayLayer(ctx, (shore + 1) / 2, () => {
@@ -525,6 +573,24 @@ export class Renderer {
       }
     }
     ctx.restore();
+  }
+
+  // Mar ao fundo em 3D ao vivo (Praia e Piratas): a faixa entre o horizonte e a areia,
+  // com as ondas bem pequenas da distância, o céu refletido e o brilho do sol. Sem a
+  // camada pronta (ou num contexto falso), um degradê liso no lugar
+  drawSea(ctx, t, band, sky, lt, sunStrength, body) {
+    const layer = this.sea3d();
+    const ok = !!(layer && layer.draw(ctx, t, {
+      kind: band.kind, pal: { water: band.water }, horizon: sky.hor, sunColor: lt.path, sunStrength, sunX: body.x, sunY: body.y,
+      top: band.top, bottom: band.bottom, s0: band.s0, s1: band.s1, noReflect: true, front: 0, reflect: band.reflect,
+    }));
+    this.sea3dDrawn = ok;
+    if (ok || typeof ctx.createLinearGradient !== 'function') return;
+    const g = ctx.createLinearGradient(0, band.top, 0, band.bottom);
+    g.addColorStop(0, band.water[0]);
+    g.addColorStop(1, band.water[2]);
+    ctx.fillStyle = g;
+    ctx.fillRect(-WATER3D_PAD, band.top, W + WATER3D_PAD * 2, band.bottom - band.top);
   }
 
   // Água gelada, o rio esverdeado da floresta ou a poeira estelar do espaço

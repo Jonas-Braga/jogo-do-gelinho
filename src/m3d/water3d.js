@@ -41,7 +41,7 @@ void main() {
 const FRAG = `
 precision highp float;
 varying vec2 vUv;
-uniform float uTime, uTop, uH, uX0, uX1, uVx;
+uniform float uTime, uTop, uH, uX0, uX1, uVx, uS0, uS1;
 uniform vec3 uC0, uC1, uC2, uHor, uSunCol;
 uniform vec2 uSun;
 uniform float uSunStr, uReflect, uWaves, uSwell, uDetail, uDrift, uLava, uSpec, uFront, uHasRefl;
@@ -102,7 +102,7 @@ void main() {
   float y = mix(uH, uTop, vUv.y);
   float k = clamp((y - uTop) / (uH - uTop), 0.0, 1.0);    // 0 = fundo, 1 = frente
   // Perspectiva do plano: escala linear na vertical da tela (achatada ao fundo)
-  float s = mix(0.3, 1.05, k);
+  float s = mix(uS0, uS1, k);
   float Z0 = 300.0;
   vec3 P = vec3((x - uVx) / s, 0.0, Z0 / s);
   vec2 q = vec2(P.x + uTime * uDrift, P.z);
@@ -213,7 +213,7 @@ export class Water3D {
       uTime: { value: 0 }, uTop: { value: WATER_TOP + 10 }, uH: { value: H },
       uX0: { value: -WATER3D.pad }, uX1: { value: W + WATER3D.pad }, uVx: { value: DEPTH.vanishX },
       uC0: { value: v3() }, uC1: { value: v3() }, uC2: { value: v3() }, uHor: { value: v3() }, uSunCol: { value: v3() },
-      uSun: { value: new THREE.Vector2(300, 80) }, uSunStr: { value: 1 },
+      uSun: { value: new THREE.Vector2(300, 80) }, uSunStr: { value: 1 }, uS0: { value: 0.3 }, uS1: { value: 1.05 },
       uReflect: { value: 0.8 }, uWaves: { value: 1 }, uSwell: { value: 0.05 }, uDetail: { value: 1 }, uDrift: { value: 5 }, uLava: { value: 0 },
       uSpec: { value: 1 }, uFront: { value: 0.35 }, uHasRefl: { value: 0 },
       uRefl: { value: this.reflTex }, uMap: { value: new THREE.Vector4(1, 0, 1, 0) }, uCanvas: { value: new THREE.Vector2(1, 1) },
@@ -249,15 +249,19 @@ export class Water3D {
   draw(ctx, t, o) {
     const cfg = WATER3D.kinds[o.kind] || WATER3D.kinds.ice;
     const u = this.uniforms;
-    const top = WATER_TOP + 10;
+    // Faixa da tela (padrão: a água das fileiras; o mar ao fundo passa a sua)
+    const top = o.top ?? WATER_TOP + 10;
+    const bottom = o.bottom ?? H;
     // Só num canvas de verdade (um contexto falso de teste não desenha nada)
     if (!(ctx?.canvas?.width > 0) || typeof ctx.getTransform !== 'function') return false;
     const m = ctx.getTransform();
     if (typeof m?.a !== 'number' || !(m.d > 0)) return false;
     const pad = WATER3D.pad;
-    // Tamanho da camada: a área da água em px de verdade (com teto)
+    // Tamanho da camada: a área da água das fileiras em px de verdade (com teto). Uma
+    // faixa menor (o mar ao fundo) usa só uma parte da mesma tela (viewport), sem trocar
+    // o tamanho nem criar outro contexto WebGL
     const devW = Math.abs(m.a) * (W + pad * 2);
-    const devH = Math.abs(m.d) * (H - top);
+    const devH = Math.abs(m.d) * (H - (WATER_TOP + 10));
     const q = Math.min(WATER3D.quality * (o.quality ?? 1), WATER3D.maxWidth / Math.max(1, devW));
     const w = Math.max(16, Math.round(devW * q));
     const h = Math.max(16, Math.round(devH * q));
@@ -265,8 +269,13 @@ export class Water3D {
       this.renderer.setSize(w, h, false);
       this.size = [w, h];
     }
+    const hb = Math.max(8, Math.min(h, Math.round(Math.abs(m.d) * (bottom - top) * q)));
     const pal = o.pal.water;
     u.uTime.value = t;
+    u.uTop.value = top;
+    u.uH.value = bottom;
+    u.uS0.value = o.s0 ?? 0.3;
+    u.uS1.value = o.s1 ?? 1.05;
     u.uC0.value.copy(srgb(this.THREE, pal[0]));
     u.uC1.value.copy(srgb(this.THREE, pal[1]));
     u.uC2.value.copy(srgb(this.THREE, pal[2]));
@@ -274,22 +283,31 @@ export class Water3D {
     u.uSunCol.value.copy(srgb(this.THREE, o.sunColor));
     u.uSun.value.set(o.sunX, o.sunY);
     u.uSunStr.value = o.sunStrength ?? 1;
-    u.uReflect.value = cfg.reflect;
+    u.uReflect.value = o.reflect ?? cfg.reflect;
     u.uWaves.value = cfg.waves;
     u.uSwell.value = (Math.PI * 2) / (cfg.spacing || WATER3D.spacing);
     u.uDetail.value = cfg.detail;
     u.uDrift.value = cfg.drift;
     u.uLava.value = cfg.lava;
     u.uSpec.value = cfg.spec;
-    u.uFront.value = cfg.front;
-    u.uHasRefl.value = cfg.reflect > 0 ? 1 : 0;
-    if (cfg.reflect > 0) {
+    u.uFront.value = o.front ?? cfg.front;
+    const refl = cfg.reflect > 0 && !o.noReflect;
+    u.uHasRefl.value = refl ? 1 : 0;
+    if (refl) {
       const [cw, rh] = this.captureReflection(ctx, m, top);
       u.uMap.value.set(m.a, m.e, m.d, m.f);
       u.uCanvas.value.set(cw, rh);
     }
+    if (hb < h) {
+      // Só a parte de baixo da tela (o viewport do WebGL começa embaixo)
+      this.renderer.setViewport(0, 0, w, hb);
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.setViewport(0, 0, w, h);
+      ctx.drawImage(this.canvas, 0, h - hb, w, hb, -pad, top, W + pad * 2, bottom - top);
+      return true;
+    }
     this.renderer.render(this.scene, this.camera);
-    ctx.drawImage(this.canvas, -pad, top, W + pad * 2, H - top);
+    ctx.drawImage(this.canvas, -pad, top, W + pad * 2, bottom - top);
     return true;
   }
 }

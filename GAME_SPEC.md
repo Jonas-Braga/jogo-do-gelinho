@@ -84,7 +84,7 @@ o visual deve ser totalmente novo.
 
 &#x20; 11 em diante, além da boia): por 5 s fica imune; o bicho que encosta leva um
 
-&#x20; chute, voa longe e vale metade do peixe (100); o urso é jogado para longe e fica tonto 2 s.
+&#x20; chute, voa longe e vale metade do peixe (50); o urso é jogado para longe e fica tonto 2 s.
 
 \- \*\*Progressão:\*\* a velocidade aumenta a cada fase. Em fases alternadas, as
 

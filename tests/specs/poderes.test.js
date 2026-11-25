@@ -406,8 +406,8 @@ suite('Poderes · boia de patinho e chuteira dourada', () => {
     expect(g.score - before).toBe(g.params.fishPoints * POWERS.kickShare);
     g.critters.update(1 / 120);
     g.critters.update(1 / 120);
-    expect(g.score - before).toBe(100);
-    expect(g.particles.texts.some((x) => x.str === '+100')).toBe(true);
+    expect(g.score - before).toBe(50);
+    expect(g.particles.texts.some((x) => x.str === '+50')).toBe(true);
   });
 
   test('sem a chuteira os bichos continuam empurrando; a chuteira não chuta peixe', () => {

@@ -697,14 +697,7 @@ export const beachScenery = {
     // Mar: do horizonte até debaixo da areia, ondulado, azul fundo ao longe e turquesa perto
     const zHor = zAt(SEA_HORIZON);
     const zSand = zAt(BEACH_SAND_BACK);
-    const cFar = new THREE.Color('#2B8FB8');
-    const cNear = new THREE.Color('#48C9D0');
-    const sea = heightField(THREE, {
-      x0: -40, x1: W + 40, z0: zHor, z1: zSand + 20, dx: 6, dz: 3,
-      h: (x, z) => Math.sin(x * 0.05 + z * 0.4) * 0.35 + Math.sin(x * 0.11 - z * 0.25) * 0.25 + (fbm(x * 0.03, z * 0.08, 181, 3) - 0.5) * 0.8,
-      colorAt: (c, x, y, z) => c.copy(cFar).lerp(cNear, Math.min(1, Math.max(0, (z - zHor) / (zSand - zHor)) ** 1.4)),
-    });
-    root.add(kit.mesh(sea, vcol({ roughness: 0.18, metalness: 0.1 })));
+    // O mar em si é a camada 3D ao vivo (SEA_BAND em src/model3d.js), por trás da foto
     // Ilhas: morrinhos verdes com faixa de areia e coqueirinhos
     const palmsT = [];
     const palmsL = [];
@@ -1374,13 +1367,7 @@ export const pirateScenery = {
     // Mar
     const zHor = zAt(PIRATE_HORIZON);
     const zSand = zAt(BEACH_SAND_BACK);
-    const cFar = new THREE.Color('#25668E');
-    const cNear = new THREE.Color('#3AAFB8');
-    root.add(kit.mesh(heightField(THREE, {
-      x0: -40, x1: W + 40, z0: zHor, z1: zSand + 20, dx: 6, dz: 3,
-      h: (x, z) => Math.sin(x * 0.05 + z * 0.4) * 0.35 + Math.sin(x * 0.11 - z * 0.25) * 0.25 + (fbm(x * 0.03, z * 0.08, 361, 3) - 0.5) * 0.8,
-      colorAt: (c, x, y, z) => c.copy(cFar).lerp(cNear, Math.min(1, Math.max(0, (z - zHor) / (zSand - zHor)) ** 1.4)),
-    }), vcol({ roughness: 0.18, metalness: 0.1 })));
+    // O mar em si é a camada 3D ao vivo (SEA_BAND em src/model3d.js), por trás da foto
     // Ilha da caveira: rochedo com relevo e a cara cavada virada para a praia
     {
       const { x, w, h } = SKULL_ISLE;

@@ -1221,7 +1221,6 @@ export function background3D(kind) {
   if (kind === 'ice') iceFinish(g);
   else if (kind === 'forest') forestFinish(g);
   else if (kind === 'beach') beachFinish(g);
-  else if (kind === 'pirate') beachFinish(g, false);
   backgrounds[name] = { img: null, bg: { canvas: c, w: W, h: BG_H } };
   delete model.sprites[`${name}:main`];
   return backgrounds[name].bg;
@@ -1255,11 +1254,7 @@ function forestFinish(g) {
 function beachFinish(g, foam = true) {
   let s = 41;
   const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  // Brilhos do sol no mar (entre o horizonte e a onda)
-  for (let i = 0; i < 90; i++) {
-    g.fillStyle = `rgba(255, 255, 240, ${0.3 + rnd() * 0.5})`;
-    g.fillRect(rnd() * W, 154 + rnd() * (SHORE_TOP - 160), 4 + rnd() * 10, 1);
-  }
+  // (os brilhos do sol no mar saem do mar 3D ao vivo, que fica por trás da foto)
   // Espuma de bolinhas na beira do mar (como no 2D); a enseada dos piratas tem pedras na beira
   if (!foam) return;
   g.fillStyle = 'rgba(255, 255, 255, 0.85)';
@@ -1328,7 +1323,9 @@ export function prefetchLevel(level) {
 // Água 3D ao vivo (src/m3d/water3d.js): criada quando o Three.js fica pronto
 const live = { water: null, waterFailed: false };
 export function water3D() {
-  if (live.water || live.waterFailed || model.state !== 'ready') return live.water;
+  // Sem o estúdio (Three.js ainda não carregou, ou um teste fingindo as fotos) não cria
+  // nem marca a camada como falha: tenta de novo depois
+  if (live.water || live.waterFailed || model.state !== 'ready' || !model.studio) return live.water;
   try {
     live.water = new Water3D(model.studio.THREE);
   } catch (e) {
@@ -1337,9 +1334,16 @@ export function water3D() {
   }
   return live.water;
 }
+// Mar ao fundo ao vivo (Praia e Piratas): a mesma camada da água 3D (outro contexto
+// WebGL passaria do limite do navegador), só na faixa do mar entre o horizonte e a areia (a foto do cenário deixa essa faixa transparente)
+// top/bottom: faixa da tela; s0/s1: escala da perspectiva no horizonte e na beira
+export const SEA_BAND = {
+  beach: { kind: 'beach', top: 150, bottom: 200, s0: 0.05, s1: 0.24, reflect: 0.35, water: ['#1F7FAE', '#2AA6C0', '#3CC2CA'] },
+  pirate: { kind: 'pirate', top: 150, bottom: 200, s0: 0.05, s1: 0.24, reflect: 0.35, water: ['#1E5C88', '#2A86A4', '#36A8B4'] },
+};
 // Céu 3D ao vivo (src/m3d/sky3d.js)
 export function sky3D() {
-  if (live.sky || live.skyFailed || model.state !== 'ready') return live.sky;
+  if (live.sky || live.skyFailed || model.state !== 'ready' || !model.studio) return live.sky;
   try {
     live.sky = new Sky3D(model.studio.THREE);
   } catch (e) {
@@ -1351,7 +1355,7 @@ export function sky3D() {
 
 // Partículas 3D ao vivo (src/m3d/particles3d.js): neve, folhas, brasas, fumaça, chamas
 export function particles3D() {
-  if (live.parts || live.partsFailed || model.state !== 'ready') return live.parts;
+  if (live.parts || live.partsFailed || model.state !== 'ready' || !model.studio) return live.parts;
   try {
     live.parts = new Particles3D(model.studio.THREE);
   } catch (e) {

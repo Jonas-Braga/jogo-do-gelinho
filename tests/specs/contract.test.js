@@ -118,7 +118,7 @@ suite('Contrato da especificação', () => {
       expect(levelParams(l).floePoints).toBe(10 * l);
       expect(levelParams(l).degreePoints).toBe(10 * l);
     }
-    expect(levelParams(1).fishPoints).toBe(200);
+    expect(levelParams(1).fishPoints).toBe(100);
   });
 
   test('estrutura de módulos em src/ continua existindo', async () => {
