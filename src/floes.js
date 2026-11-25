@@ -1,7 +1,10 @@
-import { ROW_Y, BLOCK_W, BLOCK_GAP, TRACK, MARGIN, LANDING_TOLERANCE } from './config.js';
+import { W, ROW_Y, BLOCK_W, BLOCK_GAP, TRACK, MARGIN, LANDING_TOLERANCE } from './config.js';
 import { levelParams } from './levels.js';
 
 const mod = (a, n) => ((a % n) + n) % n;
+// Até onde, além das bordas, as peças existem (cobre a câmera no máximo e a perspectiva
+// da fileira do fundo, que mostra até ~−185..W+185, com folga para a peça mais larga)
+export const LIVE = 420;
 
 // Placas fragmentadas
 const FRAG = { n: 6, w: 36, gapMin: 3, gapAmp: 24 };
@@ -52,13 +55,24 @@ export class Row {
 
   // Cada peça fica numa posição relativa ao centro do seu grupo; o espaçamento
   // entre peças varia nas fases fragmentadas.
-  pieceX(p) {
+  // near: devolve a cópia do trilho mais perto desse x (o trilho é circular)
+  pieceX(p, near = null) {
     const rel = (p.k - (p.n - 1) / 2) * (p.w + this.gap) - p.w / 2;
-    return mod(p.base + this.offset + rel, TRACK) - MARGIN;
+    const x = mod(p.base + this.offset + rel, TRACK) - MARGIN;
+    if (near == null) return x;
+    return x + Math.round((near - x - p.w / 2) / TRACK) * TRACK;
   }
 
+  // O trilho é circular e o mundo se repete a cada TRACK. Com a câmera deslocada e a
+  // perspectiva, a tela mostra além de −MARGIN..W+MARGIN, então perto das pontas cada
+  // peça vale também pela cópia do outro lado: ela nunca some nem surge à vista
   *rects() {
-    for (const p of this.pieces) yield { x: this.pieceX(p), w: p.w, piece: p };
+    for (const p of this.pieces) {
+      const x = this.pieceX(p);
+      yield { x, w: p.w, piece: p };
+      if (x + p.w - TRACK > -LIVE) yield { x: x - TRACK, w: p.w, piece: p };
+      if (x + TRACK < W + LIVE) yield { x: x + TRACK, w: p.w, piece: p };
+    }
   }
 
   pieceAt(px) {

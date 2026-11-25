@@ -561,7 +561,7 @@ export class Game {
       p.support.dip = 1;
       // A placa afunda e empurra a água: onda em volta dela e gotinhas nas pontas
       const rr = this.rows[row];
-      this.particles.landWave(rr.pieceX(p.support) + p.support.w / 2, rr.y + WAKE_LINE, p.support.w);
+      this.particles.landWave(rr.pieceX(p.support, p.x) + p.support.w / 2, rr.y + WAKE_LINE, p.support.w);
     }
     // Lascas de gelo (ou de casca de árvore nos troncos, de rocha nos asteroides)
     this.particles.chips(p.x, p.y, 7, this.landFx.chip);

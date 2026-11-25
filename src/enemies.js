@@ -2,6 +2,7 @@ import { W, ROW_Y } from './config.js';
 import { BONUS, BONUS_KINDS } from './bonus.js';
 import { POWERS, POWER_KINDS } from './powers.js';
 import { HEAT, HEAT_KINDS } from './heat.js';
+import { worldEdges } from './depth.js';
 
 // Largura de colisão de cada tipo. Os bichos das fases especiais têm o tamanho dos
 // que substituem (morcego, disco voador e gaivota = ganso; cobra, bichinho lunar e
@@ -21,6 +22,11 @@ export const SIZE = {
   cocoa: HEAT.size,
 };
 const SPACING = 52;
+// Onde os bichos entram e saem: 40 px além do que a tela pode mostrar naquela fileira
+// (com a câmera deslocada e a perspectiva, a tela vai além de 0..W)
+const EDGES = ROW_Y.map((y) => worldEdges(y));
+const GONE = 40 + SPACING * 2 + 10;
+export const entryX = (row, dir) => (dir > 0 ? EDGES[row][0] - 40 : EDGES[row][1] + 40);
 const PLAYER_HALF = 12;
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -91,7 +97,7 @@ export class Critters {
     const kind = queue.shift();
     const dir = -this.game.rows[row].dir;
     const speed = this.params.enemySpeed * BONUS.speed;
-    this.list.push({ kind, row, dir, vx: dir * speed, x: dir > 0 ? -40 : W + 40, w: SIZE[kind], ph: Math.random() * 6, ...flags });
+    this.list.push({ kind, row, dir, vx: dir * speed, x: entryX(row, dir), w: SIZE[kind], ph: Math.random() * 6, ...flags });
     return true;
   }
 
@@ -113,7 +119,7 @@ export class Critters {
         row,
         dir,
         vx: dir * speed,
-        x: dir > 0 ? -40 - i * SPACING : W + 40 + i * SPACING,
+        x: entryX(row, dir) - dir * i * SPACING,
         w: SIZE[kind],
         ph: Math.random() * Math.PI * 2,
       });
@@ -170,8 +176,9 @@ export class Critters {
       c.x += c.vx * dt;
       c.ph += dt;
     }
-    // Remove quem já saiu da tela (dos dois lados, pois inimigos podem virar)
-    this.list = this.list.filter((c) => !c.dead && c.x < W + 220 + SPACING * 3 && c.x > -220 - SPACING * 3);
+    // Remove quem já saiu da tela (dos dois lados, pois inimigos podem virar); a sobra
+    // cobre o grupo que ainda está entrando (até 3 bichos a SPACING um do outro)
+    this.list = this.list.filter((c) => !c.dead && c.x < EDGES[c.row][1] + GONE && c.x > EDGES[c.row][0] - GONE);
 
     // Interação com o jogador (só quando está de pé numa placa)
     const pl = game.player;

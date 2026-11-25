@@ -655,5 +655,9 @@
   "Ajustes: mar 3D ao fundo, reflexo do sol ao se pôr, valores e matinho dos Piratas › peixe vale 100, o chute 50 e o saco de dinheiro 1.000 (o jogo estava fácil demais)",
   "Ajustes: mar 3D ao fundo, reflexo do sol ao se pôr, valores e matinho dos Piratas › o reflexo do sol na água some quando o sol se põe atrás do horizonte",
   "Ajustes: mar 3D ao fundo, reflexo do sol ao se pôr, valores e matinho dos Piratas › Praia e Piratas: o mar ao fundo é uma camada 3D ao vivo, por trás da foto do cenário",
-  "Ajustes: mar 3D ao fundo, reflexo do sol ao se pôr, valores e matinho dos Piratas › o matinho do primeiro plano dos Piratas cobre toda a borda de baixo (não só os cantos)"
+  "Ajustes: mar 3D ao fundo, reflexo do sol ao se pôr, valores e matinho dos Piratas › o matinho do primeiro plano dos Piratas cobre toda a borda de baixo (não só os cantos)",
+  "Bordas da tela: placas e bichos surgem e somem fora da vista › worldEdges cobre tudo o que a tela mostra com a câmera em qualquer posição",
+  "Bordas da tela: placas e bichos surgem e somem fora da vista › as placas nunca surgem nem somem à vista (andam contínuas até a borda que a câmera pode mostrar)",
+  "Bordas da tela: placas e bichos surgem e somem fora da vista › levado pela placa até a borda visível, o jogador fica na borda e só cai quando a placa sai de baixo dele",
+  "Bordas da tela: placas e bichos surgem e somem fora da vista › bichos, prêmios e itens entram além do que a tela pode mostrar e só somem fora dela"
 ]

@@ -92,7 +92,17 @@ export function walkLimits(y, edge) {
   return [at(edge), at(W - edge)];
 }
 
-export const projectX = (x, y) => DEPTH.vanishX + (x - DEPTH.vanishX) * depthScale(y) + swayAt(y);
+// O que a tela pode chegar a mostrar numa profundidade y com a câmera em qualquer
+// posição (até maxCamera para cada lado). Só depende da configuração: serve para
+// a simulação fazer as coisas surgirem e sumirem sempre fora da vista
+export function worldEdges(y, pad = 0) {
+  const s = depthScale(y);
+  const o = maxCamera() * swayFactor(s);
+  const vX = DEPTH.vanishX;
+  return [vX + (-pad - o - vX) / s, vX + (W + pad + o - vX) / s];
+}
+
+export const projectX =(x, y) => DEPTH.vanishX + (x - DEPTH.vanishX) * depthScale(y) + swayAt(y);
 
 // Intervalo do mundo (x) que aparece na tela numa profundidade (para descartar o que está fora)
 export function visibleRange(y, pad = 20) {

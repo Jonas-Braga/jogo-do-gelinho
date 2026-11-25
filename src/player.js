@@ -1,4 +1,4 @@
-import { W, SHORE_Y, ROW_Y, PLAYER as P, PLAYER_HEIGHT } from './config.js';
+import { W, SHORE_Y, ROW_Y, TRACK, PLAYER as P, PLAYER_HEIGHT } from './config.js';
 import { SCARE_TIME } from './bear.js';
 import { POWERS } from './powers.js';
 import { walkLimits } from './depth.js';
@@ -119,8 +119,9 @@ export class Player {
   carry() {
     if (this.row < 0 || !this.support) return;
     const nx = this.game.rows[this.row].pieceX(this.support);
-    const d = nx - this.supportX;
-    if (Math.abs(d) < 60) this.x = this.limitX(this.x + d); // ignora o "pulo" do wrap
+    // O trilho é circular: a volta (TRACK) não é deslocamento
+    const d = nx - this.supportX - Math.round((nx - this.supportX) / TRACK) * TRACK;
+    if (Math.abs(d) < 60) this.x = this.limitX(this.x + d);
     this.supportX = nx;
   }
 

@@ -24,5 +24,6 @@ export const SPEC_FILES = [
   'profundidade.test.js',
   'pontos.test.js',
   'preload.test.js',
+  'bordas.test.js',
   'futuras.test.js',
 ];
