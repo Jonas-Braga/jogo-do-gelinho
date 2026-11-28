@@ -19,6 +19,7 @@ import { SEA } from './beach.js';
 import { HAUNT } from './halloween.js';
 import { LAVA } from './dino.js';
 import { COVE } from './pirate.js';
+import { CANDY } from './candy.js';
 import { BONUS } from './bonus.js';
 import { POWERS, POWER_NAMES } from './powers.js';
 import { HEAT } from './heat.js';
@@ -36,6 +37,7 @@ const LAND_FX = {
   // Na lava: cinza na costa, lascas de basalto, e respingos/bolhas cor de lava
   dino: { puff: LAVA.ash, chip: LAVA.chip, spark: LAVA.spark, liquid: LAVA.liquid },
   pirate: { puff: COVE.sand, chip: COVE.chip, spark: COVE.spark },
+  candy: { puff: CANDY.sand, chip: CANDY.chip, spark: CANDY.spark },
 };
 
 // Estados: title (tela inicial), play (jogando, incluindo animações de morte),

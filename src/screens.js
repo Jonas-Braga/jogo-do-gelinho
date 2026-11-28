@@ -14,6 +14,7 @@ const WORDS = {
   haunted: { floes: 'as abóboras', floe: 'a abóbora', house: 'na casa assombrada pronta' },
   cave: { floes: 'as pedras', floe: 'a pedra', house: 'na caverna pronta' },
   fort: { floes: 'os barris', floe: 'o barril', house: 'no forte pronto' },
+  ginger: { floes: 'os biscoitos', floe: 'o biscoito', house: 'na casa de biscoito pronta' },
 };
 
 // touch = true: mostra os botões da tela no lugar das teclas

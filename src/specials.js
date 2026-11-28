@@ -16,10 +16,11 @@
 //            turquesa, pranchas de surfe e peixinhos tropicais; 'halloween' =
 //            noite de lua cheia, cemitério, rio escuro, abóboras e balas;
 //            'dino' = vulcões, rio de lava, pedras de basalto e ovos de dinossauro;
-//            'pirate' = enseada ao entardecer, barris e garrafas com mensagem
+//            'pirate' = enseada ao entardecer, barris e garrafas com mensagem;
+//            'candy' = reino dos doces, rio de chocolate, biscoitos waffle e rosquinhas
 //   house    o que se constrói na costa: 'igloo' (padrão), 'cabin' (cabana de madeira)
 //            'base' (base lunar), 'hut' (cabana de palha), 'haunted' (casa assombrada)
-//            'cave' (caverna de pedra) ou 'fort' (forte pirata)
+//            'cave' (caverna de pedra), 'fort' (forte pirata) ou 'ginger' (casa de biscoito)
 //   enemies  inimigos sorteados a cada grupo (no lugar do ciclo ganso/caranguejo/molusco)
 //   aurora   false desliga a aurora boreal nesta fase
 //   breath   false desliga o vapor da respiração no frio
@@ -145,6 +146,22 @@ export const SPECIALS = {
     breath: false, // calor dos trópicos: sem vapor da respiração
     weather: 'none', // nada caindo do céu
     pace: 0.8,
+  },
+  40: {
+    id: 'doces',
+    trophy: { name: 'Troféu do Reino dos Doces', ribbon: '#E8559A' },
+    title: 'FASE 40 · ESPECIAL DO REINO DOS DOCES',
+    intro: 'Pule nos biscoitos do rio de chocolate e monte a casa de biscoito!',
+    music: 'doces',
+    outfits: { player: 'baker', bear: 'gingerman' },
+    sleigh: false,
+    decor: 'doces',
+    scenery: 'candy',
+    house: 'ginger',
+    enemies: ['bee', 'worm', 'gummy'],
+    aurora: false,
+    breath: false, // reino quentinho: sem vapor da respiração
+    pace: 0.8,     // o açúcar de confeiteiro cai do céu no lugar da neve
   },
 };
 

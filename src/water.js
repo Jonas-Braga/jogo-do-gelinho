@@ -30,6 +30,7 @@ export const SURFACE = {
     beach: { recipe: 'water', loop: 5, scale: 2, stretch: 3, relief: 0.5, glint: [255, 255, 245], spec: 0.4, drift: 6, reflect: 0.55 },
     halloween: { recipe: 'water', loop: 6, scale: 2, stretch: 3, relief: 0.5, glint: [215, 200, 255], spec: 0.25, drift: 4, reflect: 0.6 },
     pirate: { recipe: 'water', loop: 5, scale: 2, stretch: 3, relief: 0.5, glint: [255, 240, 210], spec: 0.4, drift: 6, reflect: 0.6 },
+    candy: { recipe: 'water', loop: 7, scale: 2.4, stretch: 2, relief: 0.6, glint: [255, 230, 210], spec: 0.5, drift: 3, reflect: 0.35 },
     dino: { recipe: 'lava', loop: 10, scale: 3.4, stretch: 1, relief: 1, glint: [255, 200, 100], spec: 0.35, drift: 3, reflect: 0 },
   },
   // Reflexo do cenário: comprimento (px abaixo da linha d'água) e achatamento do espelho

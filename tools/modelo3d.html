@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><title>Fotos dos modelos 3D</title></head><body style="margin:0;background:#cfe0ea;font:12px sans-serif">
 <!-- Ferramenta de desenvolvimento: mostra as fotos de um modelo 3D (src/m3d/).
-     ?m=player|bear|goose|...|floe82|log36|rock82|barrel82  modelo
+     ?m=player|bear|goose|...|floe82|log36|rock82|barrel82|cookie82  modelo
      ?k=idleR,run0R,...                   só estas fotos (senão, todas)
      ?z=1.5                               zoom (a tela cresce para caber todas)
      ?anim=12                             toca as fotos em sequência (quadros por segundo), grande,
@@ -15,12 +15,13 @@ import { boardSubject } from '../src/m3d/beach.js';
 import { pumpkinSubject } from '../src/m3d/halloween.js';
 import { basaltSubject } from '../src/m3d/dino.js';
 import { barrelSubject } from '../src/m3d/pirate.js';
+import { cookieSubject } from '../src/m3d/candy.js';
 const q = new URLSearchParams(location.search);
 const name = q.get('m') || 'player';
 const z = Number(q.get('z') || 1);
 want(name);
 const ctx = document.getElementById('c').getContext('2d');
-const S = SUBJECTS[name] || (name.startsWith('log') ? logSubject(Number(name.slice(3))) : name.startsWith('rock') ? rockSubject(Number(name.slice(4))) : name.startsWith('board') ? boardSubject(Number(name.slice(5))) : name.startsWith('pumpkin') ? pumpkinSubject(Number(name.slice(7))) : name.startsWith('basalt') ? basaltSubject(Number(name.slice(6))) : name.startsWith('barrel') ? barrelSubject(Number(name.slice(6))) : floeSubject(Number(name.slice(4))));
+const S = SUBJECTS[name] || (name.startsWith('log') ? logSubject(Number(name.slice(3))) : name.startsWith('rock') ? rockSubject(Number(name.slice(4))) : name.startsWith('board') ? boardSubject(Number(name.slice(5))) : name.startsWith('pumpkin') ? pumpkinSubject(Number(name.slice(7))) : name.startsWith('basalt') ? basaltSubject(Number(name.slice(6))) : name.startsWith('barrel') ? barrelSubject(Number(name.slice(6))) : name.startsWith('cookie') ? cookieSubject(Number(name.slice(6))) : floeSubject(Number(name.slice(4))));
 const keys = q.get('k')?.split(',') || S.poses().map((p) => p.key);
 const pre = name === 'player' ? '' : name + ':';
 const wait = () => {

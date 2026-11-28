@@ -50,6 +50,7 @@ export const OUTLINES = {
   haunted: () => [[-DW, 0], [DW, 0], [DW, DH - 8], ...quad([DW, DH - 8], [DW, DH + 8], [0, DH + 14], 8).slice(1), ...quad([0, DH + 14], [-DW, DH + 8], [-DW, DH - 8], 8).slice(1)],
   cave: () => [[-DW, 0], [DW, 0], ...arc(0, DH - DW, DW, DW, 0, Math.PI, 16), [-DW, 0]],
   fort: () => [[-DW, 0], [DW, 0], ...arc(0, DH - DW, DW, DW, 0, Math.PI, 16), [-DW, 0]],
+  ginger: () => [[-DW, 0], [DW, 0], ...arc(0, DH - DW, DW, DW, 0, Math.PI, 16), [-DW, 0]],
 };
 
 // Recorta um polígono pelo semiplano a·x + b·y ≥ c (Sutherland–Hodgman)
@@ -548,6 +549,75 @@ export const fortDoor = {
   },
 };
 
+// ---------------------------------------------------------------- Casa de biscoito
+// Porta de barra de chocolate em gomos (cada gomo com relevo), maçaneta de bala
+// dourada; batente de glacê branco em ondinhas com balinhas de goma coloridas e a
+// soleira de biscoito
+const GUMDROPS_3D = ['#FF4A6A', '#FFC83A', '#4AC86A', '#5A9AFF', '#B060E0'];
+export const gingerDoor = {
+  box: BOX, res: 2, elevation: ELEVATION,
+  poses: () => basePoses(),
+  build(kit) {
+    const { THREE, group, mesh, mat, sphere } = kit;
+    const root = group();
+    const inside = interior(kit, OUTLINES.ginger(), { dark: '#3A1C0E', lit: '#E0A070', glow: '#FFB070' });
+    const choc = mat('#5A2E16', 0.35, { metalness: 0.05 });
+    const chocLight = mat('#6E3A1E', 0.3);
+    const leafPoly = OUTLINES.ginger().map(([x, y]) => [x * 0.98, y - 0.5]);
+    const leaf = hingedLeaf(kit, leafPoly, choc, (pv) => {
+      // Gomos da barra: almofadas em relevo, 2 colunas
+      const rows = 4;
+      const gh = (DH - DW) / rows;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < 2; c++) {
+          const g = mesh(new THREE.BoxGeometry(DW - 5, gh - 4, 2.2), chocLight, 2.5 + (DW - 0.6) * c + (DW - 5) / 2, 3 + r * gh + (gh - 4) / 2, 2.4);
+          pv.add(g);
+        }
+      }
+      // Gomo de cima em arco
+      const top = mesh(new THREE.CylinderGeometry(DW - 6, DW - 6, 2.2, 24, 1, false, Math.PI / 2, Math.PI), chocLight, DW - 0.6, DH - DW + 1, 2.4);
+      top.rotation.x = Math.PI / 2;
+      pv.add(top);
+      // Maçaneta de bala dourada
+      pv.add(sphere(2.6, mat('#FFC83A', 0.2, { metalness: 0.5 }), DW * 2 - 8, DH * 0.42, 4.2, 12));
+    });
+    // Batente: tubo de glacê ondulado em volta do arco e das ombreiras, com balinhas
+    const frame = group();
+    const icing = mat('#FFFFFF', 0.55);
+    const pts = [];
+    const cy = DH - DW;
+    const R = DW + 4;
+    pts.push(new THREE.Vector3(-R, 0, 1.5));
+    for (let i = 0; i <= 40; i++) {
+      const a = Math.PI - (i / 40) * Math.PI;
+      const rr = R + Math.sin(i * 1.6) * 0.8;
+      pts.push(new THREE.Vector3(Math.cos(a) * rr, cy + Math.sin(a) * rr, 1.5));
+    }
+    pts.push(new THREE.Vector3(R, 0, 1.5));
+    const curve = new THREE.CatmullRomCurve3(pts);
+    frame.add(mesh(new THREE.TubeGeometry(curve, 120, 3.2, 10, false), icing));
+    for (let i = 0; i < 9; i++) {
+      const a = Math.PI - ((i + 0.5) / 9) * Math.PI;
+      const d = sphere(2.4, mat(GUMDROPS_3D[i % GUMDROPS_3D.length], 0.3), Math.cos(a) * (R + 1), cy + Math.sin(a) * (R + 1), 4.4, 10);
+      d.scale.set(1, 1.1, 0.8);
+      frame.add(d);
+    }
+    for (const s of [-1, 1]) {
+      for (let k = 0; k < 3; k++) {
+        const d = sphere(2.2, mat(GUMDROPS_3D[(k + (s > 0 ? 2 : 0)) % GUMDROPS_3D.length], 0.3), s * (R + 1), 8 + k * 14, 4.2, 10);
+        frame.add(d);
+      }
+    }
+    frame.add(mesh(new THREE.BoxGeometry(DW * 2 + 18, 4, 12), mat('#C47C3E', 0.8), 0, -0.5, 3));
+    root.add(inside.group, leaf, frame);
+    return { root, inside, leaf, frame };
+  },
+  apply(rig, p) {
+    show(rig, p);
+    if (p.k != null) rig.leaf.rotation.y = (1 - p.k) * 1.7;
+  },
+};
+
 // ---------------------------------------------------------------- Caverna
 // Só o interior (a boca escura em relevo); a pedra é o modelo abaixo
 export const caveDoor = {
@@ -607,9 +677,9 @@ export function stonePose(angle) {
 
 // Modelo da porta de cada estilo de casa
 export const DOOR_MODELS = {
-  igloo: 'door-igloo', cabin: 'door-cabin', base: 'door-base', hut: 'door-hut', haunted: 'door-haunted', cave: 'door-cave', fort: 'door-fort',
+  igloo: 'door-igloo', cabin: 'door-cabin', base: 'door-base', hut: 'door-hut', haunted: 'door-haunted', cave: 'door-cave', fort: 'door-fort', ginger: 'door-ginger',
 };
 export const DOOR_SUBJECTS = {
   'door-igloo': iglooDoor, 'door-cabin': cabinDoor, 'door-base': baseDoor, 'door-hut': hutDoor,
-  'door-haunted': hauntedDoor, 'door-cave': caveDoor, 'door-stone': doorStone, 'door-fort': fortDoor,
+  'door-haunted': hauntedDoor, 'door-cave': caveDoor, 'door-stone': doorStone, 'door-fort': fortDoor, 'door-ginger': gingerDoor,
 };

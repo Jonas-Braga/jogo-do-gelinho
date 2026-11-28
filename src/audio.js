@@ -75,6 +75,14 @@ export const SOUNDS = {
       s.noise({ dur: 1.1, vol: 0.16, filter: 'lowpass', f0: 600, f1: 150 });
       return;
     }
+    if (o.kind === 'gingerman') {
+      // Homem-biscoito: risadinha marota "hi-hi-hi" subindo e o "crec" do biscoito
+      [0, 0.11, 0.22, 0.33].forEach((t, i) =>
+        s.tone({ type: 'square', f0: 620 + i * 90, f1: 520 + i * 90, dur: 0.08, vol: 0.06, t, filter: 2600 }));
+      s.noise({ dur: 0.12, vol: 0.22, filter: 'bandpass', f0: 2400, q: 2, t: 0.48 });
+      s.noise({ dur: 0.06, vol: 0.18, filter: 'bandpass', f0: 1600, q: 3, t: 0.6 });
+      return;
+    }
     if (o.kind === 'croc') {
       // Crocodilo: bocarra batendo (dois estalos secos) e um sibilo rouco e grave
       s.noise({ dur: 0.05, vol: 0.32, filter: 'bandpass', f0: 900, q: 3 });
@@ -185,6 +193,18 @@ export const SOUNDS = {
       // Tubarão: água cortada (chiado que passa) e a bocada surda
       s.noise({ dur: 0.3, vol: 0.14, filter: 'bandpass', f0: 1800, f1: 700, q: 1.5 });
       s.tone({ type: 'sine', f0: 120, f1: 60, dur: 0.12, vol: 0.18, t: 0.2 });
+    } else if (o.kind === 'bee') {
+      // Abelha: "zzzz" vibrando que passa
+      [0, 0.06, 0.12, 0.18, 0.24].forEach((t, i) =>
+        s.tone({ type: 'sawtooth', f0: 210 + (i % 2) * 18, dur: 0.07, vol: 0.06, t, filter: 1400 }));
+    } else if (o.kind === 'worm') {
+      // Minhoca de goma: "bloim" elástico
+      s.tone({ type: 'sine', f0: 180, f1: 420, dur: 0.12, vol: 0.12 });
+      s.tone({ type: 'sine', f0: 420, f1: 240, dur: 0.16, vol: 0.09, t: 0.12 });
+    } else if (o.kind === 'gummy') {
+      // Bala de goma: "boing" de mola
+      s.tone({ type: 'triangle', f0: 300, f1: 900, dur: 0.14, vol: 0.12 });
+      s.tone({ type: 'triangle', f0: 700, f1: 500, dur: 0.12, vol: 0.07, t: 0.14 });
     } else if (o.kind === 'jellyfish') {
       // Água-viva: choquinho elétrico ondulando
       s.tone({ type: 'square', f0: 220, f1: 660, dur: 0.18, vol: 0.05, filter: 1800 });
@@ -825,6 +845,75 @@ function buildPirateTrack({ beat }) {
   return { beat, length: PIRATE_BARS.length * 4, events };
 }
 
+// ---- Reino dos doces: celesta, caixinha de música, baixo em pizzicato, estalinhos
+// de bolha de chiclete e sininhos de açúcar
+function celesta(s, n, t, dur) {
+  s.tone({ type: 'sine', f0: NOTE(n), dur: Math.max(0.25, dur), vol: 0.05, t });
+  s.tone({ type: 'sine', f0: NOTE(n + 12), dur: 0.2, vol: 0.016, t });
+  s.tone({ type: 'triangle', f0: NOTE(n) * 3.01, dur: 0.08, vol: 0.008, t });
+}
+function sweetBass(s, n, t) {
+  s.tone({ type: 'triangle', f0: NOTE(n), dur: 0.22, vol: 0.06, t });
+}
+function boxChord(s, notes, t) {
+  notes.forEach((n, i) => s.tone({ type: 'sine', f0: NOTE(n + 12), dur: 0.18, vol: 0.014, t: t + i * 0.04 }));
+}
+function bubblePop(s, t) {
+  s.tone({ type: 'sine', f0: 380, f1: 1300, dur: 0.06, vol: 0.03, t });
+}
+function sugarBell(s, t) {
+  s.tone({ type: 'sine', f0: 2640, dur: 0.5, vol: 0.008, t });
+  s.tone({ type: 'sine', f0: 3960, dur: 0.3, vol: 0.004, t });
+}
+const CANDY_CHORDS = {
+  C: { bass: 36, notes: [60, 64, 67] },
+  F: { bass: 41, notes: [60, 65, 69] },
+  G: { bass: 43, notes: [59, 62, 67] },
+  Am: { bass: 45, notes: [60, 64, 69] },
+  E: { bass: 40, notes: [59, 64, 68] },
+};
+const CANDY_BARS = ['C', 'C', 'F', 'G', 'C', 'Am', 'F', 'G', 'C', 'E', 'Am', 'F', 'C', 'G', 'C', 'C'];
+// Melodia original da celesta em dó maior, um compasso por linha (nota 0 = pausa)
+const CANDY_TUNE = [
+  [72, 1], [76, 1], [79, 1], [76, 1],
+  [77, 0.5], [76, 0.5], [74, 1], [72, 2],
+  [77, 1], [81, 1], [84, 1], [81, 1],
+  [79, 1.5], [77, 0.5], [76, 1], [74, 1],
+  [72, 1], [76, 1], [79, 0.5], [81, 0.5], [79, 1],
+  [76, 1], [72, 1], [69, 2],
+  [77, 1], [76, 1], [74, 1], [72, 1],
+  [74, 3], [0, 1],
+  [79, 1], [84, 1], [83, 0.5], [81, 0.5], [79, 1],
+  [80, 1], [76, 1], [71, 1], [76, 1],
+  [81, 1], [76, 0.5], [77, 0.5], [79, 1], [81, 1],
+  [77, 1.5], [76, 0.5], [74, 2],
+  [72, 1], [76, 1], [79, 1], [84, 1],
+  [83, 1], [81, 1], [79, 1], [77, 1],
+  [76, 1], [74, 1], [72, 1], [74, 1],
+  [72, 3], [0, 1],
+];
+function buildCandyTrack({ beat }) {
+  const events = [];
+  const add = (b, play) => events.push({ beat: b, play });
+  CANDY_BARS.forEach((name, bar) => {
+    const c = CANDY_CHORDS[name];
+    const b0 = bar * 4;
+    // Pizzicato no 1 e no 3; acorde de caixinha de música no 2 e no 4
+    add(b0, (s, t) => sweetBass(s, c.bass, t));
+    add(b0 + 2, (s, t) => sweetBass(s, c.bass + 7, t));
+    add(b0 + 1, (s, t) => boxChord(s, c.notes, t));
+    add(b0 + 3, (s, t) => boxChord(s, c.notes, t));
+    add(b0 + 1.5, (s, t) => bubblePop(s, t));
+    if (bar % 4 === 0) add(b0, (s, t) => sugarBell(s, t));
+    if (bar % 4 === 2) add(b0 + 3.5, (s, t) => bubblePop(s, t));
+  });
+  for (const m of phrase(CANDY_TUNE)) {
+    if (m.note) add(m.beat, (s, t) => celesta(s, m.note, t, Math.min(1, m.len * beat * 0.9)));
+  }
+  events.sort((a, b) => a.beat - b.beat);
+  return { beat, length: CANDY_BARS.length * 4, events };
+}
+
 // Trilhas disponíveis (as fases especiais escolhem a sua em specials.js)
 export const MUSIC = {
   // 64 batidas de melodia + 8 só de guizos, antes de recomeçar
@@ -841,6 +930,8 @@ export const MUSIC = {
   dino: buildDinoTrack({ beat: 0.4 }),
   // 16 compassos (64 batidas), cerca de 24 s por volta
   pirata: buildPirateTrack({ beat: 0.37 }),
+  // 16 compassos (64 batidas), cerca de 23 s por volta
+  doces: buildCandyTrack({ beat: 0.36 }),
 };
 const LOOKAHEAD = 0.12;
 

@@ -8,6 +8,7 @@ import { drawGiantCrab } from './beach.js';
 import { drawWerewolf } from './halloween.js';
 import { drawTrex } from './dino.js';
 import { drawCroc } from './pirate.js';
+import { drawGingerman } from './candy.js';
 
 const SS = 2;
 
@@ -318,6 +319,17 @@ OUTFITS.pirate = {
   pants: ['#2A3A5E', '#1C2844'], boots: ['#1E1A18', '#141210'], bootTrim: ['#3A3028', '#2A221C'],
   hands: ['#C98B62', '#E3AA80'],
 };
+// Confeiteiro (Reino dos doces): dólmã branco de botões, avental rosa com bolso,
+// calça cinza-escura, sapato preto e o chapéu de chef alto e fofo, que pula da
+// cabeça no susto
+OUTFITS.baker = {
+  body: ['#FFFFFF', '#F4F2F0', '#C9C4C6'], armBack: '#CFCACC', armFront: ['#FFFFFF', '#CFCACC'],
+  seam: 'rgba(120, 100, 110, 0.5)', chef: true, chefHat: true,
+  pants: ['#4A4A56', '#33333C'], boots: ['#1E1A1E', '#141014'], bootTrim: ['#3A3036', '#2A2228'],
+  hands: ['#C98B62', '#E3AA80'],
+};
+export const BAKER_APRON = '#FF7AB0';
+export const CHEF_HAT = '#FDFDFD';
 export const PIRATE_STRIPE = '#C8302A';
 export const PIRATE_HAT = '#1E1A1E';
 export const CAVE_FUR = '#D9892B';
@@ -341,6 +353,9 @@ function cuff(ctx, O, x, y, w) {
   if (O.sweater) knitCuff(ctx, x, y, w);
   else if (O.sailor) {
     ctx.fillStyle = PIRATE_STRIPE;
+    ctx.fillRect(x, y, w, 3.5);
+  } else if (O.chef) {
+    ctx.fillStyle = BAKER_APRON;
     ctx.fillRect(x, y, w, 3.5);
   } else if (O.stars) {
     ctx.fillStyle = WIZ_TRIM;
@@ -641,6 +656,91 @@ function starsPattern(ctx, back) {
     ctx.arc(6, -45, 2.2, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+// ---- Confeiteiro
+// Dólmã de botões duplos (já recortado pelo contorno) e o avental rosa por cima
+function chefJacket(ctx) {
+  ctx.fillStyle = 'rgba(150, 140, 150, 0.35)';
+  ctx.fillRect(-1, -48, 1.2, 22);
+  ctx.fillStyle = '#B8B0B6';
+  for (const bx of [-5, 6]) {
+    for (let y = -44; y < -28; y += 6) {
+      ctx.beginPath();
+      ctx.arc(bx, y, 1.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+function bakerApron(ctx, back) {
+  if (back) {
+    // Laço do avental nas costas
+    ctx.fillStyle = BAKER_APRON;
+    ctx.fillRect(-16, -30, 32, 3.4);
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(s * 4.5, -28.5, 4.5, 2.6, s * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillRect(-2, -28, 1.6, 9);
+    ctx.fillRect(1, -28, 1.6, 8);
+    return;
+  }
+  ctx.fillStyle = BAKER_APRON;
+  ctx.beginPath();
+  ctx.moveTo(-14, -31);
+  ctx.lineTo(15, -31);
+  ctx.lineTo(17, -13);
+  ctx.quadraticCurveTo(1, -10, -16, -13);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(160, 40, 90, 0.35)';
+  ctx.fillRect(-14, -31, 29, 2.4);
+  // Bolso com um coraçãozinho
+  ctx.strokeStyle = 'rgba(160, 40, 90, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(2, -24, 9, 6);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(5.6, -21.6, 1.2, 0, Math.PI * 2);
+  ctx.arc(7.6, -21.6, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(4.4, -21.2);
+  ctx.lineTo(6.6, -18.8);
+  ctx.lineTo(8.8, -21.2);
+  ctx.fill();
+}
+
+// Chapéu de chef: faixa reta e o "cogumelo" fofo de pregas. No susto, pula da cabeça.
+function chefHat(ctx, back, scared, t) {
+  ctx.save();
+  if (scared) {
+    ctx.translate(0, -8 - Math.abs(Math.sin(t * 9)) * 3);
+    ctx.rotate(-0.18);
+  }
+  const cx = back ? 0 : 1;
+  ctx.fillStyle = CHEF_HAT;
+  for (const [dx, dy, r] of [[-7, -78, 8], [7, -78, 8], [0, -82, 9], [-3, -74, 8], [4, -74, 8]]) {
+    ctx.beginPath();
+    ctx.arc(cx + dx, dy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = '#E4E0E4';
+  ctx.beginPath();
+  ctx.arc(cx + 7, -76, 6, -0.3, 1.6);
+  ctx.fill();
+  ctx.fillStyle = CHEF_HAT;
+  ctx.fillRect(cx - 11, -71, 22, 9);
+  ctx.strokeStyle = 'rgba(150, 140, 150, 0.6)';
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  for (const dx of [-5, 0, 5]) {
+    ctx.moveTo(cx + dx, -70);
+    ctx.lineTo(cx + dx, -63);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 // ---- Pirata
@@ -1154,6 +1254,12 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     sailorPattern(ctx);
     ctx.restore();
     sashHem(ctx, false);
+  } else if (O.chef) {
+    ctx.save();
+    ctx.clip();
+    chefJacket(ctx);
+    ctx.restore();
+    bakerApron(ctx, false);
   } else if (O.stars) {
     ctx.save();
     ctx.clip();
@@ -1202,7 +1308,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     surfHairBack(ctx, O, false);
   } else if (O.caveHair) {
     caveHairBack(ctx, false);
-  } else if (O.beanie || O.witchHat || O.pirateHat) {
+  } else if (O.beanie || O.witchHat || O.pirateHat || O.chefHat) {
     // Cabelo na nuca e orelha (o gorro ou o chapéu vêm por cima, depois do rosto)
     ctx.fillStyle = HAIR;
     ctx.beginPath();
@@ -1302,6 +1408,7 @@ export function drawPlayer(ctx, p, t, cold, ride = 0, outfit = 'parka') {
     pirateHat(ctx, false, panicking, t);
   }
   if (O.witchHat) wizardHat(ctx, false, panicking, t);
+  if (O.chefHat) chefHat(ctx, false, panicking, t);
   if (O.caveHair) caveHairTop(ctx, false, panicking, t);
   if (O.hair) {
     surfHairTop(ctx, O, false);
@@ -1517,6 +1624,8 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     sailorPattern(ctx);
     ctx.restore();
     sashHem(ctx, true);
+  } else if (O.chef) {
+    bakerApron(ctx, true);
   } else if (O.stars) {
     ctx.save();
     ctx.clip();
@@ -1568,6 +1677,21 @@ function drawPlayerBack(ctx, t, walking, step, bob, O = OUTFITS.parka) {
     // Cabeleira desgrenhada por trás, com o ossinho
     caveHairBack(ctx, true);
     caveHairTop(ctx, true, false, t);
+    return;
+  }
+  if (O.chefHat) {
+    // Nuca com cabelo, orelhas e o chapéu de chef por cima
+    ctx.fillStyle = HAIR;
+    ctx.beginPath();
+    ctx.arc(0, -57, 12.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#D99A70';
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(s * 12, -56, 2.6, 3.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    chefHat(ctx, true, false, t);
     return;
   }
   if (O.pirateHat) {
@@ -2203,6 +2327,10 @@ export function drawBear(ctx, b, t, outfit = null) {
   }
   if (outfit === 'croc') {
     drawCroc(ctx, b, t);
+    return;
+  }
+  if (outfit === 'gingerman') {
+    drawGingerman(ctx, b, t);
     return;
   }
   const F = BEAR_FUR.polar;

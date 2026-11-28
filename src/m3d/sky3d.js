@@ -25,6 +25,7 @@ export const SKY3D = {
     forest: { kind: 0, clouds: 0.5, body: 22 },
     beach: { kind: 0, clouds: 0.45, body: 22 },
     pirate: { kind: 0, clouds: 0.5, body: 24 },
+    candy: { kind: 0, clouds: 0.55, body: 24 },
     space: { kind: 1, clouds: 0, body: 26 },
     halloween: { kind: 2, clouds: 0.55, body: 46 },
     dino: { kind: 3, clouds: 0.6, body: 40 },

@@ -44,10 +44,14 @@ import {
   croc, parrot, octopus, shark, bottle, barrelSubject, BARREL_3D, fort as fortModel, chest as chestModel, cannon as cannonModel, anchor as anchorModel,
 } from './m3d/pirate.js';
 import { FORT, FORT_PIECES, drawFortDoor, drawFortLights } from './pirate.js';
+import {
+  gingerman, bee, worm, gummy, donut, cookieSubject, COOKIE_3D, gingerHouse, lollipop as lollipopModel, cane as caneModel, gumdrops as gumdropsModel,
+} from './m3d/candy.js';
+import { GINGER_HOUSE, GINGER_PIECES, drawGingerDoor, drawGingerLights } from './candy.js';
 import { DOOR, easeOutBack } from './igloo.js';
 import { drawPlayerMarks } from './sprites.js';
 import { POWERS } from './powers.js';
-import { iceScenery, forestScenery, spaceScenery, beachScenery, halloweenScenery, dinoScenery, pirateScenery, BG_H } from './m3d/scenery.js';
+import { iceScenery, forestScenery, spaceScenery, beachScenery, halloweenScenery, dinoScenery, pirateScenery, candyScenery, BG_H } from './m3d/scenery.js';
 import { SHORE_TOP } from './config.js';
 
 const M = DEPTH.model3d;
@@ -71,21 +75,24 @@ export const SUBJECTS = {
   'player-caveman': player.withOutfit('caveman'), trex, ptero, raptor, ammonite, egg: eggModel, cave: caveModel, caveTusks, fern: fernModel, nest: nestModel,
   // Piratas
   'player-pirate': player.withOutfit('pirate'), croc, parrot, octopus, shark, bottle, fort: fortModel, chest: chestModel, cannon: cannonModel, anchor: anchorModel,
+  // Reino dos doces
+  'player-baker': player.withOutfit('baker'), gingerman, bee, worm, gummy, donut, ginger: gingerHouse,
+  lollipop: lollipopModel, cane: caneModel, gumdrops: gumdropsModel,
   // Prêmios das fases especiais (iguais em todas)
   bag: bagModel, heart: heartModel, cocoa: cocoaModel,
   // Cenários de fundo (uma foto do tamanho do fundo 2D)
-  'bg-ice': iceScenery, 'bg-forest': forestScenery, 'bg-space': spaceScenery, 'bg-beach': beachScenery, 'bg-halloween': halloweenScenery, 'bg-dino': dinoScenery, 'bg-pirate': pirateScenery,
+  'bg-ice': iceScenery, 'bg-forest': forestScenery, 'bg-space': spaceScenery, 'bg-beach': beachScenery, 'bg-halloween': halloweenScenery, 'bg-dino': dinoScenery, 'bg-pirate': pirateScenery, 'bg-candy': candyScenery,
   // Portas e cortinas de cada casa (e a pedra da caverna)
   ...DOOR_SUBJECTS,
 };
 // Fases especiais já convertidas ao 3D (as outras seguem inteiras em 2D)
-export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia', 'halloween', 'dinossauros', 'piratas']);
+export const THEMES_3D = new Set(['natal', 'floresta', 'espaco', 'praia', 'halloween', 'dinossauros', 'piratas', 'doces']);
 // Modelo do jogador por roupa e do urso por variante (null = sem modelo 3D: desenho 2D)
-const PLAYER_BY_OUTFIT = { parka: 'player', sweater: 'player-sweater', lumberjack: 'player-lumberjack', astronaut: 'player-astronaut', surfer: 'player-surfer', wizard: 'player-wizard', caveman: 'player-caveman', pirate: 'player-pirate' };
-const BEAR_BY_OUTFIT = { polar: 'bear', santaHat: 'bear-santa', brown: 'bear-brown', alien: 'alien', giantCrab: 'giantCrab', werewolf: 'werewolf', trex: 'trex', croc: 'croc' };
-export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish', 'snake', 'bat', 'piranha', 'ufo', 'crawler', 'comet', 'star', 'gull', 'siri', 'jellyfish', 'tfish', 'ghost', 'spider', 'eyeball', 'candy', 'ptero', 'raptor', 'ammonite', 'egg', 'parrot', 'octopus', 'shark', 'bottle']);
+const PLAYER_BY_OUTFIT = { parka: 'player', sweater: 'player-sweater', lumberjack: 'player-lumberjack', astronaut: 'player-astronaut', surfer: 'player-surfer', wizard: 'player-wizard', caveman: 'player-caveman', pirate: 'player-pirate', baker: 'player-baker' };
+const BEAR_BY_OUTFIT = { polar: 'bear', santaHat: 'bear-santa', brown: 'bear-brown', alien: 'alien', giantCrab: 'giantCrab', werewolf: 'werewolf', trex: 'trex', croc: 'croc', gingerman: 'gingerman' };
+export const CRITTERS_3D = new Set(['goose', 'crab', 'clam', 'fish', 'snake', 'bat', 'piranha', 'ufo', 'crawler', 'comet', 'star', 'gull', 'siri', 'jellyfish', 'tfish', 'ghost', 'spider', 'eyeball', 'candy', 'ptero', 'raptor', 'ammonite', 'egg', 'parrot', 'octopus', 'shark', 'bottle', 'bee', 'worm', 'gummy', 'donut']);
 // O que substitui o peixe em cada cenário convertido (sem entrada = o peixe 3D normal)
-export const FISH_3D = { space: 'star', beach: 'tfish', halloween: 'candy', dino: 'egg', pirate: 'bottle' };
+export const FISH_3D = { space: 'star', beach: 'tfish', halloween: 'candy', dino: 'egg', pirate: 'bottle', candy: 'donut' };
 export const BOX = player.box;
 export const playerPose = player.playerPose;
 export const poseList = player.poses;
@@ -125,12 +132,13 @@ function subjectOf(name) {
   if (name.startsWith('pumpkin')) return pumpkinSubject(Number(name.slice(7)));
   if (name.startsWith('basalt')) return basaltSubject(Number(name.slice(6)));
   if (name.startsWith('barrel')) return barrelSubject(Number(name.slice(6)));
+  if (name.startsWith('cookie')) return cookieSubject(Number(name.slice(6)));
   return null;
 }
 
 // A porta anda junto com a casa: pedir a foto de uma casa pede também a da porta
 const WITH_HOUSE = {
-  igloo: ['door-igloo'], cabin: ['door-cabin'], base: ['door-base'], hut: ['door-hut'], haunted: ['door-haunted'], cave: ['door-cave', 'door-stone'], fort: ['door-fort'],
+  igloo: ['door-igloo'], cabin: ['door-cabin'], base: ['door-base'], hut: ['door-hut'], haunted: ['door-haunted'], cave: ['door-cave', 'door-stone'], fort: ['door-fort'], ginger: ['door-ginger'],
 };
 export function want(name) {
   loadModel();
@@ -406,6 +414,26 @@ const ANCHOR = {
       after: (ctx) => {
         if (hop < 3) ringAt(ctx, c.x, y + 9, 14, 3, [225, 250, 250], 0.55);
       },
+    };
+  },
+  // Reino dos doces: o brilho da rosquinha e os anéis no chocolate são 2D
+  bee: (c, y, t) => ({ y: y - 32 + Math.sin(t * 4 + c.ph) * 5, shadow: [c.x, y + 14, 12, 3, 'rgba(40, 10, 0, 0.25)'] }),
+  worm: (c, y) => ({ y: y + 8, water: y + 9, cover: 44 }),
+  gummy: (c, y, t) => {
+    const hop = Math.abs(Math.sin(t * 4 + c.ph)) * 14;
+    return {
+      y: y + 8 - hop,
+      after: (ctx) => {
+        if (hop < 4) ringAt(ctx, c.x, y + 9, 15, 3, [236, 196, 160], 0.55);
+      },
+    };
+  },
+  donut: (c, y, t) => {
+    const by = y + 4 + Math.sin(t * 3 + c.ph) * 2;
+    return {
+      y: by, tilt: Math.sin(t * 2 + c.ph) * 0.12,
+      before: (ctx) => glowAt(ctx, c.x, by - 2, 20, [255, 220, 240], 0.35),
+      after: (ctx) => ringAt(ctx, c.x, y + 9, 16, 3, [236, 196, 160], 0.55),
     };
   },
   candy: (c, y, t) => {
@@ -1191,11 +1219,96 @@ export function drawFort3D(ctx, igloo, t) {
   return true;
 }
 
+// ---------------------------------------------------------------- Reino dos doces
+// Biscoitos waffle: mesmo formato do sprite 2D (cookieSprite de src/candy.js)
+export function cookieSprite3D(piece, active) {
+  const cacheKey = active ? '3d-cookie-on' : '3d-cookie-off';
+  if (piece.sprites[cacheKey]) return piece.sprites[cacheKey];
+  const name = `cookie${piece.w}`;
+  want(name);
+  const img = sprite(name, `${piece.seed % COOKIE_3D.VARIANTS}${active ? 1 : 0}`);
+  if (!img) return null;
+  const s = { canvas: img, ox: COOKIE_3D.PAD, oy: COOKIE_3D.TOP, w: piece.w + COOKIE_3D.PAD * 2, h: COOKIE_3D.H };
+  piece.sprites[cacheKey] = s;
+  return s;
+}
+
+// Ganchos de src/candy.js (candyArt): pirulito, bengala e balas de goma, já na base
+export function drawLollipop3D(ctx) {
+  want('lollipop');
+  const img = sprite('lollipop', 'l');
+  if (!img) return false;
+  blit(ctx, img, lollipopModel.box);
+  return true;
+}
+
+export function drawCane3D(ctx) {
+  want('cane');
+  const img = sprite('cane', 'c');
+  if (!img) return false;
+  blit(ctx, img, caneModel.box);
+  return true;
+}
+
+export function drawGumdrops3D(ctx) {
+  want('gumdrops');
+  const img = sprite('gumdrops', 'g');
+  if (!img) return false;
+  blit(ctx, img, gumdropsModel.box);
+  return true;
+}
+
+// Casa de biscoito 3D: mesmo comportamento da casa 2D (sombra, contornos-guia, peças
+// caindo com o quique, a luz das janelas e a porta por cima)
+export function drawGinger3D(ctx, igloo, t) {
+  want('ginger');
+  const N = GINGER_PIECES.length - 1; // a última peça é a porta
+  const blocks = Math.min(igloo.count, N);
+  let settled = 0;
+  while (settled < blocks && igloo.anim[settled] >= 1) settled++;
+  const settledKey = settled === N && igloo.lit ? 'lit' : `n${settled}`;
+  if (blocks > 0 && !sprite('ginger', `b${blocks - 1}`)) return false;
+  if (settled > 0 && !sprite('ginger', settledKey)) return false;
+  const { HW, WALL_H, ROOF_TOP, ROOF_OVER } = GINGER_HOUSE;
+  ctx.save();
+  ctx.translate(IGLOO.x, IGLOO.baseY);
+  ctx.fillStyle = 'rgba(120, 60, 90, 0.3)';
+  ctx.beginPath();
+  ctx.ellipse(6, 3, HW + 30, 9, 0, 0, TAU);
+  ctx.fill();
+  if (igloo.count < GINGER_PIECES.length) {
+    ctx.save();
+    ctx.setLineDash([5, 6]);
+    ctx.strokeStyle = 'rgba(150, 80, 60, 0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-HW, -WALL_H, HW * 2, WALL_H);
+    ctx.beginPath();
+    ctx.moveTo(-HW - ROOF_OVER, -WALL_H);
+    ctx.lineTo(0, ROOF_TOP);
+    ctx.lineTo(HW + ROOF_OVER, -WALL_H);
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (settled > 0) blit(ctx, sprite('ginger', settledKey), gingerHouse.box);
+  for (let i = settled; i < blocks; i++) {
+    const a = igloo.anim[i];
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 3);
+    ctx.translate(0, -(1 - easeOutBack(a)) * 46);
+    blit(ctx, sprite('ginger', `b${i}`), gingerHouse.box);
+    ctx.restore();
+  }
+  if (settled === N) drawGingerLights(ctx, t, igloo.lit);
+  ctx.restore();
+  drawGingerDoor(ctx, igloo, t);
+  return true;
+}
+
 // ---------------------------------------------------------------- Cenários de fundo
 // Fundo 3D de um cenário, no mesmo formato do fundo 2D ({ canvas, w, h }), ou null
 // enquanto a foto não fica pronta (vale o 2D). A névoa na base das montanhas e os
 // brilhos da neve continuam em 2D, por cima da foto, como no desenho antigo.
-export const SCENERY_3D = { ice: 'bg-ice', forest: 'bg-forest', space: 'bg-space', beach: 'bg-beach', halloween: 'bg-halloween', dino: 'bg-dino', pirate: 'bg-pirate' };
+export const SCENERY_3D = { ice: 'bg-ice', forest: 'bg-forest', space: 'bg-space', beach: 'bg-beach', halloween: 'bg-halloween', dino: 'bg-dino', pirate: 'bg-pirate', candy: 'bg-candy' };
 const backgrounds = {};
 export function background3D(kind) {
   const name = SCENERY_3D[kind];
@@ -1270,11 +1383,11 @@ function beachFinish(g, foam = true) {
 // de uma fase com modelos novos (fase especial, bicho novo) o desenho 2D aparecia por
 // um instante antes do 3D. `levelModels` lista tudo o que uma fase usa em 3D, para
 // o jogo pedir antes (durante a contagem do bônus) e só começar a fase com tudo pronto.
-const FLOE_PREFIX = { ice: 'floe', forest: 'log', space: 'rock', beach: 'board', halloween: 'pumpkin', dino: 'basalt', pirate: 'barrel' };
+const FLOE_PREFIX = { ice: 'floe', forest: 'log', space: 'rock', beach: 'board', halloween: 'pumpkin', dino: 'basalt', pirate: 'barrel', candy: 'cookie' };
 const FRAG_W = 36; // largura dos pedaços das placas fragmentadas (src/floes.js)
 const HOUSE_MODELS = {
   igloo: ['igloo', 'porch', 'door-igloo'], cabin: ['cabin', 'door-cabin'], base: ['base', 'door-base'], hut: ['hut', 'door-hut'],
-  haunted: ['haunted', 'door-haunted'], cave: ['cave', 'caveTusks', 'door-cave', 'door-stone'], fort: ['fort', 'door-fort'],
+  haunted: ['haunted', 'door-haunted'], cave: ['cave', 'caveTusks', 'door-cave', 'door-stone'], fort: ['fort', 'door-fort'], ginger: ['ginger', 'door-ginger'],
 };
 const DECOR_MODELS = {
   natal: ['xtree', 'sleigh'],
@@ -1284,6 +1397,7 @@ const DECOR_MODELS = {
   halloween: ['deadTree', 'jack'],
   dino: ['fern', 'nest', 'egg'],
   piratas: ['chest', 'cannon', 'anchor'],
+  doces: ['lollipop', 'cane', 'gumdrops'],
 };
 
 export function levelModels(level) {

@@ -117,11 +117,14 @@ function restore({ ls, prefix, saved }) {
   }
 }
 
-export async function runAll({ filter } = {}) {
+// onProgress(feitos, total, teste): chamado antes de cada teste (a página mostra o andamento)
+export async function runAll({ filter, onProgress } = {}) {
   const realRandom = Math.random;
   const results = [];
+  const todo = tests.filter((t) => !filter || t.id.toLowerCase().includes(filter.toLowerCase()));
   for (const t of tests) {
     if (filter && !t.id.toLowerCase().includes(filter.toLowerCase())) continue;
+    onProgress?.(results.length, todo.length, t);
     if (t.todo) {
       results.push({ ...t, status: 'todo' });
       continue;

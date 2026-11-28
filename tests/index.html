@@ -30,7 +30,15 @@
 
     for (const f of SPEC_FILES) await import(`./specs/${f}`);
     const filter = new URLSearchParams(location.search).get('filtro') || undefined;
-    const results = await runAll({ filter });
+    // Andamento: "Rodando… 123/724 (17%) · nome do teste" (também em window.__testProgress)
+    const summary = document.getElementById('summary');
+    const results = await runAll({
+      filter,
+      onProgress: (done, total, t) => {
+        window.__testProgress = { done, total, name: t.id };
+        summary.textContent = `Rodando… ${done}/${total} (${Math.floor((done / total) * 100)}%) · ${t.id}`;
+      },
+    });
     let baseline = [];
     try { baseline = await (await fetch('baseline.json', { cache: 'no-store' })).json(); } catch {}
     const { missing, progressive } = filter ? { missing: [], progressive: [] } : compareBaseline(results, baseline);

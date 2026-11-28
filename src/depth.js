@@ -524,6 +524,7 @@ export const FG_KINDS = {
   // Piratas (pedido do usuário): capim em toda a borda de baixo, não só nos cantos
   // (full = altura mínima no meio), mais denso e menos desfocado
   pirate: { base: [46, 96, 50], tip: [104, 164, 78], shape: 'fronds', full: 0.32, blur: 1.6, dense: true },
+  candy: { base: [255, 240, 246], tip: [255, 190, 220], shape: 'mound' },
   space: { base: [70, 66, 84], tip: [120, 116, 136], shape: 'rocks' },
 };
 

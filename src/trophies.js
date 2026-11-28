@@ -198,6 +198,55 @@ TROPHY_EMBLEMS.piratas = (ctx) => {
   ctx.fillRect(1.6, -6, 2, 2);
 };
 
+// Pirulito em espiral diante de um cupcake de glacê rosa com a cereja
+TROPHY_EMBLEMS.doces = (ctx) => {
+  ctx.fillStyle = '#FFE0EE';
+  ctx.fillRect(-16, -16, 32, 32);
+  // Pirulito atrás, um pouco de lado
+  ctx.fillStyle = '#F6EEE0';
+  ctx.fillRect(7, -6, 2, 14);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(8, -9, 6.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#FF4A8A';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  for (let a = 0; a < Math.PI * 4; a += 0.3) {
+    const r = (a / (Math.PI * 4)) * 5.6;
+    const x = 8 + Math.cos(a) * r;
+    const y = -9 + Math.sin(a) * r;
+    if (a === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // Forminha listrada do cupcake
+  ctx.fillStyle = '#5AC8FA';
+  ctx.beginPath();
+  ctx.moveTo(-12, 2);
+  ctx.lineTo(4, 2);
+  ctx.lineTo(2, 15);
+  ctx.lineTo(-10, 15);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  for (const x of [-8, -4, 0]) ctx.fillRect(x, 3, 1.4, 11);
+  // Glacê rosa em ondas e a cereja
+  ctx.fillStyle = '#FF9ACB';
+  ctx.beginPath();
+  ctx.ellipse(-4, 1, 10, 5, 0, 0, Math.PI * 2);
+  ctx.ellipse(-4, -4, 7, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#D8202E';
+  ctx.beginPath();
+  ctx.arc(-4, -9, 2.8, 0, Math.PI * 2);
+  ctx.fill();
+  for (const [x, y, c] of [[-9, 0, '#FFD23A'], [-2, 2, '#5AC8FA'], [0, -3, '#7ADB6A'], [-7, -4, '#FFFFFF']]) {
+    ctx.fillStyle = c;
+    ctx.fillRect(x, y, 2, 1);
+  }
+};
+
 // Pegada de dinossauro de três dedos diante de um vulcão soltando lava
 TROPHY_EMBLEMS.dinossauros = (ctx) => {
   ctx.fillStyle = '#E8724A';

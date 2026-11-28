@@ -73,7 +73,8 @@ suite('Pontos: placa e grau de 10 a 100, recomeçando a cada 10 fases', () => {
   });
 
   test('acender uma fileira numa fase avançada dá os pontos do ciclo', () => {
-    for (const [lv, pts] of [[13, 30], [27, 70], [40, 100]]) {
+    // Com aprovação do usuário, a fase 40 (agora o Reino dos doces) virou a 60
+    for (const [lv, pts] of [[13, 30], [27, 70], [60, 100]]) {
       const g = makeGame({ level: lv });
       g.onLand(1);
       expect(g.score, `fase ${lv}`).toBe(pts);

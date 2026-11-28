@@ -12,7 +12,7 @@ export const WAKE_LINE = 16;
 export const PRINTS = { step: 22, life: 2.6, hold: 0.35, spread: 3.5 };
 // Cor das pegadas por cenário (a marca afundada no chão)
 export const PRINT_COLORS = {
-  ice: [112, 146, 172], forest: [44, 62, 30], space: [84, 82, 98], beach: [152, 118, 74], halloween: [26, 32, 28], dino: [62, 40, 26], pirate: [150, 116, 70],
+  ice: [112, 146, 172], forest: [44, 62, 30], space: [84, 82, 98], beach: [152, 118, 74], halloween: [26, 32, 28], dino: [62, 40, 26], pirate: [150, 116, 70], candy: [216, 170, 190],
 };
 // Peixes que saltam da água (frequência do salto, a mesma do desenho): espirram água ao
 // sair e, mais forte, ao voltar

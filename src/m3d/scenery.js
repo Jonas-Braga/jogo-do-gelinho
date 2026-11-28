@@ -8,6 +8,7 @@ import { TAU, sweepGeometry } from './kit.js';
 import { GRAVES } from '../halloween.js';
 import { VOLCANOES, NEST, TREE_FERNS } from '../dino.js';
 import { HORIZON as PIRATE_HORIZON, SKULL_ISLE, GALLEON, CHEST, CANNON, ANCHOR } from '../pirate.js';
+import { SCOOPS, COTTON_TREES, LOLLIPOP, CANE, GUMDROPS, SPRINKLES } from '../candy.js';
 
 export const BG_H = WATER_TOP + 12;
 const IGLOO_X = IGLOO.x; // a casa de cada fase fica aqui (nada de pedras ou buracos embaixo dela) // mesma altura do fundo 2D
@@ -1529,6 +1530,224 @@ export const pirateScenery = {
       },
     });
     root.add(kit.mesh(bank.geo, vcol({ roughness: 0.55, flatShading: true })));
+    return { root };
+  },
+  apply() {},
+};
+
+// ---------------------------------------------------------------- Reino dos doces
+// Fase 40: duas fileiras de morros de sorvete (morango, menta, baunilha e mirtilo; os de
+// trás mais claros pela névoa rosada) com a calda de chocolate escorrendo em gotas e a
+// cereja no maior, árvores de algodão-doce e pirulitos gigantes entre os morros, o chão
+// de glacê branco com manchas rosadas, montinhos de chantilly e granulado colorido
+// (longe da casa e dos enfeites) e o barranco em fatia de bolo (glacê escorrendo, massa,
+// recheio de creme, geleia e massa) entrando no rio de chocolate.
+export const CANDY_SCOOPS = [
+  ...SCOOPS.map((s, i) => ({ x: s.x, r: s.r, z: 505 + (i % 2) * 14, top: 92 - (s.r - 120) * 0.6, color: s.color, dark: s.dark, cherry: s.r >= 150, seed: 11 + i })),
+  { x: -10, r: 130, z: 420, top: 70, color: '#FFE0B0', dark: '#D8A870', seed: 31 },
+  { x: 250, r: 150, z: 420, top: 60, color: '#D8C8FF', dark: '#A890E0', seed: 32 },
+  { x: 520, r: 140, z: 420, top: 66, color: '#FFC8DA', dark: '#E090B0', seed: 33 },
+  { x: 800, r: 150, z: 420, top: 58, color: '#C8F0E0', dark: '#88C8B0', seed: 34 },
+  { x: 1070, r: 140, z: 420, top: 64, color: '#FFF2C8', dark: '#E0C890', seed: 35 },
+  { x: 1300, r: 140, z: 420, top: 70, color: '#FFC8DA', dark: '#E090B0', seed: 36 },
+];
+const CANDY_CLEAR = [[LOLLIPOP.x, 40], [CANE.x, 36], [GUMDROPS.x, 46], [IGLOO_X, 190]];
+export const candyClear = (x) => CANDY_CLEAR.every(([cx, r]) => Math.abs(x - cx) > r);
+
+export const candyScenery = {
+  box: { left: 0, right: W, top: 0, bottom: -BG_H },
+  res: 2,
+  elevation: SCENE_EL,
+  distance: 1300,
+  poses: () => [{ key: 'main' }],
+  stage: (studio) => studio.stageScenery({
+    target: [640, 0, 480], size: 950, fog: { color: '#F8DCEA', near: 1050, far: 2200 },
+    sky: 1, skyColor: '#FFE8F2', ground: '#F0C8D8', keyIntensity: 3.1, keyColor: '#FFF0E8',
+    sun: [-0.7, 0.55, -0.2], exposure: 1,
+  }),
+  build(kit) {
+    const { THREE, group, mat } = kit;
+    const root = group();
+    const vcol = (extra = {}) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, ...extra });
+    let seed = 1;
+    const rnd = () => hash(seed++, 41, 457);
+    const zBack = zAt(120);
+    const zEdge = zAt(EDGE_TOP);
+    const zFront = zAt(SNOW_BACK);
+    // Chão de glacê (ondulado, mais rosado nas manchas), do fundo até a beira
+    const cW = new THREE.Color('#FFFFFF');
+    const cP = new THREE.Color('#FFD6E6');
+    const frost = (x, z) => {
+      const k = Math.max(0, (z - zFront) / (zEdge - zFront));
+      return (fbm(x * 0.01, z * 0.02, 461, 4) - 0.45) * 6 * Math.min(1, (1 - k) * 5) + (z < zFront ? (fbm(x * 0.006, z * 0.01, 463, 3) - 0.5) * 10 : 0);
+    };
+    root.add(kit.mesh(heightField(THREE, {
+      x0: -60, x1: W + 60, z0: zBack, z1: zEdge, dx: 6, dz: 5,
+      h: frost,
+      colorAt: (c, x, y, z) => c.copy(cW).lerp(cP, Math.min(0.8, Math.max(0, fbm(x * 0.012, z * 0.03, 467, 3) - 0.45) * 2.4)),
+    }), vcol({ bumpMap: grainTexture(THREE, 41), bumpScale: 0.35, roughness: 0.55 })));
+    // Morros de sorvete com a calda de chocolate por cima
+    const syrup = mat('#5A2E16', 0.22, { metalness: 0.05 });
+    for (const s of CANDY_SCOOPS) {
+      const base = frost(s.x, s.z) - 6;
+      const H = (s.z * S - s.top) / C - base;
+      const D = 70;
+      const light = new THREE.Color('#FFFFFF');
+      const col = new THREE.Color(s.color);
+      const dark = new THREE.Color(s.dark);
+      const geo = new THREE.SphereGeometry(1, 56, 28, 0, TAU, 0, Math.PI * 0.55);
+      const pos = geo.attributes.position;
+      const cols = [];
+      for (let i = 0; i < pos.count; i++) {
+        const vx = pos.getX(i), vy = pos.getY(i), vz = pos.getZ(i);
+        // Borda de baixo derretendo em ondas, superfície levemente irregular
+        const a = Math.atan2(vz, vx);
+        const melt = vy < 0.2 ? (0.2 - vy) * (1 + Math.sin(a * 9 + s.seed) * 0.35) : 0;
+        const n = 1 + (fbm(vx * 2 + s.seed, vz * 2 + vy, 469, 3) - 0.5) * 0.06 + melt * 0.4;
+        pos.setXYZ(i, vx * s.r * n, base + vy * H, vz * D * n);
+        const t = Math.max(0, Math.min(1, vy));
+        const c = dark.clone().lerp(col, Math.min(1, t * 1.8)).lerp(light, Math.max(0, t - 0.75) * 1.6);
+        cols.push(c.r, c.g, c.b);
+      }
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+      geo.computeVertexNormals();
+      root.add(kit.mesh(geo, vcol({ roughness: 0.6 }), s.x, 0, s.z));
+      // Calda: calota um pouco maior, com gotas escorrendo pela borda
+      const cap = new THREE.SphereGeometry(1, 64, 20, 0, TAU, 0, Math.PI * 0.2);
+      const cp = cap.attributes.position;
+      for (let i = 0; i < cp.count; i++) {
+        const vx = cp.getX(i), vy = cp.getY(i), vz = cp.getZ(i);
+        const a = Math.atan2(vz, vx);
+        let th = Math.acos(Math.min(1, vy));
+        const edge = Math.max(0, (th - Math.PI * 0.1) / (Math.PI * 0.1));
+        const drip = Math.max(0, Math.sin(a * 6 + s.seed * 1.7)) ** 1.6;
+        th += edge * drip * Math.PI * 0.13;
+        const sx = Math.sin(th) * Math.cos(a);
+        const sz = Math.sin(th) * Math.sin(a);
+        const sy = Math.cos(th);
+        cp.setXYZ(i, sx * s.r * 1.02, base + sy * H * 1.02 + 0.5, sz * D * 1.02);
+      }
+      cap.computeVertexNormals();
+      root.add(kit.mesh(cap, syrup, s.x, 0, s.z));
+      if (s.cherry) {
+        const topY = base + H * 1.02;
+        root.add(kit.sphere(11, mat('#D8202E', 0.15, { emissive: '#4A0008', emissiveIntensity: 0.2 }), s.x + 6, topY + 9, s.z + 4, 20));
+        root.add(kit.bone(1.1, [s.x + 8, topY + 18, s.z + 4], [s.x + 22, topY + 36, s.z], mat('#4A7A2A', 0.6)));
+      }
+    }
+    // Árvores de algodão-doce (palito e nuvem fofa) entre os morros e na beira do fundo
+    const sticks = [];
+    const fluff = { '#FFB6E0': [], '#B6E2FF': [], '#FFF0B0': [] };
+    const tones = Object.keys(fluff);
+    const tree = (x, z, h, tone) => {
+      const y0 = frost(x, z) - 1;
+      sticks.push({ x, y: y0, z, s: 1, sy: h * 0.62 });
+      for (const [dx, dy, r] of [[0, 0.82, 0.28], [-0.2, 0.68, 0.22], [0.2, 0.68, 0.22], [0, 0.6, 0.24], [0.1, 0.9, 0.18]]) {
+        fluff[tone].push({ x: x + dx * h, y: y0 + dy * h, z: z + (rnd() - 0.5) * 6, s: r * h, sy: 0.92, ry: rnd() * TAU });
+      }
+    };
+    for (const t of COTTON_TREES) tree(t.x, zFront - 6, t.h / C, t.color === '#B6E2FF' ? '#B6E2FF' : '#FFB6E0');
+    for (let i = 0; i < 14; i++) {
+      const x = -20 + rnd() * (W + 40);
+      if (Math.abs(x - IGLOO_X) < 150) continue;
+      tree(x, zFront - 30 - rnd() * 40, (40 + rnd() * 40) / C, tones[i % 3]);
+    }
+    const stickG = new THREE.CylinderGeometry(1.4, 1.8, 1, 8);
+    stickG.translate(0, 0.5, 0);
+    root.add(instanced(THREE, stickG, mat('#F6EEE0', 0.6), sticks));
+    const puffG = new THREE.IcosahedronGeometry(1, 2);
+    for (const [tone, items] of Object.entries(fluff)) {
+      root.add(instanced(THREE, puffG, new THREE.MeshStandardMaterial({ color: tone, roughness: 1, emissive: tone, emissiveIntensity: 0.12 }), items));
+    }
+    // Pirulitos gigantes no fundo (disco em espiral virado para a frente)
+    const swirl = (() => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const g = c.getContext('2d');
+      g.fillStyle = '#FFFFFF';
+      g.fillRect(0, 0, 128, 128);
+      g.lineWidth = 11;
+      g.lineCap = 'round';
+      ['#FF4A8A', '#5AC8FA', '#FFD23A'].forEach((col, k) => {
+        g.strokeStyle = col;
+        g.beginPath();
+        for (let a = 0; a < TAU * 2.2; a += 0.1) {
+          const r = (a / (TAU * 2.2)) * 60;
+          const x = 64 + Math.cos(a + k * 2.1) * r;
+          const y = 64 + Math.sin(a + k * 2.1) * r;
+          if (a === 0) g.moveTo(x, y);
+          else g.lineTo(x, y);
+        }
+        g.stroke();
+      });
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    })();
+    const discM = [mat('#FFE0F0', 0.25), new THREE.MeshStandardMaterial({ map: swirl, roughness: 0.2 }), mat('#FFE0F0', 0.25)];
+    for (const [x, h, r] of [[190, 90, 22], [610, 110, 26], [880, 80, 18], [1250, 100, 22]]) {
+      const z = zFront - 50;
+      const y0 = frost(x, z) - 1;
+      root.add(kit.mesh(new THREE.CylinderGeometry(1.8, 1.8, h / C, 8), mat('#F6EEE0', 0.6), x, y0 + h / C / 2, z));
+      const d = kit.mesh(new THREE.CylinderGeometry(r, r, 5, 40), discM, x, y0 + h / C + r * 0.8, z);
+      d.rotation.x = Math.PI / 2;
+      root.add(d);
+    }
+    // Chantilly e granulado no glacê da frente (longe da casa e dos enfeites)
+    const cream = [];
+    const sprinkles = [];
+    for (let i = 0; i < 1600; i++) {
+      const x = -20 + rnd() * (W + 40);
+      const z = zFront + rnd() * (zEdge - zFront - 6);
+      const y = frost(x, z);
+      if (i < 40) {
+        if (!candyClear(x)) continue;
+        cream.push({ x, y: y - 1, z, s: 3 + rnd() * 3, sy: 0.9, ry: rnd() * TAU });
+        continue;
+      }
+      sprinkles.push({ x, y: y + 0.4, z, s: 1, sx: 0.5, sy: 0.5, sz: 1, ry: rnd() * TAU, color: SPRINKLES[i % SPRINKLES.length] });
+    }
+    // Montinho de chantilly: cone torcido de gomos
+    const dollop = new THREE.ConeGeometry(1, 1.6, 8, 3);
+    {
+      const p = dollop.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const a = Math.atan2(p.getZ(i), p.getX(i));
+        const k = 1 + Math.cos(a * 8 + p.getY(i) * 4) * 0.12;
+        p.setX(i, p.getX(i) * k);
+        p.setZ(i, p.getZ(i) * k);
+      }
+      dollop.translate(0, 0.8, 0);
+      dollop.computeVertexNormals();
+    }
+    root.add(instanced(THREE, dollop, mat('#FFFFFF', 0.6), cream));
+    const spr = new THREE.CapsuleGeometry(0.5, 2, 2, 6);
+    spr.rotateX(Math.PI / 2);
+    root.add(instanced(THREE, spr, new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.4 }), sprinkles, { shadow: false }));
+    // Barranco em fatia de bolo: glacê, massa, creme, geleia, massa e o chocolate embaixo
+    const layers = [
+      [0.12, '#FFFFFF'], [0.36, '#F2CC98'], [0.46, '#FFF8F0'], [0.56, '#D8506A'], [0.82, '#E2B074'], [1, '#5A2E16'],
+    ].map(([v, c]) => [v, new THREE.Color(c)]);
+    const bank = bankWall(THREE, {
+      zEdge, step: 5, rows: 22,
+      bulge: (x, v) => (noise2(x * 0.05, v * 2, 471) - 0.5) * 1.6 + v * 8,
+      color: (c, x, v) => {
+        const wob = (noise2(x * 0.04, 3, 473) - 0.5) * 0.04;
+        const hit = layers.find(([lv]) => v + wob <= lv) || layers[layers.length - 1];
+        c.copy(hit[1]);
+        // Furinhos da massa
+        if (hit[1].r > 0.85 && hit[1].g < 0.85 && noise2(x * 0.6, v * 30, 477) > 0.7) c.offsetHSL(0, 0, -0.08);
+      },
+    });
+    root.add(kit.mesh(bank.geo, vcol({ roughness: 0.75 })));
+    // Glacê escorrendo da beira por cima da fatia
+    const drips = [];
+    for (let x = -30; x < W + 30; x += 9 + rnd() * 10) {
+      // Gotas penduradas logo abaixo da beira (nada para cima da linha do glacê)
+      const len = rnd() < 0.45 ? 3 + rnd() * 5 : 1.6;
+      drips.push({ x, y: -len - 1.2, z: zEdge + 2.4, s: 2.3, sy: len / 2.3, sz: 0.7 });
+    }
+    root.add(instanced(THREE, new THREE.SphereGeometry(1, 10, 8), mat('#FFFFFF', 0.45), drips));
     return { root };
   },
   apply() {},

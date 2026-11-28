@@ -21,6 +21,7 @@ export const SPEC_FILES = [
   'poderes.test.js',
   'dinossauros.test.js',
   'piratas.test.js',
+  'doces.test.js',
   'profundidade.test.js',
   'pontos.test.js',
   'preload.test.js',
