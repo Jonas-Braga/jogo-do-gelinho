@@ -2,7 +2,7 @@ import { W, H, RULES } from './config.js';
 import { drawLifeIcon } from './sprites.js';
 import { FONT, panel, mix, pad6 } from './ui.js';
 import {
-  drawTitle, drawPause, drawLevelEnd, drawGameOver, drawBanner, drawTouchButtons,
+  drawTitle, drawPause, drawLevelEnd, drawGameOver, drawCheckpoint, drawBanner, drawTouchButtons,
 } from './screens.js';
 import { drawCelebration } from './trophies.js';
 import { POWERS, POWER_NAMES, drawPowerIcon } from './powers.js';
@@ -151,7 +151,8 @@ export function drawHud(ctx, game) {
   ctx.textAlign = 'left';
 
   // Controles: dica de teclado ou botões de toque
-  if (game.input.showTouch) {
+  // Na escolha do checkpoint toca-se direto nos cartões: os botões sairiam por cima
+  if (game.input.showTouch && game.state !== 'checkpoint') {
     drawTouchButtons(ctx, game);
   } else {
     ctx.font = `500 13px ${FONT}`;
@@ -177,6 +178,7 @@ export function drawHud(ctx, game) {
   if (game.state === 'levelEnd') drawLevelEnd(ctx, game);
   else if (game.state === 'trophy') drawCelebration(ctx, game);
   else if (game.state === 'gameOver') drawGameOver(ctx, game);
+  else if (game.state === 'checkpoint') drawCheckpoint(ctx, game);
   if (game.paused) drawPause(ctx, game);
   ctx.restore();
 }

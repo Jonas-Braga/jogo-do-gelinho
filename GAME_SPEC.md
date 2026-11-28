@@ -100,6 +100,14 @@ o visual deve ser totalmente novo.
 &#x20; de 45°), e o tempo a mais vira bônus de temperatura. Vida extra a cada 5.000
 &#x20; pontos. Começa com 3 vidas.
 
+\- \*\*Checkpoints:\*\* cada fase especial vencida (com o troféu dela) é um checkpoint.
+&#x20; Ao perder todas as vidas, quem tem troféus escolhe na tela de troféus de onde
+&#x20; recomeçar: de uma fase especial já vencida, com 1 vida e pontuação zerada (os
+&#x20; prêmios da fase dão mais vidas), ou "Começar do zero" (fase 1, 3 vidas). Os
+&#x20; checkpoints continuam salvos depois de recomeçar do zero.
+&#x20; Na tela inicial também dá para começar de um checkpoint: clicando/tocando num
+&#x20; troféu ganho da prateleira (ou ← → e Enter).
+
 
 
 \## Direção visual (moderna e semi-realista)

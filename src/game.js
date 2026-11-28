@@ -12,7 +12,7 @@ import { SeaTraffic, engineSound } from './beach.js';
 import { Sfx } from './audio.js';
 import { levelParams, levelIntro } from './levels.js';
 import { loadHighScore, saveHighScore, loadTrophies, saveTrophies } from './storage.js';
-import { normTrophies } from './specials.js';
+import { normTrophies, TROPHY_LEVELS } from './specials.js';
 import { Celebration } from './trophies.js';
 import { DUST } from './space.js';
 import { SEA } from './beach.js';
@@ -40,7 +40,9 @@ const LAND_FX = {
 
 // Estados: title (tela inicial), play (jogando, incluindo animações de morte),
 // entering (entrando no iglu), levelEnd (contagem do bônus), trophy (comemoração de
-// um troféu novo, ao concluir uma fase especial pela primeira vez), gameOver.
+// um troféu novo, ao concluir uma fase especial pela primeira vez), gameOver e
+// checkpoint (depois do fim de jogo, quem tem troféus escolhe de que fase especial
+// recomeçar, com 1 vida, ou "Começar do zero").
 export class Game {
   // `title: true` começa na tela inicial (o jogo de verdade); sem a opção, começa
   // direto numa partida (usado pelos testes).
@@ -82,31 +84,35 @@ export class Game {
     this.banner = null;
 
     this.input.on('pause', () => {
-      if (this.state === 'gameOver' || this.state === 'title') return;
+      if (this.state === 'gameOver' || this.state === 'title' || this.state === 'checkpoint') return;
       this.paused = !this.paused;
       this.sfx.play('pause');
     });
     this.input.on('mute', () => this.sfx.toggleMute());
-    this.input.on('blur', () => { if (this.state !== 'title') this.paused = true; });
+    this.input.on('blur', () => { if (this.state !== 'title' && this.state !== 'checkpoint') this.paused = true; });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        if (this.state !== 'title') this.paused = true;
+        if (this.state !== 'title' && this.state !== 'checkpoint') this.paused = true;
         this.saveRecord();
       }
     });
     this.input.on('action', () => {
-      if (this.state === 'gameOver' || this.state === 'title') this.newGame();
+      if (this.state === 'gameOver') this.afterGameOver();
+      else if (this.state === 'checkpoint') this.confirmCheckpoint();
+      else if (this.state === 'title') this.newGame(this.titleSel);
       else if (this.state === 'trophy') this.endCelebration();
       else this.reverseRow();
     });
     this.input.on('start', () => {
-      if (this.state === 'gameOver' || this.state === 'title') this.newGame();
+      if (this.state === 'gameOver') this.afterGameOver();
+      else if (this.state === 'checkpoint') this.confirmCheckpoint();
+      else if (this.state === 'title') this.newGame(this.titleSel);
       else if (this.state === 'trophy') this.endCelebration();
     });
     // Start do joystick: começa/continua nas telas e pausa durante a partida
     this.input.on('menu', () => {
       this.sfx.unlock?.();
-      if (['gameOver', 'title', 'trophy'].includes(this.state)) this.input.emit('start');
+      if (['gameOver', 'checkpoint', 'title', 'trophy'].includes(this.state)) this.input.emit('start');
       else this.input.emit('pause');
     });
 
@@ -117,6 +123,9 @@ export class Game {
   // Tela inicial: cenário vivo ao fundo (placas, neve, iglu aceso soltando fumaça)
   showTitle() {
     this.state = 'title';
+    // Troféu destacado na prateleira (checkpoint de onde começar); 1 = do zero
+    this.titleSel = 1;
+    this.titleAxis = 0;
     this.paused = false;
     this.level = 1;
     this.score = 0;
@@ -182,26 +191,111 @@ export class Game {
     return this.preload.ready(1) ? 'ok' : 'loading';
   }
 
-  newGame() {
+  // `from` = fase especial de onde recomeçar (checkpoint, só com o troféu dela):
+  // começa nela com RULES.checkpointLives vida e pontuação zerada. Sem `from`, do zero.
+  newGame(from = 1) {
     if (this.locked) return;
+    if (!this.checkpoints.includes(from)) from = 1;
     // Modo só 3D: a partida espera as fotos da fase 1 (começa sozinha quando ficam
-    // prontas) e num aparelho sem 3D não começa
-    const gfx = this.state === 'title' ? this.graphicsStatus() : 'ok';
-    if (gfx !== 'ok') {
-      this.startPending = gfx === 'loading';
-      return;
+    // prontas) e num aparelho sem 3D não começa. Começando de um checkpoint na tela
+    // inicial, espera também as fotos da fase dele (no máximo PRELOAD_MAX s).
+    if (this.state === 'title') {
+      const gfx = this.graphicsStatus();
+      const wait = from > 1 && this.preload && !this.preload.ready(from) && (this.pendingWait || 0) < PRELOAD_MAX;
+      if (gfx !== 'ok' || wait) {
+        this.startPending = gfx !== 'unavailable';
+        this.pendingFrom = from;
+        if (from > 1) this.preload?.request(from);
+        return;
+      }
     }
     this.startPending = false;
+    this.pendingFrom = 1;
+    this.pendingWait = 0;
     this.ranking = null;
     this.score = 0;
-    this.lives = RULES.startLives;
-    this.level = 1;
+    this.lives = from > 1 ? RULES.checkpointLives : RULES.startLives;
+    this.level = from;
+    this.startedFrom = from;
+    this.checkpoint = null;
     this.nextLife = RULES.extraLifeEvery;
     this.paused = false;
     this.newRecord = false;
     // A fumaça do iglu aceso da tela inicial não pode sobrar sobre o iglu vazio
     this.particles.fx = this.particles.fx.filter((f) => f.kind !== 'smoke');
     this.startLevel();
+  }
+
+  // Tela inicial: começa direto de um checkpoint (clique/toque num troféu ganho da
+  // prateleira). Troféu ainda não ganho: nada.
+  startFromTitle(level) {
+    if (this.state !== 'title' || this.locked || !this.checkpoints.includes(level)) return false;
+    this.titleSel = level;
+    this.newGame(level);
+    return true;
+  }
+
+  // Tela inicial: ←/→ destacam um troféu ganho da prateleira (ou nenhum = do zero)
+  moveTitleSel(dir) {
+    if (this.state !== 'title' || this.startPending) return;
+    const open = [1, ...this.checkpoints];
+    const i = Math.max(0, open.indexOf(this.titleSel));
+    const next = open[Math.max(0, Math.min(open.length - 1, i + dir))];
+    if (next === this.titleSel) return;
+    this.titleSel = next;
+    this.sfx.play('tick');
+    if (next > 1) this.preload?.request(next);
+  }
+
+  // Checkpoints liberados: as fases especiais cujo troféu o jogador já tem
+  get checkpoints() {
+    return this.trophies.filter((lv) => TROPHY_LEVELS.includes(lv));
+  }
+
+  // Tecla no fim de jogo: quem tem checkpoints escolhe de onde recomeçar; quem não
+  // tem recomeça do zero, como sempre
+  afterGameOver() {
+    if (this.locked) return;
+    const cps = this.checkpoints;
+    if (!cps.length) {
+      this.newGame();
+      return;
+    }
+    // Opções: 1 = "Começar do zero", depois cada fase especial (as sem troféu
+    // aparecem com "?" e não podem ser escolhidas). Começa no checkpoint mais adiantado.
+    this.state = 'checkpoint';
+    this.checkpoint = { options: [1, ...TROPHY_LEVELS], sel: cps[cps.length - 1], axis: 0, pending: false, wait: 0 };
+    this.preload?.request(this.checkpoint.sel);
+  }
+
+  // Muda a opção escolhida (±1), pulando as fases especiais ainda sem troféu
+  moveCheckpoint(dir) {
+    const c = this.checkpoint;
+    if (this.state !== 'checkpoint' || !c || c.pending) return;
+    const open = c.options.filter((lv) => lv === 1 || this.checkpoints.includes(lv));
+    const i = open.indexOf(c.sel);
+    const next = open[Math.max(0, Math.min(open.length - 1, i + dir))];
+    if (next === c.sel) return;
+    c.sel = next;
+    this.sfx.play('tick');
+    this.preload?.request(next);
+  }
+
+  // Escolhe uma opção (toque/clique direto num cartão) ou confirma a selecionada.
+  // A fase só começa com as fotos 3D dela prontas (no máximo PRELOAD_MAX s de espera).
+  confirmCheckpoint(level) {
+    const c = this.checkpoint;
+    if (this.state !== 'checkpoint' || !c) return;
+    if (level != null) {
+      if (level !== 1 && !this.checkpoints.includes(level)) return;
+      c.sel = level;
+      this.preload?.request(level);
+    }
+    if (this.preload && c.wait < PRELOAD_MAX && !this.preload.ready(c.sel)) {
+      c.pending = true; // começa sozinha quando as fotos ficarem prontas
+      return;
+    }
+    this.newGame(c.sel);
   }
 
   // Salva o recorde se a pontuação atual o superou: na conta (com backend) ou no
@@ -393,14 +487,22 @@ export class Game {
     }
 
     // Motor do jet ski passando ao fundo da Praia (silêncio fora da partida)
-    const playing = this.state !== 'title' && this.state !== 'gameOver' && this.state !== 'trophy';
+    const playing = !['title', 'gameOver', 'checkpoint', 'trophy'].includes(this.state);
     this.sfx.setEngine(playing && this.special?.boats ? engineSound(this.boats) : null);
 
-    if (this.state === 'title' && this.startPending && this.graphicsStatus() === 'ok') {
-      this.newGame();
-      return;
+    if (this.state === 'title' && this.startPending) {
+      this.pendingWait = (this.pendingWait || 0) + (this.graphicsStatus() === 'ok' ? dt : 0);
+      const from = this.pendingFrom || 1;
+      if (this.graphicsStatus() === 'ok' && (from === 1 || !this.preload || this.preload.ready(from) || this.pendingWait >= PRELOAD_MAX)) {
+        this.newGame(from);
+        return;
+      }
     }
     if (this.state === 'title') {
+      // ←/→ escolhem o checkpoint na prateleira de troféus (uma opção por aperto)
+      const ax = this.input.axisX();
+      if (ax && ax !== this.titleAxis) this.moveTitleSel(ax);
+      this.titleAxis = ax;
       // Só o cenário vive: personagem respirando na costa e fumaça do iglu
       this.player.moving = false;
       this.smokeT -= dt;
@@ -412,6 +514,18 @@ export class Game {
       return;
     }
     if (this.state === 'gameOver') return;
+    if (this.state === 'checkpoint') {
+      // ←/→ (teclado, joystick ou botões de andar): uma opção por aperto
+      const c = this.checkpoint;
+      const ax = this.input.axisX();
+      if (ax && ax !== c.axis) this.moveCheckpoint(ax);
+      c.axis = ax;
+      if (c.pending) {
+        c.wait += dt;
+        if (c.wait >= PRELOAD_MAX || this.preload.ready(c.sel)) this.newGame(c.sel);
+      }
+      return;
+    }
     this.sfx.updateMusic(dt);
     if (this.state === 'trophy') {
       // Comemoração: o jogo espera a tecla; a fumaça do iglu continua saindo

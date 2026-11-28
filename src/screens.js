@@ -1,8 +1,9 @@
 // Telas: inicial, pausa, fim de fase, fim de jogo, aviso de fase e botões de toque.
-import { W, H } from './config.js';
+import { W, H, RULES } from './config.js';
 import { TOUCH_BUTTONS, WALK_PAD } from './input.js';
 import { FONT, panel, pad6 } from './ui.js';
-import { drawTrophyShelf, drawTrophyIcons } from './trophies.js';
+import { drawTrophyShelf, drawTrophyIcons, drawTrophy } from './trophies.js';
+import { trophyFor } from './specials.js';
 
 // Palavras de cada construção: o que se pula e o que se constrói
 const WORDS = {
@@ -94,7 +95,13 @@ export function drawTitle(ctx, game) {
   }
 
   // Prateleira com a coleção de troféus das fases especiais
-  drawTrophyShelf(ctx, game.trophies, t);
+  // Troféu ganho = checkpoint: clicar/tocar nele (ou ← → e Enter) começa dali
+  const cps = game.checkpoints || [];
+  const sel = cps.includes(game.titleSel) ? game.titleSel : null;
+  const hint = !cps.length ? '' : game.input.style === 'touch'
+    ? 'toque num troféu para começar da fase dele'
+    : game.input.style === 'pad' ? '← → escolher o troféu de onde começar' : '← → ou clique num troféu para começar da fase dele';
+  drawTrophyShelf(ctx, game.trophies, t, { selected: sel, hint });
 
   // Painel de instruções
   const px = W / 2 - 330;
@@ -146,12 +153,20 @@ export function drawTitle(ctx, game) {
     ctx.restore();
     return;
   }
+  if (game.startPending) {
+    // Começando de um checkpoint: as fotos 3D da fase dele ainda estão sendo tiradas
+    ctx.font = `700 20px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText(`Preparando a fase ${game.pendingFrom}… a partida começa sozinha`, W / 2, 638);
+    ctx.restore();
+    return;
+  }
   ctx.globalAlpha = blink(t);
   ctx.font = `800 24px ${FONT}`;
   ctx.fillStyle = '#FFFFFF';
   const start = { pad: 'Aperte A ou Start para começar', touch: 'Toque para começar' }[game.input.style]
     || 'Pressione Enter ou Espaço para começar';
-  ctx.fillText(start, W / 2, 638);
+  ctx.fillText(sel ? `${start} na fase ${sel} (1 vida)` : start, W / 2, 638);
   ctx.restore();
 }
 
@@ -252,10 +267,129 @@ export function drawGameOver(ctx, game) {
   ctx.globalAlpha = blink(t);
   ctx.font = `600 16px ${FONT}`;
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText({ pad: 'Aperte A ou Start para jogar de novo', touch: 'Toque para jogar de novo' }[game.input.style]
-    || 'Enter ou Espaço para jogar de novo', cx, H / 2 + 126);
+  // Com checkpoints (troféus), a tecla leva à escolha de onde recomeçar
+  const more = game.checkpoints?.length > 0;
+  ctx.fillText(more
+    ? ({ pad: 'Aperte A ou Start para continuar', touch: 'Toque para continuar' }[game.input.style]
+      || 'Enter ou Espaço para continuar')
+    : ({ pad: 'Aperte A ou Start para jogar de novo', touch: 'Toque para jogar de novo' }[game.input.style]
+      || 'Enter ou Espaço para jogar de novo'), cx, H / 2 + 126);
   ctx.restore();
   if (game.ranking) drawRanking(ctx, game, W / 2 + 10, RANKING_W);
+}
+
+// ------------------------------------------------------------ Checkpoints
+// Depois do fim de jogo, quem tem troféus escolhe de onde recomeçar: "Começar do
+// zero" (fase 1, 3 vidas) ou uma fase especial já vencida (1 vida). Um cartão por
+// opção; as fases especiais sem troféu aparecem com "?" e não podem ser escolhidas.
+export const CHECKPOINT = { y: 236, h: 250, w: 132, gap: 16, maxW: 1200 };
+
+// Retângulos dos cartões (coordenadas lógicas), na ordem das opções
+export function checkpointCards(options) {
+  const n = options.length;
+  const { w, gap, maxW } = CHECKPOINT;
+  const k = Math.min(1, maxW / (n * w + (n - 1) * gap));
+  const cw = w * k;
+  const cg = gap * k;
+  const x0 = W / 2 - (n * cw + (n - 1) * cg) / 2;
+  return options.map((level, i) => ({ level, x: x0 + i * (cw + cg), y: CHECKPOINT.y, w: cw, h: CHECKPOINT.h }));
+}
+
+// Cartão sob o toque/clique (ou null)
+export function checkpointAt(game, x, y) {
+  const c = game.checkpoint;
+  if (game.state !== 'checkpoint' || !c) return null;
+  return checkpointCards(c.options).find((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) || null;
+}
+
+export function drawCheckpoint(ctx, game) {
+  const c = game.checkpoint;
+  if (!c) return;
+  const t = game.time;
+  const open = new Set(game.checkpoints);
+  ctx.save();
+  ctx.fillStyle = 'rgba(4, 20, 34, 0.72)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  iceTitle(ctx, 'DE ONDE QUER CONTINUAR?', W / 2, 128, 46);
+  ctx.font = `600 16px ${FONT}`;
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillText('Cada troféu é um checkpoint: recomece na fase especial dele.', W / 2, 172);
+
+  for (const r of checkpointCards(c.options)) {
+    const lv = r.level;
+    const zero = lv === 1;
+    const can = zero || open.has(lv);
+    const sel = lv === c.sel;
+    const lift = sel ? -8 - Math.sin(t * 4) * 2 : 0;
+    const y = r.y + lift;
+    ctx.save();
+    ctx.globalAlpha = can ? 1 : 0.45;
+    panel(ctx, r.x, y, r.w, r.h, 16, sel ? 0.9 : 0.7);
+    if (sel) {
+      ctx.strokeStyle = '#FFD36B';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.roundRect(r.x, y, r.w, r.h, 16);
+      ctx.stroke();
+    }
+    const cx = r.x + r.w / 2;
+    const s = r.w / CHECKPOINT.w;
+    if (zero) {
+      // Floco de neve: o começo de tudo
+      ctx.save();
+      ctx.translate(cx, y + 92 * s);
+      ctx.strokeStyle = '#BDEBFA';
+      ctx.lineWidth = 5 * s;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 6; i++) {
+        ctx.rotate(Math.PI / 3);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, -44 * s);
+        ctx.moveTo(0, -26 * s);
+        ctx.lineTo(-11 * s, -36 * s);
+        ctx.moveTo(0, -26 * s);
+        ctx.lineTo(11 * s, -36 * s);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else {
+      const sh = sel ? ((t * 0.6) % 2.2) - 0.6 : null;
+      drawTrophy(ctx, lv, cx, y + 150 * s, 110 * s, { locked: !can, shine: sh });
+    }
+    ctx.fillStyle = sel ? '#FFD36B' : '#FFFFFF';
+    ctx.font = `900 ${Math.round(17 * s)}px ${FONT}`;
+    ctx.fillText(zero ? 'DO ZERO' : `FASE ${lv}`, cx, y + 190 * s);
+    ctx.font = `600 ${Math.round(13 * s)}px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    const sub = zero ? 'Fase 1' : can ? trophyFor(lv)?.name.replace(/^Troféu (d[aoe]s?) /, '') : 'bloqueado';
+    ctx.fillText(sub, cx, y + 212 * s, r.w - 10);
+    // Vidas com que se começa
+    if (can) {
+      const n = zero ? RULES.startLives : RULES.checkpointLives;
+      ctx.fillStyle = '#FF6B7E';
+      ctx.font = `800 ${Math.round(14 * s)}px ${FONT}`;
+      ctx.fillText(`${'♥'.repeat(n)} ${n === 1 ? '1 vida' : `${n} vidas`}`, cx, y + 236 * s, r.w - 10);
+    }
+    ctx.restore();
+  }
+
+  // Opção escolhida, em palavras
+  const sel = c.sel;
+  ctx.font = `800 22px ${FONT}`;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(sel === 1
+    ? 'Começar do zero: fase 1 com 3 vidas (os checkpoints continuam salvos)'
+    : `${trophyFor(sel)?.name || `Fase ${sel}`}: começa na fase ${sel} com 1 vida`, W / 2, 548);
+  ctx.globalAlpha = c.pending ? 0.85 : blink(t);
+  ctx.font = `700 17px ${FONT}`;
+  ctx.fillStyle = c.pending ? 'rgba(255,255,255,0.85)' : '#FFD36B';
+  ctx.fillText(c.pending ? 'Preparando a fase…' : ({
+    pad: '← → escolher   ·   A ou Start começar',
+    touch: 'Toque no ponto de partida',
+  }[game.input.style] || '← → escolher   ·   Enter ou Espaço começar'), W / 2, 594);
+  ctx.restore();
 }
 
 const ordinal = (n) => `${n}º`;

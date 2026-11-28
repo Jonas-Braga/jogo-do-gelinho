@@ -1,6 +1,8 @@
 import { W, H } from './config.js';
 import { Game } from './game.js';
 import { MUTE_BUTTON } from './hud.js';
+import { checkpointAt } from './screens.js';
+import { shelfAt } from './trophies.js';
 import { createBackend } from './backend.js';
 import { AuthUI } from './auth-ui.js';
 import { InstallButton } from './install.js';
@@ -70,6 +72,31 @@ canvas.addEventListener('pointerdown', (e) => {
   if (inMute(p)) {
     game.sfx.toggleMute();
     return;
+  }
+  // Escolha do checkpoint: tocar/clicar num cartão começa dali
+  if (game.state === 'checkpoint') {
+    if (e.pointerType !== 'mouse') {
+      e.preventDefault();
+      game.input.touchMode = true;
+      game.input.padActive = false;
+    }
+    const card = checkpointAt(game, p.x, p.y);
+    if (card) game.confirmCheckpoint(card.level);
+    return;
+  }
+  // Tela inicial: clicar/tocar num troféu ganho da prateleira começa da fase dele;
+  // num troféu ainda não ganho, nada
+  if (game.state === 'title' && !game.locked) {
+    const slot = shelfAt(p.x, p.y);
+    if (slot) {
+      if (e.pointerType !== 'mouse') {
+        e.preventDefault();
+        game.input.touchMode = true;
+        game.input.padActive = false;
+      }
+      game.startFromTitle(slot.level);
+      return;
+    }
   }
   if (e.pointerType === 'mouse') {
     // Mouse: clicar na tela inicial / fim de jogo também começa (e encerra a

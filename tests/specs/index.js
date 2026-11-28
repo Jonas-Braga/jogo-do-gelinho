@@ -25,5 +25,6 @@ export const SPEC_FILES = [
   'pontos.test.js',
   'preload.test.js',
   'bordas.test.js',
+  'checkpoint.test.js',
   'futuras.test.js',
 ];

@@ -31,6 +31,7 @@ export const PLAYER = {
 
 export const RULES = {
   startLives: 3,
+  checkpointLives: 1,     // recomeçando de um checkpoint (fase especial), só 1 vida
   tempStart: 45,
   tempTick: 1.0,          // segundos por grau perdido
   extraLifeEvery: 5000,

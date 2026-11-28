@@ -432,17 +432,32 @@ export function drawTrophyIcons(ctx, trophies, right, baseY) {
 // Coleção na tela inicial: troféus ganhos e silhuetas com "?" para os que faltam
 export const SHELF = { y: 276, size: 84, gap: 118, maxW: 1060 };
 
-export function drawTrophyShelf(ctx, trophies, t = 0) {
+// Posição de cada troféu da prateleira: base centrada em (x, y), altura `size`.
+// Com muitas fases especiais, os troféus encolhem para a prateleira caber na tela.
+export function shelfSlots() {
+  const n = TROPHY_LEVELS.length;
+  const k = Math.min(1, SHELF.maxW / ((n - 1) * SHELF.gap + SHELF.size * 1.7));
+  const size = SHELF.size * k;
+  const gap = SHELF.gap * k;
+  const x0 = W / 2 - ((n - 1) * gap) / 2;
+  return TROPHY_LEVELS.map((level, i) => ({ level, x: x0 + i * gap, y: SHELF.y, size, gap }));
+}
+
+// Troféu da prateleira sob o clique/toque (ou null)
+export function shelfAt(x, y) {
+  return shelfSlots().find((s) => Math.abs(x - s.x) <= s.gap / 2 && y >= s.y - s.size * 1.05 && y <= s.y + 12) || null;
+}
+
+// `selected` = nível do troféu destacado (checkpoint escolhido); `hint` = texto
+// depois do contador da coleção
+export function drawTrophyShelf(ctx, trophies, t = 0, { selected = null, hint = '' } = {}) {
   const have = new Set(trophies || []);
   const n = TROPHY_LEVELS.length;
   if (!n) return;
-  // Com muitas fases especiais, os troféus encolhem para a prateleira caber na tela
-  const k = Math.min(1, SHELF.maxW / ((n - 1) * SHELF.gap + SHELF.size * 1.7));
+  const slots = shelfSlots();
   const { y } = SHELF;
-  const size = SHELF.size * k;
-  const gap = SHELF.gap * k;
+  const { size, gap } = slots[0];
   const w = Math.max(260, (n - 1) * gap + size * 1.7);
-  const x0 = W / 2 - ((n - 1) * gap) / 2;
   ctx.save();
   // Tábua da prateleira
   const g = ctx.createLinearGradient(0, y, 0, y + 10);
@@ -454,17 +469,28 @@ export function drawTrophyShelf(ctx, trophies, t = 0) {
   ctx.fill();
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.fillRect(W / 2 - w / 2 + 6, y + 9, w - 12, 3);
-  TROPHY_LEVELS.forEach((lv, i) => {
-    const x = x0 + i * gap;
+  slots.forEach(({ level: lv, x }, i) => {
     const got = have.has(lv);
+    if (got && lv === selected) {
+      // Checkpoint escolhido: moldura dourada e o troféu um pouco maior
+      ctx.save();
+      ctx.strokeStyle = '#FFD36B';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = 'rgba(255, 211, 107, 0.8)';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.roundRect(x - gap * 0.46, y - size * 1.12, gap * 0.92, size * 1.12 + 6, 12);
+      ctx.stroke();
+      ctx.restore();
+    }
     // Brilho passando de vez em quando, um troféu de cada vez
     const sh = got ? ((t * 0.5 + i * 0.37) % 2.2) - 0.6 : null;
-    drawTrophy(ctx, lv, x, y, size, { locked: !got, shine: sh });
+    drawTrophy(ctx, lv, x, y, got && lv === selected ? size * 1.08 : size, { locked: !got, shine: sh });
   });
   ctx.textAlign = 'center';
   ctx.font = `800 14px ${FONT}`;
   ctx.fillStyle = '#FFD36B';
-  ctx.fillText(`COLEÇÃO DE TROFÉUS  ${have.size}/${n}`, W / 2, y + 30);
+  ctx.fillText(`COLEÇÃO DE TROFÉUS  ${have.size}/${n}${hint ? `   ·   ${hint}` : ''}`, W / 2, y + 30);
   ctx.restore();
 }
 

@@ -85,6 +85,38 @@ function mulberry32(seed) {
   };
 }
 
+// Cada teste começa com o localStorage de teste (prefixo STORE.prefix) como estava
+// antes dele: um teste que ganha troféus ou salva recorde não muda os seguintes.
+// Os do jogador (sem o prefixo de teste) nunca são tocados.
+async function prefixed() {
+  const { STORE } = await import('../src/storage.js');
+  const ls = globalThis.localStorage;
+  const keys = [];
+  try {
+    for (let i = 0; i < ls.length; i++) {
+      const k = ls.key(i);
+      if (k?.startsWith(STORE.prefix)) keys.push(k);
+    }
+  } catch {
+    /* indisponível */
+  }
+  return { ls, prefix: STORE.prefix, saved: new Map(keys.map((k) => [k, ls.getItem(k)])) };
+}
+
+function restore({ ls, prefix, saved }) {
+  try {
+    const now = [];
+    for (let i = 0; i < ls.length; i++) {
+      const k = ls.key(i);
+      if (k?.startsWith(prefix)) now.push(k);
+    }
+    for (const k of now) if (!saved.has(k)) ls.removeItem(k);
+    for (const [k, v] of saved) ls.setItem(k, v);
+  } catch {
+    /* indisponível */
+  }
+}
+
 export async function runAll({ filter } = {}) {
   const realRandom = Math.random;
   const results = [];
@@ -95,6 +127,7 @@ export async function runAll({ filter } = {}) {
       continue;
     }
     Math.random = mulberry32(12345);
+    const store = await prefixed();
     const start = Date.now();
     try {
       await t.fn();
@@ -103,6 +136,7 @@ export async function runAll({ filter } = {}) {
       results.push({ ...t, status: 'fail', error: e instanceof AssertionError ? e.message : e.stack || String(e) });
     } finally {
       Math.random = realRandom;
+      restore(store);
     }
   }
   return results;

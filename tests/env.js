@@ -55,5 +55,9 @@ if (typeof globalThis.localStorage === 'undefined') {
     getItem: (k) => (mem.has(k) ? mem.get(k) : null),
     setItem: (k, v) => mem.set(k, String(v)),
     removeItem: (k) => mem.delete(k),
+    key: (i) => [...mem.keys()][i] ?? null,
+    get length() {
+      return mem.size;
+    },
   };
 }
